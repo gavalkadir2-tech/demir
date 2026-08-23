@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "quotes" ADD COLUMN     "overheadAmount" DOUBLE PRECISION NOT NULL DEFAULT 0,
+ADD COLUMN     "subtotalBeforeProfit" DOUBLE PRECISION NOT NULL DEFAULT 0;

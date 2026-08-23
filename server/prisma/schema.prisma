@@ -1,0 +1,367 @@
+// Demirciler için Parça, Malzeme, Kesim ve Maliyet Hesaplama Yazılımı
+// Prisma şeması (PostgreSQL)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Kullanıcılar (MVP'de auth UI yok; ileride çoklu kullanıcı için hazır tablo)
+// ---------------------------------------------------------------------------
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  name         String
+  passwordHash String?
+  role         String   @default("admin")
+  createdAt    DateTime @default(now())
+
+  @@map("users")
+}
+
+// Firma bilgileri (tekil kayıt, id=1)
+model Settings {
+  id                  Int      @id @default(1)
+  companyName         String   @default("Atölyem")
+  logoUrl             String?
+  phone               String?
+  email               String?
+  address             String?
+  taxNumber           String?
+  defaultVatPercent   Float    @default(20)
+  defaultProfitPercent Float   @default(20)
+  currency            String   @default("TRY")
+  quoteValidityDays   Int      @default(15)
+  updatedAt           DateTime @updatedAt
+
+  @@map("settings")
+}
+
+model Customer {
+  id        Int      @id @default(autoincrement())
+  name      String
+  phone     String?
+  email     String?
+  address   String?
+  note      String?
+  createdAt DateTime @default(now())
+
+  projects Project[]
+
+  @@map("customers")
+}
+
+enum ProjectCategory {
+  RAILING // korkuluk
+  STAIRS // merdiven
+  CANOPY // sundurma
+  ROOF // çatı
+  DOOR // kapı
+  FORGE // ferforje
+  STEEL_STRUCTURE // çelik konstrüksiyon
+  CHASSIS // şase
+  SHELF // raf
+  TABLE // masa
+  WORKBENCH // tezgah
+  CUSTOM // özel ürün
+  OTHER // diğer
+}
+
+enum ProjectStatus {
+  DRAFT // taslak
+  CALCULATED // hesaplandı
+  QUOTE_READY // teklif hazır
+  QUOTE_SENT // teklif gönderildi
+  APPROVED // onaylandı
+  IN_PRODUCTION // üretimde
+  INSTALLING // montajda
+  COMPLETED // tamamlandı
+  CANCELLED // iptal
+}
+
+enum LaborMode {
+  PER_METER
+  PER_HOUR
+  FIXED
+}
+
+enum ProfitMode {
+  PERCENT
+  FIXED
+}
+
+model Project {
+  id           Int             @id @default(autoincrement())
+  customerId   Int
+  customer     Customer        @relation(fields: [customerId], references: [id])
+  title        String
+  category     ProjectCategory @default(OTHER)
+  status       ProjectStatus   @default(DRAFT)
+  note         String?
+  date         DateTime        @default(now())
+
+  laborMode    LaborMode       @default(PER_HOUR)
+  laborRate    Float           @default(0)
+  overheadPercent Float        @default(0)
+  profitMode   ProfitMode      @default(PERCENT)
+  profitValue  Float           @default(20)
+  vatPercent   Float           @default(20)
+  validityDays Int             @default(15)
+
+  stockDeducted Boolean        @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items         ProjectItem[]
+  parts         Part[]
+  laborItems    LaborItem[]
+  expenses      Expense[]
+  cuttingLists  CuttingList[]
+  quotes        Quote[]
+  stockMovements StockMovement[]
+
+  @@map("projects")
+}
+
+// Ürün şablon tanımları (Korkuluk, Merdiven, Sundurma, Kapı, Özel...)
+model ProductTemplate {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique // railing | stairs | canopy | door | custom
+  name        String
+  description String?
+  active      Boolean  @default(true)
+
+  items ProjectItem[]
+
+  @@map("product_templates")
+}
+
+// Bir projeye eklenen ürün şablonu örneği (girilen parametreler + hesap sonucu özeti)
+model ProjectItem {
+  id          Int             @id @default(autoincrement())
+  projectId   Int
+  project     Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  templateId  Int
+  template    ProductTemplate @relation(fields: [templateId], references: [id])
+  name        String
+  paramsJson  Json
+  resultJson  Json?
+  createdAt   DateTime        @default(now())
+
+  parts Part[]
+
+  @@map("project_items")
+}
+
+enum MaterialCategory {
+  PROFILE // profil
+  SHEET // sac
+  CONSUMABLE // sarf malzeme
+  FASTENER // bağlantı elemanı
+  OTHER
+}
+
+enum MaterialUnit {
+  M
+  KG
+  ADET
+  M2
+}
+
+model Material {
+  id                Int               @id @default(autoincrement())
+  name              String
+  category          MaterialCategory  @default(PROFILE)
+  section           String? // kesit, örn "40x40x2"
+  thicknessMm       Float?
+  standardLengthM   Float? // profiller için standart boy
+  sheetWidthMm      Float? // sac için
+  sheetHeightMm     Float? // sac için
+  unit              MaterialUnit      @default(M)
+  unitPrice         Float             @default(0) // birim (m/kg/adet/m2) başına TL
+  unitWeightKgPerM  Float? // profil: kg/m
+  kgPerM2           Float? // sac: kg/m2
+  kerfMm            Float             @default(3)
+  stockQty          Float             @default(0)
+  minStockQty       Float             @default(0)
+  supplier          String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  parts          Part[]
+  priceHistory   MaterialPrice[]
+  stockMovements StockMovement[]
+  cuttingLists   CuttingList[]
+
+  @@map("materials")
+}
+
+model MaterialPrice {
+  id            Int      @id @default(autoincrement())
+  materialId    Int
+  material      Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  price         Float
+  effectiveDate DateTime @default(now())
+
+  @@map("material_prices")
+}
+
+// Fiziksel kesim parçası (elle eklenen veya bir ürün şablonundan üretilen)
+model Part {
+  id            Int          @id @default(autoincrement())
+  projectId     Int
+  project       Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectItemId Int?
+  projectItem   ProjectItem? @relation(fields: [projectItemId], references: [id], onDelete: Cascade)
+  materialId    Int
+  material      Material     @relation(fields: [materialId], references: [id])
+  label         String? // örn "Dikme", "Üst profil"
+  lengthMm      Float
+  qty           Int
+  note          String?
+  createdAt     DateTime     @default(now())
+
+  @@map("parts")
+}
+
+model StockMovement {
+  id         Int      @id @default(autoincrement())
+  materialId Int
+  material   Material @relation(fields: [materialId], references: [id])
+  projectId  Int?
+  project    Project? @relation(fields: [projectId], references: [id])
+  qtyDelta   Float // pozitif: giriş, negatif: çıkış
+  reason     String
+  createdAt  DateTime @default(now())
+
+  @@map("stock_movements")
+}
+
+// Bir proje+malzeme için üretilmiş kesim planı (hesaplanmış/saklanmış sonuç)
+model CuttingList {
+  id               Int      @id @default(autoincrement())
+  projectId        Int
+  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  materialId       Int
+  material         Material @relation(fields: [materialId], references: [id])
+  standardLengthMm Float
+  kerfMm           Float
+  barsJson         Json // [{ cuts:number[], wasteMm:number }]
+  totalBars        Int
+  totalWasteMm     Float
+  wastePercent     Float
+  generatedAt      DateTime @default(now())
+
+  @@map("cutting_lists")
+}
+
+enum LaborType {
+  WELDING // kaynak
+  CUTTING // kesim
+  ASSEMBLY // montaj
+  PAINTING // boya
+  OTHER
+}
+
+model LaborItem {
+  id          Int       @id @default(autoincrement())
+  projectId   Int
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  type        LaborType @default(OTHER)
+  description String?
+  hours       Float?
+  rate        Float?
+  fixedAmount Float?
+  amount      Float // kaydedilirken hesaplanan tutar
+  createdAt   DateTime  @default(now())
+
+  @@map("labor_items")
+}
+
+enum ExpenseType {
+  TRANSPORT // nakliye
+  INSTALLATION // montaj gideri
+  PAINT // boya malzemesi
+  CONSUMABLE // sarf malzeme
+  OTHER
+}
+
+model Expense {
+  id        Int         @id @default(autoincrement())
+  projectId Int
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  type      ExpenseType @default(OTHER)
+  name      String
+  amount    Float
+  createdAt DateTime    @default(now())
+
+  @@map("expenses")
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+}
+
+model Quote {
+  id           Int         @id @default(autoincrement())
+  projectId    Int
+  project      Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  quoteNumber  String      @unique
+  date         DateTime    @default(now())
+  validUntil   DateTime
+  status       QuoteStatus @default(DRAFT)
+
+  materialCost    Float
+  wasteCost       Float
+  consumableCost  Float
+  laborCost       Float
+  paintCost       Float
+  transportCost   Float
+  installCost     Float
+  otherCost       Float
+  totalCost       Float
+  overheadAmount       Float @default(0)
+  subtotalBeforeProfit Float @default(0)
+  profitAmount    Float
+  subtotal        Float
+  vatPercent      Float
+  vatAmount       Float
+  total           Float
+
+  notes     String?
+  createdAt DateTime @default(now())
+
+  items QuoteItem[]
+
+  @@map("quotes")
+}
+
+enum QuoteItemType {
+  MATERIAL
+  LABOR
+  EXPENSE
+  PRODUCT
+}
+
+model QuoteItem {
+  id          Int           @id @default(autoincrement())
+  quoteId     Int
+  quote       Quote         @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  type        QuoteItemType
+  description String
+  qty         Float
+  unit        String
+  unitPrice   Float
+  lineTotal   Float
+
+  @@map("quote_items")
+}

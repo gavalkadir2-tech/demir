@@ -1,0 +1,272 @@
+import { useEffect, useState } from "react";
+import { api } from "../api/client";
+import { Material, MaterialCategory, MaterialUnit, MALZEME_KATEGORI_ETIKET } from "../api/types";
+import { Modal, Spinner, EmptyState, HataKutusu } from "../components/ui";
+import { tl, sayi } from "../lib/format";
+
+const KATEGORILER: MaterialCategory[] = ["PROFILE", "SHEET", "CONSUMABLE", "FASTENER", "OTHER"];
+const BIRIMLER: MaterialUnit[] = ["M", "KG", "ADET", "M2"];
+
+export default function Malzemeler() {
+  const [malzemeler, setMalzemeler] = useState<Material[] | null>(null);
+  const [kategori, setKategori] = useState<MaterialCategory | "">("");
+  const [q, setQ] = useState("");
+  const [modal, setModal] = useState<Material | "new" | null>(null);
+  const [sacModal, setSacModal] = useState(false);
+
+  const yukle = () => {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (kategori) params.set("category", kategori);
+    api.get<Material[]>(`/materials?${params}`).then(setMalzemeler);
+  };
+
+  useEffect(() => {
+    yukle();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, kategori]);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h1 className="text-2xl font-bold">Malzemeler</h1>
+        <div className="flex gap-2">
+          <button className="btn-secondary" onClick={() => setSacModal(true)}>
+            🧮 Sac Hesaplama
+          </button>
+          <button className="btn-primary" onClick={() => setModal("new")}>
+            ➕ Yeni Malzeme
+          </button>
+        </div>
+      </div>
+
+      <div className="flex gap-3 flex-wrap">
+        <input className="field-input flex-1 min-w-[200px]" placeholder="Malzeme ara (ad veya kesit)..." value={q} onChange={(e) => setQ(e.target.value)} />
+        <select className="field-select w-auto" value={kategori} onChange={(e) => setKategori(e.target.value as any)}>
+          <option value="">Tüm kategoriler</option>
+          {KATEGORILER.map((k) => (
+            <option key={k} value={k}>
+              {MALZEME_KATEGORI_ETIKET[k]}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {!malzemeler ? (
+        <Spinner />
+      ) : malzemeler.length === 0 ? (
+        <EmptyState title="Malzeme bulunamadı" />
+      ) : (
+        <div className="overflow-x-auto card !p-0">
+          <table className="w-full text-sm">
+            <thead className="bg-neutral-50 text-neutral-500 text-left">
+              <tr>
+                <th className="px-4 py-3">Ad</th>
+                <th className="px-4 py-3">Kategori</th>
+                <th className="px-4 py-3">Birim Fiyat</th>
+                <th className="px-4 py-3">Stok</th>
+                <th className="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-neutral-100">
+              {malzemeler.map((m) => (
+                <tr key={m.id} className={m.stockQty <= m.minStockQty && m.minStockQty > 0 ? "bg-amber-50" : undefined}>
+                  <td className="px-4 py-3">
+                    <div className="font-semibold">{m.name}</div>
+                    {m.standardLengthM && <div className="text-xs text-neutral-500">Standart boy: {m.standardLengthM} m</div>}
+                  </td>
+                  <td className="px-4 py-3">{MALZEME_KATEGORI_ETIKET[m.category]}</td>
+                  <td className="px-4 py-3">
+                    {tl(m.unitPrice)} / {m.unit === "M" ? "m" : m.unit === "KG" ? "kg" : m.unit === "M2" ? "m²" : "adet"}
+                  </td>
+                  <td className="px-4 py-3">
+                    {sayi(m.stockQty)} {m.minStockQty > 0 && `(min ${sayi(m.minStockQty)})`}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button className="btn-secondary btn-sm" onClick={() => setModal(m)}>
+                      Düzenle
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {modal && <MalzemeModal malzeme={modal === "new" ? null : modal} onClose={() => setModal(null)} onSaved={yukle} />}
+      <SacHesaplamaModal open={sacModal} onClose={() => setSacModal(false)} />
+    </div>
+  );
+}
+
+function MalzemeModal({ malzeme, onClose, onSaved }: { malzeme: Material | null; onClose: () => void; onSaved: () => void }) {
+  const [form, setForm] = useState<Partial<Material>>(
+    malzeme ?? { category: "PROFILE", unit: "KG", unitPrice: 0, kerfMm: 3, stockQty: 0, minStockQty: 0 }
+  );
+  const [hata, setHata] = useState<string | null>(null);
+  const [kaydediliyor, setKaydediliyor] = useState(false);
+
+  const set = (k: keyof Material, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
+
+  const kaydet = async () => {
+    if (!form.name?.trim()) {
+      setHata("Malzeme adı zorunlu.");
+      return;
+    }
+    setKaydediliyor(true);
+    setHata(null);
+    try {
+      const gövde = { ...form };
+      if (malzeme) await api.put(`/materials/${malzeme.id}`, gövde);
+      else await api.post("/materials", gövde);
+      onSaved();
+      onClose();
+    } catch (e: any) {
+      setHata(e.message);
+    } finally {
+      setKaydediliyor(false);
+    }
+  };
+
+  return (
+    <Modal open onClose={onClose} title={malzeme ? "Malzemeyi Düzenle" : "Yeni Malzeme"} wide>
+      <div className="space-y-3">
+        <HataKutusu mesaj={hata} />
+        <div className="grid md:grid-cols-2 gap-3">
+          <div>
+            <label className="field-label">Malzeme Adı *</label>
+            <input className="field-input" value={form.name ?? ""} onChange={(e) => set("name", e.target.value)} />
+          </div>
+          <div>
+            <label className="field-label">Kesit (örn. 40x40x2)</label>
+            <input className="field-input" value={form.section ?? ""} onChange={(e) => set("section", e.target.value)} />
+          </div>
+          <div>
+            <label className="field-label">Kategori</label>
+            <select className="field-select" value={form.category} onChange={(e) => set("category", e.target.value)}>
+              {KATEGORILER.map((k) => (
+                <option key={k} value={k}>
+                  {MALZEME_KATEGORI_ETIKET[k]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="field-label">Birim</label>
+            <select className="field-select" value={form.unit} onChange={(e) => set("unit", e.target.value)}>
+              {BIRIMLER.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="field-label">Birim Fiyat (TL)</label>
+            <input type="number" className="field-input" value={form.unitPrice ?? 0} onChange={(e) => set("unitPrice", Number(e.target.value))} />
+          </div>
+          <div>
+            <label className="field-label">Kg/m Ağırlık (profil için)</label>
+            <input type="number" className="field-input" value={form.unitWeightKgPerM ?? ""} onChange={(e) => set("unitWeightKgPerM", e.target.value ? Number(e.target.value) : null)} />
+          </div>
+          <div>
+            <label className="field-label">Standart Boy (m)</label>
+            <input type="number" className="field-input" value={form.standardLengthM ?? ""} onChange={(e) => set("standardLengthM", e.target.value ? Number(e.target.value) : null)} />
+          </div>
+          <div>
+            <label className="field-label">Kesim Payı (mm)</label>
+            <input type="number" className="field-input" value={form.kerfMm ?? 3} onChange={(e) => set("kerfMm", Number(e.target.value))} />
+          </div>
+          <div>
+            <label className="field-label">Stok Miktarı</label>
+            <input type="number" className="field-input" value={form.stockQty ?? 0} onChange={(e) => set("stockQty", Number(e.target.value))} />
+          </div>
+          <div>
+            <label className="field-label">Min. Stok</label>
+            <input type="number" className="field-input" value={form.minStockQty ?? 0} onChange={(e) => set("minStockQty", Number(e.target.value))} />
+          </div>
+          <div>
+            <label className="field-label">Tedarikçi</label>
+            <input className="field-input" value={form.supplier ?? ""} onChange={(e) => set("supplier", e.target.value)} />
+          </div>
+        </div>
+        <button className="btn-primary w-full" onClick={kaydet} disabled={kaydediliyor}>
+          {kaydediliyor ? "Kaydediliyor..." : "Kaydet"}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function SacHesaplamaModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [kalinlikMm, setKalinlikMm] = useState(2);
+  const [enMm, setEnMm] = useState(1250);
+  const [boyMm, setBoyMm] = useState(2500);
+  const [adet, setAdet] = useState(1);
+  const [birimFiyatKg, setBirimFiyatKg] = useState(42);
+  const [sonuc, setSonuc] = useState<{ alanM2: number; agirlikKg: number; maliyet: number } | null>(null);
+  const [hata, setHata] = useState<string | null>(null);
+
+  const hesapla = async () => {
+    setHata(null);
+    try {
+      const r = await api.post<{ alanM2: number; agirlikKg: number; maliyet: number }>("/calc/araclar/sac", {
+        kalinlikMm,
+        enMm,
+        boyMm,
+        adet,
+        birimFiyatKg,
+      });
+      setSonuc(r);
+    } catch (e: any) {
+      setHata(e.message);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title="Sac Hesaplama">
+      <div className="space-y-3">
+        <HataKutusu mesaj={hata} />
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="field-label">Kalınlık (mm)</label>
+            <input type="number" className="field-input" value={kalinlikMm} onChange={(e) => setKalinlikMm(Number(e.target.value))} />
+          </div>
+          <div>
+            <label className="field-label">Adet</label>
+            <input type="number" className="field-input" value={adet} onChange={(e) => setAdet(Number(e.target.value))} />
+          </div>
+          <div>
+            <label className="field-label">En (mm)</label>
+            <input type="number" className="field-input" value={enMm} onChange={(e) => setEnMm(Number(e.target.value))} />
+          </div>
+          <div>
+            <label className="field-label">Boy (mm)</label>
+            <input type="number" className="field-input" value={boyMm} onChange={(e) => setBoyMm(Number(e.target.value))} />
+          </div>
+          <div className="col-span-2">
+            <label className="field-label">Kg Birim Fiyatı (TL)</label>
+            <input type="number" className="field-input" value={birimFiyatKg} onChange={(e) => setBirimFiyatKg(Number(e.target.value))} />
+          </div>
+        </div>
+        <button className="btn-primary w-full" onClick={hesapla}>
+          Hesapla
+        </button>
+        {sonuc && (
+          <div className="rounded-xl bg-neutral-50 border border-neutral-200 p-4 space-y-1 text-sm">
+            <div>
+              Toplam Alan: <strong>{sonuc.alanM2} m²</strong>
+            </div>
+            <div>
+              Toplam Ağırlık: <strong>{sonuc.agirlikKg} kg</strong>
+            </div>
+            <div>
+              Toplam Maliyet: <strong>{tl(sonuc.maliyet)}</strong>
+            </div>
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
