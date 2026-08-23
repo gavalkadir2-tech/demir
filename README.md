@@ -33,7 +33,10 @@ client/
 
 ### Gereksinimler
 - Node.js 20+
-- PostgreSQL 14+ (yerel veya uzak)
+- PostgreSQL 14+ — yerel kurulum yerine [Supabase](https://supabase.com) gibi ücretsiz bir bulut
+  PostgreSQL de kullanılabilir (kurulum gerektirmez). Supabase kullanırken proje ayarlarından
+  **Connect → ORMs → Prisma** ile hem `DATABASE_URL` (havuzlu) hem `DIRECT_URL` (doğrudan,
+  migration'lar için) adreslerini alıp `.env`'e ekleyin — `server/.env.example` içinde örneği var.
 
 ### Backend
 
