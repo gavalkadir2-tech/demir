@@ -77,6 +77,7 @@ const bosluklarSchema = z.array(
     konumMm: z.number(),
     genislikMm: z.number(),
     yukseklikMm: z.number(),
+    tabanYuksekligiMm: z.number().optional(),
   })
 );
 

@@ -466,6 +466,7 @@ function KapiAlanlari({ materials, onChange }: { materials: Material[]; onChange
 interface DuvarBoslukTaslak {
   etiket: string;
   konumMm: number;
+  tabanYuksekligiMm: number;
   genislikMm: number;
   yukseklikMm: number;
 }
@@ -502,25 +503,50 @@ function DuvarAlanlari({ materials, onChange }: { materials: Material[]; onChang
       </div>
 
       <div className="rounded-xl border border-neutral-200 p-3 space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <span className="font-semibold text-sm">Kapı / Pencere Boşlukları (opsiyonel)</span>
-          <button
-            type="button"
-            className="btn-secondary btn-sm"
-            onClick={() =>
-              setBosluklar((l) => [...l, { etiket: "Kapı", konumMm: 0, genislikMm: 900, yukseklikMm: 2100 }])
-            }
-          >
-            ➕ Boşluk Ekle
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="btn-secondary btn-sm"
+              onClick={() =>
+                setBosluklar((l) => [
+                  ...l,
+                  { etiket: "Kapı", konumMm: 0, tabanYuksekligiMm: 0, genislikMm: 900, yukseklikMm: 2100 },
+                ])
+              }
+            >
+              ➕ Kapı Ekle
+            </button>
+            <button
+              type="button"
+              className="btn-secondary btn-sm"
+              onClick={() =>
+                setBosluklar((l) => [
+                  ...l,
+                  { etiket: "Pencere", konumMm: 0, tabanYuksekligiMm: 900, genislikMm: 1200, yukseklikMm: 1200 },
+                ])
+              }
+            >
+              ➕ Pencere Ekle
+            </button>
+          </div>
         </div>
+        <p className="text-xs text-neutral-500">
+          Konum: duvarın sol kenarından. Taban yüksekliği: kapı için 0 (yerden başlar), pencere için yerden yüksekliği (örn. 900mm).
+        </p>
         {bosluklar.map((b, i) => (
-          <div key={i} className="grid grid-cols-5 gap-2 items-end border-t border-neutral-100 pt-3">
+          <div key={i} className="grid grid-cols-6 gap-2 items-end border-t border-neutral-100 pt-3">
             <div>
               <label className="field-label">Ad</label>
               <input className="field-input" value={b.etiket} onChange={(e) => bosluklariGuncelle(i, "etiket", e.target.value)} />
             </div>
             <Sayi label="Konum (mm)" value={b.konumMm} onChange={(v) => bosluklariGuncelle(i, "konumMm", v)} />
+            <Sayi
+              label="Taban Yük. (mm)"
+              value={b.tabanYuksekligiMm}
+              onChange={(v) => bosluklariGuncelle(i, "tabanYuksekligiMm", v)}
+            />
             <Sayi label="Genişlik (mm)" value={b.genislikMm} onChange={(v) => bosluklariGuncelle(i, "genislikMm", v)} />
             <Sayi label="Yükseklik (mm)" value={b.yukseklikMm} onChange={(v) => bosluklariGuncelle(i, "yukseklikMm", v)} />
             <button

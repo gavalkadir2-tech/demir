@@ -5,6 +5,8 @@ export interface DuvarBoslukVeri {
   konumMm: number;
   genislikMm: number;
   yukseklikMm: number;
+  /** Tabandan boşluğun altına kadar mesafe (mm). 0/boş = kapı gibi tabana kadar iner. */
+  tabanYuksekligiMm?: number;
 }
 
 export interface DuvarPaneliSemaVeri {
@@ -28,7 +30,15 @@ export default function WallSchematic({ veri }: { veri: DuvarPaneliSemaVeri }) {
   if (!genislikMm || !yukseklikMm || !dikmeAraligiHedefMm) return null;
 
   const gecerliBosluklar = bosluklar
-    .filter((b) => b.genislikMm > 0 && b.yukseklikMm > 0 && b.konumMm >= 0 && b.konumMm + b.genislikMm <= genislikMm)
+    .map((b) => ({ ...b, tabanYuksekligiMm: Math.max(0, b.tabanYuksekligiMm ?? 0) }))
+    .filter(
+      (b) =>
+        b.genislikMm > 0 &&
+        b.yukseklikMm > 0 &&
+        b.konumMm >= 0 &&
+        b.konumMm + b.genislikMm <= genislikMm &&
+        b.tabanYuksekligiMm + b.yukseklikMm <= yukseklikMm
+    )
     .sort((a, b) => a.konumMm - b.konumMm);
 
   const araliklarSayisi = Math.max(1, Math.ceil(genislikMm / dikmeAraligiHedefMm));
@@ -55,10 +65,11 @@ export default function WallSchematic({ veri }: { veri: DuvarPaneliSemaVeri }) {
   const topY = MARGIN_TOP + (drawH - scaledH);
   const groundY = topY + scaledH;
 
-  // Alt ray segmentleri (boşluklar keser)
+  // Alt ray segmentleri: sadece tabana inen (kapı gibi) boşluklar keser.
+  const tabanaInenler = gecerliBosluklar.filter((b) => b.tabanYuksekligiMm <= EPSILON);
   const altRaySegmentleri: { x1: number; x2: number }[] = [];
   let imlec = 0;
-  for (const b of gecerliBosluklar) {
+  for (const b of tabanaInenler) {
     if (b.konumMm > imlec) altRaySegmentleri.push({ x1: imlec, x2: b.konumMm });
     imlec = Math.max(imlec, b.konumMm + b.genislikMm);
   }
@@ -74,36 +85,32 @@ export default function WallSchematic({ veri }: { veri: DuvarPaneliSemaVeri }) {
       <line x1={x0 - 15} y1={groundY} x2={x0 + scaledW + 15} y2={groundY} stroke="#a3a3a3" strokeWidth={2} />
 
       {/* Boşluk kesim alanları */}
-      {gecerliBosluklar.map((b, i) => (
-        <g key={i}>
-          <rect
-            x={x0 + b.konumMm * scale}
-            y={groundY - b.yukseklikMm * scale}
-            width={b.genislikMm * scale}
-            height={b.yukseklikMm * scale}
-            fill="#ffffff"
-            stroke="#d4d4d4"
-            strokeDasharray="3 2"
-          />
-          {/* Lento */}
-          <rect
-            x={x0 + b.konumMm * scale}
-            y={groundY - b.yukseklikMm * scale - RAY_KALINLIK}
-            width={b.genislikMm * scale}
-            height={RAY_KALINLIK}
-            fill={VURGU}
-          />
-          <text
-            x={x0 + (b.konumMm + b.genislikMm / 2) * scale}
-            y={groundY - b.yukseklikMm * scale + 14}
-            textAnchor="middle"
-            fontSize={10}
-            fill="#a3a3a3"
-          >
-            {b.etiket}
-          </text>
-        </g>
-      ))}
+      {gecerliBosluklar.map((b, i) => {
+        const bosAltY = groundY - b.tabanYuksekligiMm * scale;
+        const bosUstY = bosAltY - b.yukseklikMm * scale;
+        return (
+          <g key={i}>
+            <rect
+              x={x0 + b.konumMm * scale}
+              y={bosUstY}
+              width={b.genislikMm * scale}
+              height={b.yukseklikMm * scale}
+              fill="#ffffff"
+              stroke="#d4d4d4"
+              strokeDasharray="3 2"
+            />
+            {/* Lento (üst) */}
+            <rect x={x0 + b.konumMm * scale} y={bosUstY - RAY_KALINLIK} width={b.genislikMm * scale} height={RAY_KALINLIK} fill={VURGU} />
+            {/* Eşik (alt) - tabana inmeyen boşluklarda */}
+            {b.tabanYuksekligiMm > EPSILON && (
+              <rect x={x0 + b.konumMm * scale} y={bosAltY} width={b.genislikMm * scale} height={RAY_KALINLIK} fill={VURGU} />
+            )}
+            <text x={x0 + (b.konumMm + b.genislikMm / 2) * scale} y={bosUstY + 14} textAnchor="middle" fontSize={10} fill="#a3a3a3">
+              {b.etiket}
+            </text>
+          </g>
+        );
+      })}
 
       {/* Dikmeler */}
       {dikmePozisyonlari.map((px, i) => (

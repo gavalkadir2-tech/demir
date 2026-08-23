@@ -16,8 +16,10 @@ export interface DuvarBosluk {
   /** Duvarın sol kenarından boşluğun sol kenarına mesafe (mm) */
   konumMm: number;
   genislikMm: number;
-  /** Boşluk yüksekliği, tabandan (mm) */
+  /** Boşluğun kendi yüksekliği (mm) */
   yukseklikMm: number;
+  /** Tabandan boşluğun altına kadar mesafe (mm). 0 = kapı gibi tabana kadar iner; >0 = pencere gibi yerden yüksekte. */
+  tabanYuksekligiMm?: number;
 }
 
 export interface DuvarPaneliGirdi {
@@ -56,13 +58,17 @@ export function calculateWallPanel(girdi: DuvarPaneliGirdi): UrunHesapSonucu {
   if (!ustProfilKey || !altProfilKey || !dikmeProfilKey)
     throw new HesaplamaHatasi("Üst ray, alt ray ve dikme profili seçilmelidir.");
 
-  const siraliBosluklar = [...bosluklar].sort((a, b) => a.konumMm - b.konumMm);
+  const KAPI_ESIGI_TOLERANS_MM = 1;
+
+  const siraliBosluklar = [...bosluklar]
+    .map((b) => ({ ...b, tabanYuksekligiMm: Math.max(0, b.tabanYuksekligiMm ?? 0) }))
+    .sort((a, b) => a.konumMm - b.konumMm);
   for (const b of siraliBosluklar) {
     if (b.genislikMm <= 0 || b.yukseklikMm <= 0) throw new HesaplamaHatasi(`"${b.etiket}" boşluğunun ölçüleri 0'dan büyük olmalı.`);
     if (b.konumMm < 0 || b.konumMm + b.genislikMm > genislikMm)
       throw new HesaplamaHatasi(`"${b.etiket}" boşluğu duvar sınırlarının dışına taşıyor.`);
-    if (b.yukseklikMm > yukseklikMm)
-      throw new HesaplamaHatasi(`"${b.etiket}" boşluğunun yüksekliği duvar yüksekliğinden fazla olamaz.`);
+    if (b.tabanYuksekligiMm + b.yukseklikMm > yukseklikMm)
+      throw new HesaplamaHatasi(`"${b.etiket}" boşluğu (taban yüksekliği + boşluk yüksekliği) duvar yüksekliğini aşıyor.`);
   }
   for (let i = 1; i < siraliBosluklar.length; i++) {
     if (siraliBosluklar[i].konumMm < siraliBosluklar[i - 1].konumMm + siraliBosluklar[i - 1].genislikMm) {
@@ -113,17 +119,16 @@ export function calculateWallPanel(girdi: DuvarPaneliGirdi): UrunHesapSonucu {
 
   parcalar.push({ label: "Üst ray", profilKey: ustProfilKey, uzunlukMm: Math.round(genislikMm), adet: 1 });
 
-  // Alt ray: kapı/boşluk aralıklarında kesintiye uğrar.
+  // Alt ray: sadece tabana kadar inen (kapı gibi) boşluklarda kesintiye uğrar.
+  // Yerden yüksek boşluklar (pencere gibi) altında alt ray kesintisiz devam eder.
+  const tabanaInenBosluklar = siraliBosluklar.filter((b) => b.tabanYuksekligiMm <= KAPI_ESIGI_TOLERANS_MM);
   const altRaySegmentleri: { baslangic: number; bitis: number }[] = [];
   let imlec = 0;
-  for (const b of siraliBosluklar) {
+  for (const b of tabanaInenBosluklar) {
     if (b.konumMm > imlec) altRaySegmentleri.push({ baslangic: imlec, bitis: b.konumMm });
     imlec = Math.max(imlec, b.konumMm + b.genislikMm);
   }
   if (imlec < genislikMm) altRaySegmentleri.push({ baslangic: imlec, bitis: genislikMm });
-  if (altRaySegmentleri.length === 0 && siraliBosluklar.length === 0) {
-    altRaySegmentleri.push({ baslangic: 0, bitis: genislikMm });
-  }
 
   for (const seg of altRaySegmentleri) {
     const uzunluk = Math.round(seg.bitis - seg.baslangic);
@@ -132,13 +137,23 @@ export function calculateWallPanel(girdi: DuvarPaneliGirdi): UrunHesapSonucu {
   }
 
   for (const b of siraliBosluklar) {
+    const ustKotMm = b.tabanYuksekligiMm + b.yukseklikMm;
     parcalar.push({
       label: `Lento (${b.etiket})`,
       profilKey: lentoProfilKey,
       uzunlukMm: Math.round(b.genislikMm + lentoTasmaMm),
       adet: 1,
-      not: `${b.etiket} boşluğu üstü, taban seviyesinden ${Math.round(b.yukseklikMm)} mm yükseklikte.`,
+      not: `${b.etiket} boşluğu üstü, taban seviyesinden ${Math.round(ustKotMm)} mm yükseklikte.`,
     });
+    if (b.tabanYuksekligiMm > KAPI_ESIGI_TOLERANS_MM) {
+      parcalar.push({
+        label: `Eşik (${b.etiket})`,
+        profilKey: lentoProfilKey,
+        uzunlukMm: Math.round(b.genislikMm + lentoTasmaMm),
+        adet: 1,
+        not: `${b.etiket} boşluğu altı, taban seviyesinden ${Math.round(b.tabanYuksekligiMm)} mm yükseklikte.`,
+      });
+    }
   }
 
   sonuc.parcalar = parcalar;

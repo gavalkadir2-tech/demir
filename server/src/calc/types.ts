@@ -55,5 +55,9 @@ export function profilOzetOlustur(parcalar: HesaplananParca[]): UrunHesapSonucu[
     mevcut.toplamAdetParca += p.adet;
     map.set(p.profilKey, mevcut);
   }
-  return Array.from(map.entries()).map(([profilKey, v]) => ({ profilKey, ...v }));
+  return Array.from(map.entries()).map(([profilKey, v]) => ({
+    profilKey,
+    toplamMetre: Math.round(v.toplamMetre * 100) / 100,
+    toplamAdetParca: v.toplamAdetParca,
+  }));
 }

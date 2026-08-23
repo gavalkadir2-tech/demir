@@ -63,6 +63,43 @@ test("duvar paneli: kapı boşluğu alt rayı kesiyor ve lento ekliyor", () => {
   assert.equal(sonuc.ozetDegerler.bosluklarSayisi, 1);
 });
 
+test("duvar paneli: pencere (yerden yükseklikli boşluk) alt rayı kesmiyor, eşik ekliyor", () => {
+  const sonuc = calculateWallPanel({
+    genislikMm: 4000,
+    yukseklikMm: 2500,
+    dikmeAraligiHedefMm: 600,
+    ustProfilKey: "ray",
+    altProfilKey: "ray",
+    dikmeProfilKey: "dikme",
+    bosluklar: [{ etiket: "Pencere", konumMm: 1500, genislikMm: 1000, tabanYuksekligiMm: 900, yukseklikMm: 1200 }],
+  });
+
+  // Pencere tabana inmediği için alt ray kesintisiz tek parça olmalı
+  const altRaylar = sonuc.parcalar.filter((p) => p.label === "Alt ray");
+  assert.equal(altRaylar.length, 1);
+  assert.equal(altRaylar[0].uzunlukMm, 4000);
+
+  // Hem lento hem eşik olmalı
+  assert.ok(sonuc.parcalar.some((p) => p.label === "Lento (Pencere)"));
+  assert.ok(sonuc.parcalar.some((p) => p.label === "Eşik (Pencere)"));
+});
+
+test("duvar paneli: boşluk üst kotu duvar yüksekliğini aşarsa hata verir", () => {
+  assert.throws(
+    () =>
+      calculateWallPanel({
+        genislikMm: 4000,
+        yukseklikMm: 2500,
+        dikmeAraligiHedefMm: 600,
+        ustProfilKey: "ray",
+        altProfilKey: "ray",
+        dikmeProfilKey: "dikme",
+        bosluklar: [{ etiket: "Pencere", konumMm: 1500, genislikMm: 1000, tabanYuksekligiMm: 2000, yukseklikMm: 1000 }],
+      }),
+    HesaplamaHatasi
+  );
+});
+
 test("duvar paneli: sınırları aşan boşlukta hata verir", () => {
   assert.throws(
     () =>
