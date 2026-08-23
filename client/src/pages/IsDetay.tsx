@@ -19,7 +19,7 @@ import { Spinner, HataKutusu, UyariKutusu, Badge, Modal, EmptyState } from "../c
 import MaterialSelect from "../components/MaterialSelect";
 import CuttingBarView from "../components/CuttingBarView";
 import { UrunFormu, URUN_EMOJI } from "./YeniIs";
-import RailingSchematic from "../components/RailingSchematic";
+import SemaGorunum from "../components/SemaGorunum";
 import { tl, mm, tarih, sayi } from "../lib/format";
 
 const DURUMLAR: ProjectStatus[] = [
@@ -262,20 +262,9 @@ function ParcalarTab({ proje, onChanged }: { proje: Project; onChanged: () => vo
               Sil
             </button>
           </div>
-          {item.template.key === "railing" && (
-            <div className="mb-3">
-              <RailingSchematic
-                veri={{
-                  toplamUzunlukMm: Number(item.paramsJson.toplamUzunlukMm),
-                  yukseklikMm: Number(item.paramsJson.yukseklikMm),
-                  araKayitSayisi: Number(item.paramsJson.araKayitSayisi ?? 0),
-                  dikmeSayisi: item.resultJson.ozetDegerler.dikmeSayisi,
-                  araliklarSayisi: item.resultJson.ozetDegerler.araliklarSayisi,
-                  gercekAralikMm: item.resultJson.ozetDegerler.gercekAralikMm,
-                }}
-              />
-            </div>
-          )}
+          <div className="mb-3">
+            <SemaGorunum templateKey={item.template.key} params={item.paramsJson} ozetDegerler={item.resultJson.ozetDegerler} />
+          </div>
           <PartTable parcalar={(proje.parts ?? []).filter((p) => p.projectItemId === item.id)} onDelete={parcaSil} />
         </div>
       ))}
