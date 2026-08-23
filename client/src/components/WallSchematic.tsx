@@ -1,0 +1,131 @@
+import { OkTanimlari, YatayOlcu, DikeyOlcu, mmEtiket, KOYU, VURGU, VIEW_W, VIEW_H } from "./schematicShared";
+
+export interface DuvarBoslukVeri {
+  etiket: string;
+  konumMm: number;
+  genislikMm: number;
+  yukseklikMm: number;
+}
+
+export interface DuvarPaneliSemaVeri {
+  genislikMm: number;
+  yukseklikMm: number;
+  dikmeAraligiHedefMm: number;
+  bosluklar?: DuvarBoslukVeri[];
+}
+
+const MARGIN_LEFT = 70;
+const MARGIN_RIGHT = 20;
+const MARGIN_TOP = 20;
+const MARGIN_BOTTOM = 70;
+const RAY_KALINLIK = 5;
+const DIKME_GENISLIK = 6;
+const EPSILON = 1;
+
+/** Duvar panelinin önden görünüşünü (dikme/ray/boşluk) ölçekli, ölçüleri etiketli SVG olarak gösterir. */
+export default function WallSchematic({ veri }: { veri: DuvarPaneliSemaVeri }) {
+  const { genislikMm, yukseklikMm, dikmeAraligiHedefMm, bosluklar = [] } = veri;
+  if (!genislikMm || !yukseklikMm || !dikmeAraligiHedefMm) return null;
+
+  const gecerliBosluklar = bosluklar
+    .filter((b) => b.genislikMm > 0 && b.yukseklikMm > 0 && b.konumMm >= 0 && b.konumMm + b.genislikMm <= genislikMm)
+    .sort((a, b) => a.konumMm - b.konumMm);
+
+  const araliklarSayisi = Math.max(1, Math.ceil(genislikMm / dikmeAraligiHedefMm));
+  const gercekAralikMm = genislikMm / araliklarSayisi;
+  const temelPozisyonlar = Array.from({ length: araliklarSayisi + 1 }, (_, i) => Math.round(i * gercekAralikMm));
+
+  let dikmePozisyonlari = temelPozisyonlar.filter(
+    (x) => !gecerliBosluklar.some((b) => x > b.konumMm + EPSILON && x < b.konumMm + b.genislikMm - EPSILON)
+  );
+  for (const b of gecerliBosluklar) {
+    for (const kenar of [b.konumMm, b.konumMm + b.genislikMm]) {
+      if (!dikmePozisyonlari.some((x) => Math.abs(x - kenar) < EPSILON)) dikmePozisyonlari.push(Math.round(kenar));
+    }
+  }
+  dikmePozisyonlari.sort((a, b) => a - b);
+
+  const drawW = VIEW_W - MARGIN_LEFT - MARGIN_RIGHT;
+  const drawH = VIEW_H - MARGIN_TOP - MARGIN_BOTTOM;
+  const scale = Math.min(drawW / genislikMm, drawH / yukseklikMm);
+
+  const scaledW = genislikMm * scale;
+  const scaledH = yukseklikMm * scale;
+  const x0 = MARGIN_LEFT;
+  const topY = MARGIN_TOP + (drawH - scaledH);
+  const groundY = topY + scaledH;
+
+  // Alt ray segmentleri (boşluklar keser)
+  const altRaySegmentleri: { x1: number; x2: number }[] = [];
+  let imlec = 0;
+  for (const b of gecerliBosluklar) {
+    if (b.konumMm > imlec) altRaySegmentleri.push({ x1: imlec, x2: b.konumMm });
+    imlec = Math.max(imlec, b.konumMm + b.genislikMm);
+  }
+  if (imlec < genislikMm) altRaySegmentleri.push({ x1: imlec, x2: genislikMm });
+
+  const dimGenislikY = groundY + 30;
+  const dimYukseklikX = x0 - 30;
+
+  return (
+    <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} className="w-full h-auto" role="img" aria-label="Duvar paneli şematik çizimi">
+      <OkTanimlari />
+
+      <line x1={x0 - 15} y1={groundY} x2={x0 + scaledW + 15} y2={groundY} stroke="#a3a3a3" strokeWidth={2} />
+
+      {/* Boşluk kesim alanları */}
+      {gecerliBosluklar.map((b, i) => (
+        <g key={i}>
+          <rect
+            x={x0 + b.konumMm * scale}
+            y={groundY - b.yukseklikMm * scale}
+            width={b.genislikMm * scale}
+            height={b.yukseklikMm * scale}
+            fill="#ffffff"
+            stroke="#d4d4d4"
+            strokeDasharray="3 2"
+          />
+          {/* Lento */}
+          <rect
+            x={x0 + b.konumMm * scale}
+            y={groundY - b.yukseklikMm * scale - RAY_KALINLIK}
+            width={b.genislikMm * scale}
+            height={RAY_KALINLIK}
+            fill={VURGU}
+          />
+          <text
+            x={x0 + (b.konumMm + b.genislikMm / 2) * scale}
+            y={groundY - b.yukseklikMm * scale + 14}
+            textAnchor="middle"
+            fontSize={10}
+            fill="#a3a3a3"
+          >
+            {b.etiket}
+          </text>
+        </g>
+      ))}
+
+      {/* Dikmeler */}
+      {dikmePozisyonlari.map((px, i) => (
+        <rect key={i} x={x0 + px * scale - DIKME_GENISLIK / 2} y={topY} width={DIKME_GENISLIK} height={scaledH} fill={KOYU} />
+      ))}
+
+      {/* Üst ray (kesintisiz) */}
+      <rect x={x0} y={topY} width={scaledW} height={RAY_KALINLIK} fill={KOYU} />
+      {/* Alt ray segmentleri */}
+      {altRaySegmentleri.map((s, i) => (
+        <rect
+          key={i}
+          x={x0 + s.x1 * scale}
+          y={groundY - RAY_KALINLIK}
+          width={(s.x2 - s.x1) * scale}
+          height={RAY_KALINLIK}
+          fill={KOYU}
+        />
+      ))}
+
+      <YatayOlcu x1={x0} x2={x0 + scaledW} y={dimGenislikY} etiket={mmEtiket(genislikMm)} />
+      <DikeyOlcu y1={topY} y2={groundY} x={dimYukseklikX} etiket={mmEtiket(yukseklikMm)} />
+    </svg>
+  );
+}

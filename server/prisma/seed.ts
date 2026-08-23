@@ -15,6 +15,7 @@ async function main() {
       { key: "stairs", name: "Merdiven", description: "Çelik merdiven, isteğe bağlı korkuluk" },
       { key: "canopy", name: "Sundurma", description: "Sundurma / kanopi çatı sistemi" },
       { key: "door", name: "Kapı", description: "Demir kapı (kasa + kanat)" },
+      { key: "wall", name: "Çelik Duvar Paneli", description: "Prefabrik/çelik karkas duvar paneli (dikme + ray + boşluklar)" },
       { key: "custom", name: "Manuel / Çelik Konstrüksiyon", description: "Elle parça girişi, hazır şablona bağlı değil" },
     ],
     skipDuplicates: true,

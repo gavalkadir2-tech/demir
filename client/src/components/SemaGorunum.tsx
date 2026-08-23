@@ -2,6 +2,7 @@ import RailingSchematic from "./RailingSchematic";
 import StairsSchematic from "./StairsSchematic";
 import CanopySchematic from "./CanopySchematic";
 import DoorSchematic from "./DoorSchematic";
+import WallSchematic, { DuvarBoslukVeri } from "./WallSchematic";
 
 /** Ürün şablonuna göre uygun şematik çizimi seçip render eder (railing/stairs/canopy/door). */
 export default function SemaGorunum({
@@ -59,6 +60,17 @@ export default function SemaGorunum({
             kanatGenislikMm: ozetDegerler.kanatGenislikMm,
             kanatYukseklikMm: ozetDegerler.kanatYukseklikMm,
             araKayitSayisi: n("araKayitSayisi"),
+          }}
+        />
+      );
+    case "wall":
+      return (
+        <WallSchematic
+          veri={{
+            genislikMm: n("genislikMm"),
+            yukseklikMm: n("yukseklikMm"),
+            dikmeAraligiHedefMm: n("dikmeAraligiHedefMm"),
+            bosluklar: (params.bosluklar as DuvarBoslukVeri[] | undefined) ?? [],
           }}
         />
       );

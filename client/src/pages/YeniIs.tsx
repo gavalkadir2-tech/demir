@@ -12,10 +12,18 @@ const TEMPLATE_KATEGORI: Record<string, ProjectCategory> = {
   stairs: "STAIRS",
   canopy: "CANOPY",
   door: "DOOR",
+  wall: "STEEL_STRUCTURE",
   custom: "OTHER",
 };
 
-export const URUN_EMOJI: Record<string, string> = { railing: "🚧", stairs: "🪜", canopy: "⛺", door: "🚪", custom: "🔩" };
+export const URUN_EMOJI: Record<string, string> = {
+  railing: "🚧",
+  stairs: "🪜",
+  canopy: "⛺",
+  door: "🚪",
+  wall: "🏗️",
+  custom: "🔩",
+};
 const EMOJI = URUN_EMOJI;
 
 const KATEGORILER = Object.keys(KATEGORI_ETIKET) as ProjectCategory[];
@@ -269,6 +277,7 @@ export function UrunFormu({
         {templateKey === "stairs" && <MerdivenAlanlari materials={materials} onChange={setParams} />}
         {templateKey === "canopy" && <SundurmaAlanlari materials={materials} onChange={setParams} />}
         {templateKey === "door" && <KapiAlanlari materials={materials} onChange={setParams} />}
+        {templateKey === "wall" && <DuvarAlanlari materials={materials} onChange={setParams} />}
 
         <button className="btn-primary w-full" onClick={hesapla} disabled={hesaplaniyor}>
           {hesaplaniyor ? "Hesaplanıyor..." : "🧮 Hesapla"}
@@ -450,6 +459,81 @@ function KapiAlanlari({ materials, onChange }: { materials: Material[]; onChange
           <Sayi label="Kol Adedi" value={kolAdet} onChange={setKolAdet} />
         </div>
       </details>
+    </div>
+  );
+}
+
+interface DuvarBoslukTaslak {
+  etiket: string;
+  konumMm: number;
+  genislikMm: number;
+  yukseklikMm: number;
+}
+
+function DuvarAlanlari({ materials, onChange }: { materials: Material[]; onChange: (p: Record<string, unknown>) => void }) {
+  const [genislikMm, setGenislikMm] = useState(4000);
+  const [yukseklikMm, setYukseklikMm] = useState(2500);
+  const [dikmeAraligiHedefMm, setDikmeAraligiHedefMm] = useState(600);
+  const [ustProfilId, setUstProfilId] = useState<number>();
+  const [altProfilId, setAltProfilId] = useState<number>();
+  const [dikmeProfilId, setDikmeProfilId] = useState<number>();
+  const [bosluklar, setBosluklar] = useState<DuvarBoslukTaslak[]>([]);
+
+  useEffect(() => {
+    onChange({ genislikMm, yukseklikMm, dikmeAraligiHedefMm, ustProfilId, altProfilId, dikmeProfilId, bosluklar });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [genislikMm, yukseklikMm, dikmeAraligiHedefMm, ustProfilId, altProfilId, dikmeProfilId, bosluklar]);
+
+  const bosluklariGuncelle = (i: number, alan: keyof DuvarBoslukTaslak, deger: string | number) => {
+    setBosluklar((liste) => liste.map((b, idx) => (idx === i ? { ...b, [alan]: deger } : b)));
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-3 gap-3">
+        <Sayi label="Duvar Genişliği (mm)" value={genislikMm} onChange={setGenislikMm} />
+        <Sayi label="Duvar Yüksekliği (mm)" value={yukseklikMm} onChange={setYukseklikMm} />
+        <Sayi label="Dikme Aralığı (mm)" value={dikmeAraligiHedefMm} onChange={setDikmeAraligiHedefMm} />
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <MaterialSelect label="Üst Ray" materials={materials} value={ustProfilId} onChange={setUstProfilId} />
+        <MaterialSelect label="Alt Ray" materials={materials} value={altProfilId} onChange={setAltProfilId} />
+        <MaterialSelect label="Dikme Profili" materials={materials} value={dikmeProfilId} onChange={setDikmeProfilId} />
+      </div>
+
+      <div className="rounded-xl border border-neutral-200 p-3 space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="font-semibold text-sm">Kapı / Pencere Boşlukları (opsiyonel)</span>
+          <button
+            type="button"
+            className="btn-secondary btn-sm"
+            onClick={() =>
+              setBosluklar((l) => [...l, { etiket: "Kapı", konumMm: 0, genislikMm: 900, yukseklikMm: 2100 }])
+            }
+          >
+            ➕ Boşluk Ekle
+          </button>
+        </div>
+        {bosluklar.map((b, i) => (
+          <div key={i} className="grid grid-cols-5 gap-2 items-end border-t border-neutral-100 pt-3">
+            <div>
+              <label className="field-label">Ad</label>
+              <input className="field-input" value={b.etiket} onChange={(e) => bosluklariGuncelle(i, "etiket", e.target.value)} />
+            </div>
+            <Sayi label="Konum (mm)" value={b.konumMm} onChange={(v) => bosluklariGuncelle(i, "konumMm", v)} />
+            <Sayi label="Genişlik (mm)" value={b.genislikMm} onChange={(v) => bosluklariGuncelle(i, "genislikMm", v)} />
+            <Sayi label="Yükseklik (mm)" value={b.yukseklikMm} onChange={(v) => bosluklariGuncelle(i, "yukseklikMm", v)} />
+            <button
+              type="button"
+              className="btn-danger btn-sm"
+              onClick={() => setBosluklar((l) => l.filter((_, idx) => idx !== i))}
+            >
+              Sil
+            </button>
+          </div>
+        ))}
+        {bosluklar.length === 0 && <div className="text-sm text-neutral-500">Boşluk eklenmedi, duvar tam dolu hesaplanacak.</div>}
+      </div>
     </div>
   );
 }
