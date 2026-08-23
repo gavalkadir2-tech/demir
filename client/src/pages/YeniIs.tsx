@@ -5,6 +5,7 @@ import { Customer, Material, ProductTemplate, ProjectCategory, KATEGORI_ETIKET, 
 import { Spinner, HataKutusu } from "../components/ui";
 import MaterialSelect from "../components/MaterialSelect";
 import HesapSonucuGorunum from "../components/HesapSonucuGorunum";
+import RailingSchematic from "../components/RailingSchematic";
 
 const TEMPLATE_KATEGORI: Record<string, ProjectCategory> = {
   railing: "RAILING",
@@ -277,6 +278,18 @@ export function UrunFormu({
       {onizleme && (
         <div className="card space-y-4">
           <h2 className="font-bold text-lg">Hesap Sonucu</h2>
+          {templateKey === "railing" && (
+            <RailingSchematic
+              veri={{
+                toplamUzunlukMm: Number(params.toplamUzunlukMm),
+                yukseklikMm: Number(params.yukseklikMm),
+                araKayitSayisi: Number(params.araKayitSayisi ?? 0),
+                dikmeSayisi: onizleme.sonuc.ozetDegerler.dikmeSayisi,
+                araliklarSayisi: onizleme.sonuc.ozetDegerler.araliklarSayisi,
+                gercekAralikMm: onizleme.sonuc.ozetDegerler.gercekAralikMm,
+              }}
+            />
+          )}
           <HesapSonucuGorunum sonuc={onizleme.sonuc} malzemeler={onizleme.malzemeler} />
           <button className="btn-primary w-full" onClick={kaydet} disabled={kaydediliyor}>
             {kaydediliyor ? "Kaydediliyor..." : "✅ Kaydet ve İşe Git"}
