@@ -1,0 +1,131 @@
+import { Router } from "express";
+import { z } from "zod";
+import { prisma } from "../lib/prisma";
+import { asyncHandler } from "../lib/errors";
+
+const router = Router();
+
+const malzemeSchema = z.object({
+  name: z.string().min(1),
+  category: z.enum(["PROFILE", "SHEET", "CONSUMABLE", "FASTENER", "OTHER"]).default("PROFILE"),
+  section: z.string().optional().nullable(),
+  thicknessMm: z.number().nonnegative().optional().nullable(),
+  standardLengthM: z.number().positive().optional().nullable(),
+  sheetWidthMm: z.number().positive().optional().nullable(),
+  sheetHeightMm: z.number().positive().optional().nullable(),
+  unit: z.enum(["M", "KG", "ADET", "M2"]).default("M"),
+  unitPrice: z.number().nonnegative(),
+  unitWeightKgPerM: z.number().nonnegative().optional().nullable(),
+  kgPerM2: z.number().nonnegative().optional().nullable(),
+  kerfMm: z.number().nonnegative().default(3),
+  stockQty: z.number().nonnegative().default(0),
+  minStockQty: z.number().nonnegative().default(0),
+  supplier: z.string().optional().nullable(),
+});
+
+router.get(
+  "/",
+  asyncHandler(async (req, res) => {
+    const q = typeof req.query.q === "string" ? req.query.q : undefined;
+    const category = typeof req.query.category === "string" ? req.query.category : undefined;
+    const malzemeler = await prisma.material.findMany({
+      where: {
+        AND: [
+          q ? { OR: [{ name: { contains: q, mode: "insensitive" } }, { section: { contains: q, mode: "insensitive" } }] } : {},
+          category ? { category: category as any } : {},
+        ],
+      },
+      orderBy: [{ category: "asc" }, { name: "asc" }],
+    });
+    res.json(malzemeler);
+  })
+);
+
+router.get(
+  "/kritik-stok",
+  asyncHandler(async (_req, res) => {
+    const malzemeler = await prisma.$queryRaw`
+      SELECT * FROM materials WHERE "stockQty" <= "minStockQty" AND "minStockQty" > 0 ORDER BY name ASC
+    `;
+    res.json(malzemeler);
+  })
+);
+
+router.get(
+  "/:id",
+  asyncHandler(async (req, res) => {
+    const malzeme = await prisma.material.findUniqueOrThrow({
+      where: { id: Number(req.params.id) },
+      include: { priceHistory: { orderBy: { effectiveDate: "desc" }, take: 20 } },
+    });
+    res.json(malzeme);
+  })
+);
+
+router.post(
+  "/",
+  asyncHandler(async (req, res) => {
+    const data = malzemeSchema.parse(req.body);
+    const malzeme = await prisma.material.create({
+      data: { ...data, priceHistory: { create: { price: data.unitPrice } } },
+    });
+    res.status(201).json(malzeme);
+  })
+);
+
+router.put(
+  "/:id",
+  asyncHandler(async (req, res) => {
+    const data = malzemeSchema.partial().parse(req.body);
+    const id = Number(req.params.id);
+    const mevcut = await prisma.material.findUniqueOrThrow({ where: { id } });
+
+    const malzeme = await prisma.material.update({
+      where: { id },
+      data: {
+        ...data,
+        ...(data.unitPrice != null && data.unitPrice !== mevcut.unitPrice
+          ? { priceHistory: { create: { price: data.unitPrice } } }
+          : {}),
+      },
+    });
+    res.json(malzeme);
+  })
+);
+
+router.delete(
+  "/:id",
+  asyncHandler(async (req, res) => {
+    await prisma.material.delete({ where: { id: Number(req.params.id) } });
+    res.status(204).end();
+  })
+);
+
+router.get(
+  "/:id/stock-movements",
+  asyncHandler(async (req, res) => {
+    const hareketler = await prisma.stockMovement.findMany({
+      where: { materialId: Number(req.params.id) },
+      orderBy: { createdAt: "desc" },
+      include: { project: { select: { id: true, title: true } } },
+    });
+    res.json(hareketler);
+  })
+);
+
+const stokAyarSchema = z.object({ qtyDelta: z.number(), reason: z.string().min(1) });
+
+router.post(
+  "/:id/stock-adjust",
+  asyncHandler(async (req, res) => {
+    const { qtyDelta, reason } = stokAyarSchema.parse(req.body);
+    const id = Number(req.params.id);
+    const [malzeme] = await prisma.$transaction([
+      prisma.material.update({ where: { id }, data: { stockQty: { increment: qtyDelta } } }),
+      prisma.stockMovement.create({ data: { materialId: id, qtyDelta, reason } }),
+    ]);
+    res.json(malzeme);
+  })
+);
+
+export default router;

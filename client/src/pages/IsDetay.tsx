@@ -1,0 +1,778 @@
+import { useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { api } from "../api/client";
+import {
+  Project,
+  ProjectStatus,
+  Material,
+  LaborType,
+  ExpenseType,
+  ProductTemplate,
+  ISCILIK_ETIKET,
+  GIDER_ETIKET,
+  DURUM_ETIKET,
+  DURUM_RENK,
+  KATEGORI_ETIKET,
+  TEKLIF_DURUM_ETIKET,
+} from "../api/types";
+import { Spinner, HataKutusu, UyariKutusu, Badge, Modal, EmptyState } from "../components/ui";
+import MaterialSelect from "../components/MaterialSelect";
+import CuttingBarView from "../components/CuttingBarView";
+import { UrunFormu, URUN_EMOJI } from "./YeniIs";
+import { tl, mm, tarih, sayi } from "../lib/format";
+
+const DURUMLAR: ProjectStatus[] = [
+  "DRAFT",
+  "CALCULATED",
+  "QUOTE_READY",
+  "QUOTE_SENT",
+  "APPROVED",
+  "IN_PRODUCTION",
+  "INSTALLING",
+  "COMPLETED",
+  "CANCELLED",
+];
+
+const SEKMELER = [
+  { key: "ozet", label: "Özet" },
+  { key: "parcalar", label: "Parçalar" },
+  { key: "kesim", label: "Kesim Listesi" },
+  { key: "maliyet", label: "İşçilik & Giderler" },
+  { key: "teklifler", label: "Teklifler" },
+] as const;
+
+type SekmeKey = (typeof SEKMELER)[number]["key"];
+
+export default function IsDetay() {
+  const { id } = useParams();
+  const projectId = Number(id);
+  const [proje, setProje] = useState<Project | null>(null);
+  const [tab, setTab] = useState<SekmeKey>("ozet");
+
+  const yukle = () => api.get<Project>(`/projects/${projectId}`).then(setProje);
+
+  useEffect(() => {
+    yukle();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
+
+  if (!proje) return <Spinner />;
+
+  return (
+    <div className="space-y-6">
+      <Link to="/isler" className="text-sm text-brand-700 font-semibold">
+        ← İşler
+      </Link>
+
+      <div className="card">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h1 className="text-2xl font-bold">{proje.title}</h1>
+            <div className="text-neutral-500">
+              {proje.customer?.name} • {KATEGORI_ETIKET[proje.category]} • {tarih(proje.createdAt)}
+            </div>
+          </div>
+          <select
+            className="field-select w-auto"
+            value={proje.status}
+            onChange={async (e) => {
+              await api.put(`/projects/${projectId}`, { status: e.target.value });
+              yukle();
+            }}
+          >
+            {DURUMLAR.map((d) => (
+              <option key={d} value={d}>
+                {DURUM_ETIKET[d]}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="flex gap-1 overflow-x-auto border-b border-neutral-200">
+        {SEKMELER.map((s) => (
+          <button
+            key={s.key}
+            onClick={() => setTab(s.key)}
+            className={`px-4 py-3 font-semibold whitespace-nowrap border-b-2 -mb-px ${
+              tab === s.key ? "border-brand-600 text-brand-700" : "border-transparent text-neutral-500 hover:text-neutral-800"
+            }`}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "ozet" && <OzetTab proje={proje} onChanged={yukle} />}
+      {tab === "parcalar" && <ParcalarTab proje={proje} onChanged={yukle} />}
+      {tab === "kesim" && <KesimTab proje={proje} onChanged={yukle} />}
+      {tab === "maliyet" && <MaliyetTab proje={proje} onChanged={yukle} />}
+      {tab === "teklifler" && <TekliflerTab proje={proje} onChanged={yukle} />}
+    </div>
+  );
+}
+
+function OzetTab({ proje, onChanged }: { proje: Project; onChanged: () => void }) {
+  const [form, setForm] = useState({
+    overheadPercent: proje.overheadPercent,
+    profitMode: proje.profitMode,
+    profitValue: proje.profitValue,
+    vatPercent: proje.vatPercent,
+    validityDays: proje.validityDays,
+    note: proje.note ?? "",
+  });
+  const [kaydediliyor, setKaydediliyor] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+  const [dusuluyor, setDusuluyor] = useState(false);
+  const [stokUyari, setStokUyari] = useState<string[]>([]);
+
+  const kaydet = async () => {
+    setKaydediliyor(true);
+    setHata(null);
+    try {
+      await api.put(`/projects/${proje.id}`, form);
+      onChanged();
+    } catch (e: any) {
+      setHata(e.message);
+    } finally {
+      setKaydediliyor(false);
+    }
+  };
+
+  const stoktanDus = async () => {
+    setDusuluyor(true);
+    setHata(null);
+    try {
+      const r = await api.post<{ uyarilar: string[] }>(`/projects/${proje.id}/stock/deduct`);
+      setStokUyari(r.uyarilar);
+      onChanged();
+    } catch (e: any) {
+      setHata(e.message);
+    } finally {
+      setDusuluyor(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <HataKutusu mesaj={hata} />
+      <UyariKutusu mesajlar={stokUyari} />
+
+      <div className="card space-y-3">
+        <h2 className="font-bold">Müşteri</h2>
+        <div className="text-sm text-neutral-600">
+          {proje.customer?.phone && <div>📞 {proje.customer.phone}</div>}
+          {proje.customer?.address && <div>📍 {proje.customer.address}</div>}
+        </div>
+      </div>
+
+      <div className="card space-y-3">
+        <h2 className="font-bold">Maliyet Ayarları</h2>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="field-label">Genel Gider (%)</label>
+            <input type="number" className="field-input" value={form.overheadPercent} onChange={(e) => setForm({ ...form, overheadPercent: Number(e.target.value) })} />
+          </div>
+          <div>
+            <label className="field-label">KDV (%)</label>
+            <input type="number" className="field-input" value={form.vatPercent} onChange={(e) => setForm({ ...form, vatPercent: Number(e.target.value) })} />
+          </div>
+          <div>
+            <label className="field-label">Kâr Modu</label>
+            <select className="field-select" value={form.profitMode} onChange={(e) => setForm({ ...form, profitMode: e.target.value as "PERCENT" | "FIXED" })}>
+              <option value="PERCENT">Yüzde (%)</option>
+              <option value="FIXED">Sabit TL</option>
+            </select>
+          </div>
+          <div>
+            <label className="field-label">Kâr {form.profitMode === "PERCENT" ? "(%)" : "(TL)"}</label>
+            <input type="number" className="field-input" value={form.profitValue} onChange={(e) => setForm({ ...form, profitValue: Number(e.target.value) })} />
+          </div>
+          <div>
+            <label className="field-label">Teklif Geçerlilik (gün)</label>
+            <input type="number" className="field-input" value={form.validityDays} onChange={(e) => setForm({ ...form, validityDays: Number(e.target.value) })} />
+          </div>
+        </div>
+        <div>
+          <label className="field-label">Not</label>
+          <textarea className="field-input" rows={2} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
+        </div>
+        <button className="btn-primary" onClick={kaydet} disabled={kaydediliyor}>
+          {kaydediliyor ? "Kaydediliyor..." : "Kaydet"}
+        </button>
+      </div>
+
+      <div className="card space-y-3">
+        <h2 className="font-bold">Stok</h2>
+        {proje.stockDeducted ? (
+          <div className="text-emerald-700 font-semibold">✅ Bu iş için malzeme stoktan düşüldü.</div>
+        ) : (
+          <>
+            <p className="text-sm text-neutral-500">
+              İş onaylandığında, kesim planına göre gereken çubuk adetleri stoktan düşülür. Önce "Kesim Listesi" sekmesinden planı oluşturun.
+            </p>
+            <button className="btn-secondary" onClick={stoktanDus} disabled={dusuluyor}>
+              {dusuluyor ? "Düşülüyor..." : "📦 Stoktan Düş"}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ParcalarTab({ proje, onChanged }: { proje: Project; onChanged: () => void }) {
+  const [manuelModal, setManuelModal] = useState(false);
+  const [urunModal, setUrunModal] = useState(false);
+
+  const itemSil = async (itemId: number) => {
+    if (!confirm("Bu ürünü ve ilgili parçalarını silmek istediğinize emin misiniz?")) return;
+    await api.del(`/projects/${proje.id}/items/${itemId}`);
+    onChanged();
+  };
+
+  const parcaSil = async (partId: number) => {
+    if (!confirm("Bu parçayı silmek istediğinize emin misiniz?")) return;
+    await api.del(`/projects/${proje.id}/parts/${partId}`);
+    onChanged();
+  };
+
+  const manuelParcalar = (proje.parts ?? []).filter((p) => !p.projectItemId);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex gap-2 flex-wrap">
+        <button className="btn-primary" onClick={() => setUrunModal(true)}>
+          ➕ Ürün Şablonundan Ekle
+        </button>
+        <button className="btn-secondary" onClick={() => setManuelModal(true)}>
+          ➕ Manuel Parça Ekle
+        </button>
+      </div>
+
+      {(proje.items ?? []).map((item) => (
+        <div key={item.id} className="card">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <div className="font-bold">{item.name}</div>
+              <div className="text-sm text-neutral-500">{item.template.name}</div>
+            </div>
+            <button className="btn-danger btn-sm" onClick={() => itemSil(item.id)}>
+              Sil
+            </button>
+          </div>
+          <PartTable parcalar={(proje.parts ?? []).filter((p) => p.projectItemId === item.id)} onDelete={parcaSil} />
+        </div>
+      ))}
+
+      <div className="card">
+        <h2 className="font-bold mb-2">Manuel Eklenen Parçalar</h2>
+        {manuelParcalar.length === 0 ? (
+          <div className="text-sm text-neutral-500">Manuel eklenen parça yok.</div>
+        ) : (
+          <PartTable parcalar={manuelParcalar} onDelete={parcaSil} />
+        )}
+      </div>
+
+      {(proje.items ?? []).length === 0 && manuelParcalar.length === 0 && (
+        <EmptyState title="Henüz parça eklenmedi" description="Bir ürün şablonu seçin veya manuel parça ekleyin." />
+      )}
+
+      {manuelModal && (
+        <ManuelParcaModal
+          projectId={proje.id}
+          onClose={() => setManuelModal(false)}
+          onSaved={() => {
+            setManuelModal(false);
+            onChanged();
+          }}
+        />
+      )}
+      {urunModal && (
+        <UrunSablonuModal
+          projectId={proje.id}
+          onClose={() => setUrunModal(false)}
+          onSaved={() => {
+            setUrunModal(false);
+            onChanged();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function PartTable({ parcalar, onDelete }: { parcalar: Project["parts"]; onDelete: (id: number) => void }) {
+  if (!parcalar || parcalar.length === 0) return null;
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="bg-neutral-50 text-neutral-500 text-left">
+          <tr>
+            <th className="px-3 py-2">Parça</th>
+            <th className="px-3 py-2">Malzeme</th>
+            <th className="px-3 py-2">Uzunluk</th>
+            <th className="px-3 py-2">Adet</th>
+            <th className="px-3 py-2"></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-neutral-100">
+          {parcalar.map((p) => (
+            <tr key={p.id}>
+              <td className="px-3 py-2 font-medium">{p.label || "-"}</td>
+              <td className="px-3 py-2">{p.material.name}</td>
+              <td className="px-3 py-2">{mm(p.lengthMm)}</td>
+              <td className="px-3 py-2">{p.qty}</td>
+              <td className="px-3 py-2 text-right">
+                <button className="text-red-600 text-xs font-semibold" onClick={() => onDelete(p.id)}>
+                  Sil
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ManuelParcaModal({ projectId, onClose, onSaved }: { projectId: number; onClose: () => void; onSaved: () => void }) {
+  const [materials, setMaterials] = useState<Material[] | null>(null);
+  const [materialId, setMaterialId] = useState<number>();
+  const [label, setLabel] = useState("");
+  const [lengthMm, setLengthMm] = useState(1000);
+  const [qty, setQty] = useState(1);
+  const [note, setNote] = useState("");
+  const [hata, setHata] = useState<string | null>(null);
+  const [kaydediliyor, setKaydediliyor] = useState(false);
+
+  useEffect(() => {
+    api.get<Material[]>("/materials").then(setMaterials);
+  }, []);
+
+  const kaydet = async () => {
+    if (!materialId) return setHata("Malzeme seçin.");
+    setKaydediliyor(true);
+    setHata(null);
+    try {
+      await api.post(`/projects/${projectId}/parts`, { materialId, label, lengthMm, qty, note });
+      onSaved();
+    } catch (e: any) {
+      setHata(e.message);
+    } finally {
+      setKaydediliyor(false);
+    }
+  };
+
+  return (
+    <Modal open onClose={onClose} title="Manuel Parça Ekle">
+      <div className="space-y-3">
+        <HataKutusu mesaj={hata} />
+        {!materials ? (
+          <Spinner />
+        ) : (
+          <MaterialSelect label="Malzeme / Profil" materials={materials} value={materialId} onChange={setMaterialId} />
+        )}
+        <div>
+          <label className="field-label">Parça Adı (örn. Dikme, Kiriş)</label>
+          <input className="field-input" value={label} onChange={(e) => setLabel(e.target.value)} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="field-label">Uzunluk (mm)</label>
+            <input type="number" className="field-input" value={lengthMm} onChange={(e) => setLengthMm(Number(e.target.value))} />
+          </div>
+          <div>
+            <label className="field-label">Adet</label>
+            <input type="number" className="field-input" value={qty} onChange={(e) => setQty(Number(e.target.value))} />
+          </div>
+        </div>
+        <div>
+          <label className="field-label">Açıklama</label>
+          <input className="field-input" value={note} onChange={(e) => setNote(e.target.value)} />
+        </div>
+        <button className="btn-primary w-full" onClick={kaydet} disabled={kaydediliyor}>
+          {kaydediliyor ? "Kaydediliyor..." : "Ekle"}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function UrunSablonuModal({ projectId, onClose, onSaved }: { projectId: number; onClose: () => void; onSaved: () => void }) {
+  const [sablonlar, setSablonlar] = useState<ProductTemplate[] | null>(null);
+  const [materials, setMaterials] = useState<Material[] | null>(null);
+  const [secilenTemplate, setSecilenTemplate] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.get<ProductTemplate[]>("/product-templates").then((t) => setSablonlar(t.filter((s) => s.key !== "custom")));
+    api.get<Material[]>("/materials?category=PROFILE").then(setMaterials);
+  }, []);
+
+  return (
+    <Modal open onClose={onClose} title="Ürün Şablonundan Ekle" wide>
+      {!secilenTemplate ? (
+        !sablonlar ? (
+          <Spinner />
+        ) : (
+          <div className="grid sm:grid-cols-2 gap-3">
+            {sablonlar.map((s) => (
+              <button key={s.key} className="card flex items-center gap-3 hover:shadow-md text-left" onClick={() => setSecilenTemplate(s.key)}>
+                <div className="text-3xl">{URUN_EMOJI[s.key] ?? "🛠️"}</div>
+                <div className="font-bold">{s.name}</div>
+              </button>
+            ))}
+          </div>
+        )
+      ) : !materials ? (
+        <Spinner />
+      ) : (
+        <UrunFormu templateKey={secilenTemplate} projectId={projectId} materials={materials} onSaved={onSaved} />
+      )}
+    </Modal>
+  );
+}
+
+function KesimTab({ proje, onChanged }: { proje: Project; onChanged: () => void }) {
+  const [uretiliyor, setUretiliyor] = useState(false);
+  const [uyarilar, setUyarilar] = useState<string[]>([]);
+  const [hata, setHata] = useState<string | null>(null);
+
+  const uret = async () => {
+    setUretiliyor(true);
+    setHata(null);
+    try {
+      const r = await api.post<{ uyarilar: string[] }>(`/projects/${proje.id}/cutting/generate`);
+      setUyarilar(r.uyarilar);
+      onChanged();
+    } catch (e: any) {
+      setHata(e.message);
+    } finally {
+      setUretiliyor(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <HataKutusu mesaj={hata} />
+      <UyariKutusu mesajlar={uyarilar} />
+      <button className="btn-primary" onClick={uret} disabled={uretiliyor}>
+        {uretiliyor ? "Hesaplanıyor..." : "✂️ Kesim Planını Oluştur / Güncelle"}
+      </button>
+
+      {(proje.cuttingLists ?? []).length === 0 ? (
+        <EmptyState title="Henüz kesim planı yok" description="Parçalar eklendikten sonra kesim planını oluşturun." />
+      ) : (
+        (proje.cuttingLists ?? []).map((cl) => (
+          <div key={cl.id} className="card space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h2 className="font-bold text-lg">{cl.material.name}</h2>
+              <div className="text-sm text-neutral-500">
+                Standart boy: {cl.standardLengthMm / 1000} m • Kesim payı: {cl.kerfMm} mm
+              </div>
+            </div>
+            <div className="grid sm:grid-cols-3 gap-3 text-sm">
+              <div className="rounded-xl bg-neutral-50 p-3 text-center">
+                <div className="text-2xl font-bold">{cl.totalBars}</div>
+                <div className="text-neutral-500">Toplam Çubuk</div>
+              </div>
+              <div className="rounded-xl bg-neutral-50 p-3 text-center">
+                <div className="text-2xl font-bold">{mm(cl.totalWasteMm)}</div>
+                <div className="text-neutral-500">Toplam Fire</div>
+              </div>
+              <div className="rounded-xl bg-neutral-50 p-3 text-center">
+                <div className="text-2xl font-bold">%{sayi(cl.wastePercent, 1)}</div>
+                <div className="text-neutral-500">Fire Oranı</div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {cl.barsJson.map((bar, i) => (
+                <CuttingBarView key={i} bar={bar} standardLengthMm={cl.standardLengthMm} index={i} />
+              ))}
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+function MaliyetTab({ proje, onChanged }: { proje: Project; onChanged: () => void }) {
+  return (
+    <div className="space-y-6">
+      <IscilikBolumu proje={proje} onChanged={onChanged} />
+      <GiderBolumu proje={proje} onChanged={onChanged} />
+    </div>
+  );
+}
+
+function IscilikBolumu({ proje, onChanged }: { proje: Project; onChanged: () => void }) {
+  const [modal, setModal] = useState(false);
+  const sil = async (id: number) => {
+    await api.del(`/projects/${proje.id}/labor/${id}`);
+    onChanged();
+  };
+  return (
+    <div className="card space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="font-bold">İşçilik</h2>
+        <button className="btn-secondary btn-sm" onClick={() => setModal(true)}>
+          ➕ Ekle
+        </button>
+      </div>
+      {(proje.laborItems ?? []).length === 0 ? (
+        <div className="text-sm text-neutral-500">İşçilik kalemi yok.</div>
+      ) : (
+        <div className="divide-y divide-neutral-100">
+          {proje.laborItems!.map((l) => (
+            <div key={l.id} className="flex items-center justify-between py-2 text-sm">
+              <div>
+                <span className="font-semibold">{ISCILIK_ETIKET[l.type]}</span>
+                {l.description && ` - ${l.description}`}
+                {l.hours != null && <span className="text-neutral-500"> ({l.hours} saat × {tl(l.rate ?? 0)})</span>}
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="font-bold">{tl(l.amount)}</span>
+                <button className="text-red-600 text-xs font-semibold" onClick={() => sil(l.id)}>
+                  Sil
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {modal && (
+        <IscilikModal
+          projectId={proje.id}
+          onClose={() => setModal(false)}
+          onSaved={() => {
+            setModal(false);
+            onChanged();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function IscilikModal({ projectId, onClose, onSaved }: { projectId: number; onClose: () => void; onSaved: () => void }) {
+  const [type, setType] = useState<LaborType>("WELDING");
+  const [description, setDescription] = useState("");
+  const [mod, setMod] = useState<"saat" | "sabit">("saat");
+  const [hours, setHours] = useState(1);
+  const [rate, setRate] = useState(250);
+  const [fixedAmount, setFixedAmount] = useState(1000);
+  const [hata, setHata] = useState<string | null>(null);
+  const [kaydediliyor, setKaydediliyor] = useState(false);
+
+  const kaydet = async () => {
+    setKaydediliyor(true);
+    setHata(null);
+    try {
+      const gövde = mod === "saat" ? { type, description, hours, rate } : { type, description, fixedAmount };
+      await api.post(`/projects/${projectId}/labor`, gövde);
+      onSaved();
+    } catch (e: any) {
+      setHata(e.message);
+    } finally {
+      setKaydediliyor(false);
+    }
+  };
+
+  return (
+    <Modal open onClose={onClose} title="İşçilik Ekle">
+      <div className="space-y-3">
+        <HataKutusu mesaj={hata} />
+        <div>
+          <label className="field-label">Tür</label>
+          <select className="field-select" value={type} onChange={(e) => setType(e.target.value as LaborType)}>
+            {Object.entries(ISCILIK_ETIKET).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="field-label">Açıklama</label>
+          <input className="field-input" value={description} onChange={(e) => setDescription(e.target.value)} />
+        </div>
+        <div className="flex gap-2">
+          <button className={mod === "saat" ? "btn-primary btn-sm flex-1" : "btn-secondary btn-sm flex-1"} onClick={() => setMod("saat")}>
+            Saat × Ücret
+          </button>
+          <button className={mod === "sabit" ? "btn-primary btn-sm flex-1" : "btn-secondary btn-sm flex-1"} onClick={() => setMod("sabit")}>
+            Sabit Tutar
+          </button>
+        </div>
+        {mod === "saat" ? (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="field-label">Saat</label>
+              <input type="number" className="field-input" value={hours} onChange={(e) => setHours(Number(e.target.value))} />
+            </div>
+            <div>
+              <label className="field-label">Saatlik Ücret (TL)</label>
+              <input type="number" className="field-input" value={rate} onChange={(e) => setRate(Number(e.target.value))} />
+            </div>
+          </div>
+        ) : (
+          <div>
+            <label className="field-label">Tutar (TL)</label>
+            <input type="number" className="field-input" value={fixedAmount} onChange={(e) => setFixedAmount(Number(e.target.value))} />
+          </div>
+        )}
+        <button className="btn-primary w-full" onClick={kaydet} disabled={kaydediliyor}>
+          {kaydediliyor ? "Kaydediliyor..." : "Ekle"}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function GiderBolumu({ proje, onChanged }: { proje: Project; onChanged: () => void }) {
+  const [modal, setModal] = useState(false);
+  const sil = async (id: number) => {
+    await api.del(`/projects/${proje.id}/expenses/${id}`);
+    onChanged();
+  };
+  return (
+    <div className="card space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="font-bold">Giderler (Boya, Nakliye, Montaj, Sarf Malzeme...)</h2>
+        <button className="btn-secondary btn-sm" onClick={() => setModal(true)}>
+          ➕ Ekle
+        </button>
+      </div>
+      {(proje.expenses ?? []).length === 0 ? (
+        <div className="text-sm text-neutral-500">Gider kalemi yok.</div>
+      ) : (
+        <div className="divide-y divide-neutral-100">
+          {proje.expenses!.map((g) => (
+            <div key={g.id} className="flex items-center justify-between py-2 text-sm">
+              <div>
+                <span className="font-semibold">{GIDER_ETIKET[g.type]}</span> - {g.name}
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="font-bold">{tl(g.amount)}</span>
+                <button className="text-red-600 text-xs font-semibold" onClick={() => sil(g.id)}>
+                  Sil
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {modal && (
+        <GiderModal
+          projectId={proje.id}
+          onClose={() => setModal(false)}
+          onSaved={() => {
+            setModal(false);
+            onChanged();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function GiderModal({ projectId, onClose, onSaved }: { projectId: number; onClose: () => void; onSaved: () => void }) {
+  const [type, setType] = useState<ExpenseType>("TRANSPORT");
+  const [name, setName] = useState("");
+  const [amount, setAmount] = useState(0);
+  const [hata, setHata] = useState<string | null>(null);
+  const [kaydediliyor, setKaydediliyor] = useState(false);
+
+  const kaydet = async () => {
+    if (!name.trim()) return setHata("Açıklama girin.");
+    setKaydediliyor(true);
+    setHata(null);
+    try {
+      await api.post(`/projects/${projectId}/expenses`, { type, name, amount });
+      onSaved();
+    } catch (e: any) {
+      setHata(e.message);
+    } finally {
+      setKaydediliyor(false);
+    }
+  };
+
+  return (
+    <Modal open onClose={onClose} title="Gider Ekle">
+      <div className="space-y-3">
+        <HataKutusu mesaj={hata} />
+        <div>
+          <label className="field-label">Tür</label>
+          <select className="field-select" value={type} onChange={(e) => setType(e.target.value as ExpenseType)}>
+            {Object.entries(GIDER_ETIKET).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="field-label">Açıklama</label>
+          <input className="field-input" value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div>
+          <label className="field-label">Tutar (TL)</label>
+          <input type="number" className="field-input" value={amount} onChange={(e) => setAmount(Number(e.target.value))} />
+        </div>
+        <button className="btn-primary w-full" onClick={kaydet} disabled={kaydediliyor}>
+          {kaydediliyor ? "Kaydediliyor..." : "Ekle"}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function TekliflerTab({ proje, onChanged }: { proje: Project; onChanged: () => void }) {
+  const [uretiliyor, setUretiliyor] = useState(false);
+  const [uyarilar, setUyarilar] = useState<string[]>([]);
+  const [hata, setHata] = useState<string | null>(null);
+
+  const uret = async () => {
+    setUretiliyor(true);
+    setHata(null);
+    try {
+      const r = await api.post<{ uyarilar: string[] }>(`/projects/${proje.id}/quotes/generate`);
+      setUyarilar(r.uyarilar);
+      onChanged();
+    } catch (e: any) {
+      setHata(e.message);
+    } finally {
+      setUretiliyor(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <HataKutusu mesaj={hata} />
+      <UyariKutusu mesajlar={uyarilar} />
+      <button className="btn-primary" onClick={uret} disabled={uretiliyor}>
+        {uretiliyor ? "Oluşturuluyor..." : "📄 Teklif Oluştur"}
+      </button>
+
+      {(proje.quotes ?? []).length === 0 ? (
+        <EmptyState title="Henüz teklif oluşturulmadı" />
+      ) : (
+        <div className="grid gap-3">
+          {proje.quotes!.map((q) => (
+            <Link to={`/teklifler/${q.id}`} key={q.id} className="card flex items-center justify-between hover:shadow-md">
+              <div>
+                <div className="font-bold">{q.quoteNumber}</div>
+                <div className="text-sm text-neutral-500">{tarih(q.date)}</div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="font-bold text-lg">{tl(q.total)}</span>
+                <Badge>{TEKLIF_DURUM_ETIKET[q.status]}</Badge>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
