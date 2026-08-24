@@ -28,6 +28,9 @@ export interface CatiKafesiGirdi {
   asikProfilKey?: string;
   /** Hedeflenen aşık aralığı (mm), eğim yönünde, örn. 1000 */
   asikAraligiHedefMm?: number;
+  /** Çatı kaplama türü: trapez_sac | polikarbon | yok */
+  kaplamaTuru?: "trapez_sac" | "polikarbon" | "yok";
+  kaplamaKalinlikMm?: number;
   plakaEnMm?: number;
   plakaBoyMm?: number;
   plakaKalinlikMm?: number;
@@ -37,6 +40,8 @@ export interface CatiKafesiGirdi {
 const VARSAYILAN = {
   diyagonalSayisi: 0,
   asikAraligiHedefMm: 1000,
+  kaplamaTuru: "trapez_sac" as const,
+  kaplamaKalinlikMm: 0.5,
   plakaEnMm: 120,
   plakaBoyMm: 120,
   plakaKalinlikMm: 10,
@@ -145,6 +150,17 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
     birim: "adet",
     adet: 2 * kafesSayisi * ankrajSayisiPerPlaka,
   });
+
+  const kaplamaTuru = girdi.kaplamaTuru ?? VARSAYILAN.kaplamaTuru;
+  if (kaplamaTuru !== "yok") {
+    sonuc.sacKalemleri.push({
+      label: kaplamaTuru === "polikarbon" ? "Çatı kaplaması (polikarbon)" : "Çatı kaplaması (trapez sac)",
+      enMm: Math.round(catiUzunluguMm),
+      boyMm: Math.ceil(ustBaslikUzunlukMm),
+      kalinlikMm: girdi.kaplamaKalinlikMm ?? VARSAYILAN.kaplamaKalinlikMm,
+      adet: 2, // iki yamaç
+    });
+  }
 
   const egimDerece = (Math.atan(egimYuzde / 100) * 180) / Math.PI;
   const catiAlaniM2 = ((2 * ustBaslikUzunlukMm) / 1000) * (catiUzunluguMm / 1000);

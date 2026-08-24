@@ -105,6 +105,8 @@ const trussSchema = z.object({
   diyagonalSayisi: z.number().int().optional(),
   asikProfilId: z.number().int().optional(),
   asikAraligiHedefMm: z.number().optional(),
+  kaplamaTuru: z.enum(["trapez_sac", "polikarbon", "yok"]).optional(),
+  kaplamaKalinlikMm: z.number().optional(),
   plakaEnMm: z.number().optional(),
   plakaBoyMm: z.number().optional(),
   plakaKalinlikMm: z.number().optional(),

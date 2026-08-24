@@ -72,6 +72,35 @@ test("çatı kafesi: aşık profili verilmezse aşık parçası oluşmaz", () =>
   assert.equal(sonuc.ozetDegerler.asikSatirSayisi, 0);
 });
 
+test("çatı kafesi: varsayılan kaplama (trapez sac) sac kalemi ekler", () => {
+  const sonuc = calculateRoofTruss({
+    acikligMm: 6000,
+    egimYuzde: 30,
+    catiUzunluguMm: 9000,
+    kafesAraligiHedefMm: 900,
+    ustBaslikProfilKey: "ust",
+    altBaslikProfilKey: "alt",
+  });
+  const kaplama = sonuc.sacKalemleri.find((s) => s.label.includes("kaplaması"))!;
+  assert.ok(kaplama);
+  assert.equal(kaplama.enMm, 9000);
+  assert.equal(kaplama.boyMm, 3133);
+  assert.equal(kaplama.adet, 2);
+});
+
+test("çatı kafesi: kaplamaTuru 'yok' verilirse sac kalemi eklenmez", () => {
+  const sonuc = calculateRoofTruss({
+    acikligMm: 6000,
+    egimYuzde: 30,
+    catiUzunluguMm: 9000,
+    kafesAraligiHedefMm: 900,
+    ustBaslikProfilKey: "ust",
+    altBaslikProfilKey: "alt",
+    kaplamaTuru: "yok",
+  });
+  assert.ok(!sonuc.sacKalemleri.some((s) => s.label.includes("kaplaması")));
+});
+
 test("çatı kafesi: diyagonal sayısı girilip profili girilmezse hata verir", () => {
   assert.throws(
     () =>
