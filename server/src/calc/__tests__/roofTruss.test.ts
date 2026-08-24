@@ -135,6 +135,111 @@ test("çatı kafesi: diyagonalSayisi verilirse panel sayısını (yaklaşık /4)
   assert.equal(sonuc.ozetDegerler.diyagonalPanelSayisi, 2);
 });
 
+test("çatı kafesi: direkler tek tek, artan yükseklik ve doğru konumla listelenir", () => {
+  const sonuc = calculateRoofTruss({
+    acikligMm: 6000,
+    egimYuzde: 30,
+    catiUzunluguMm: 9000,
+    kafesAraligiHedefMm: 900,
+    ustBaslikProfilKey: "ust",
+    altBaslikProfilKey: "alt",
+    direkSayisi: 3,
+    direkProfilKey: "direk",
+  });
+
+  const direk1 = sonuc.parcalar.find((p) => p.label === "Direk 1")!;
+  const direk2 = sonuc.parcalar.find((p) => p.label === "Direk 2")!;
+  const direk3 = sonuc.parcalar.find((p) => p.label === "Direk 3")!;
+  assert.equal(direk1.uzunlukMm, 225);
+  assert.equal(direk2.uzunlukMm, 450);
+  assert.equal(direk3.uzunlukMm, 675);
+  assert.ok(direk1.not?.includes("750"));
+  assert.ok(direk2.not?.includes("1500"));
+  assert.ok(direk3.not?.includes("2250"));
+  assert.equal(direk1.adet, 22); // 2 yamaç x 11 kafes
+
+  // direk varsa diyagonal panel sayısı direkSayisi+1 ile birebir aynı olmalı
+  assert.equal(sonuc.ozetDegerler.direkSayisi, 3);
+  assert.equal(sonuc.ozetDegerler.direkAralikMm, 750);
+});
+
+test("çatı kafesi: direk sayısı girilip profili girilmezse hata verir", () => {
+  assert.throws(
+    () =>
+      calculateRoofTruss({
+        acikligMm: 6000,
+        egimYuzde: 30,
+        catiUzunluguMm: 9000,
+        kafesAraligiHedefMm: 900,
+        ustBaslikProfilKey: "ust",
+        altBaslikProfilKey: "alt",
+        direkSayisi: 3,
+      }),
+    HesaplamaHatasi
+  );
+});
+
+test("çatı kafesi: direk varsa diyagonal panel sayısı direk konumlarıyla birebir eşleşir", () => {
+  const sonuc = calculateRoofTruss({
+    acikligMm: 6000,
+    egimYuzde: 30,
+    catiUzunluguMm: 9000,
+    kafesAraligiHedefMm: 900,
+    ustBaslikProfilKey: "ust",
+    altBaslikProfilKey: "alt",
+    direkSayisi: 3,
+    direkProfilKey: "direk",
+    diyagonalProfilKey: "diyagonal",
+  });
+  assert.equal(sonuc.ozetDegerler.diyagonalPanelSayisi, 4); // direkSayisi + 1
+});
+
+test("çatı kafesi: oluklu ise üst başlık oluk mesafesi kadar kısalır", () => {
+  const sonuc = calculateRoofTruss({
+    acikligMm: 6000,
+    egimYuzde: 30,
+    catiUzunluguMm: 9000,
+    kafesAraligiHedefMm: 900,
+    ustBaslikProfilKey: "ust",
+    altBaslikProfilKey: "alt",
+    olukluMu: true,
+    olukMesafesiMm: 300,
+  });
+  const ustBaslik = sonuc.parcalar.find((p) => p.label === "Üst başlık")!;
+  assert.equal(ustBaslik.uzunlukMm, 2833);
+});
+
+test("çatı kafesi: oluksuz ise üst başlık çıkma payı kadar uzar", () => {
+  const sonuc = calculateRoofTruss({
+    acikligMm: 6000,
+    egimYuzde: 30,
+    catiUzunluguMm: 9000,
+    kafesAraligiHedefMm: 900,
+    ustBaslikProfilKey: "ust",
+    altBaslikProfilKey: "alt",
+    cikmaPayiMm: 400,
+  });
+  const ustBaslik = sonuc.parcalar.find((p) => p.label === "Üst başlık")!;
+  assert.equal(ustBaslik.uzunlukMm, 3533);
+});
+
+test("çatı kafesi: oluk mesafesi üst başlıktan büyükse hata verir", () => {
+  assert.throws(
+    () =>
+      calculateRoofTruss({
+        acikligMm: 6000,
+        egimYuzde: 30,
+        catiUzunluguMm: 9000,
+        kafesAraligiHedefMm: 900,
+        ustBaslikProfilKey: "ust",
+        altBaslikProfilKey: "alt",
+        olukluMu: true,
+        olukMesafesiMm: 5000,
+      }),
+    HesaplamaHatasi
+  );
+});
+
 test("çatı kafesi: diyagonal sayısı girilip profili girilmezse hata verir", () => {
   assert.throws(
     () =>

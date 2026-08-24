@@ -11,6 +11,7 @@ export interface CatiKafesiSemaVeri {
   kafesSayisi?: number;
   gercekAralikMm?: number;
   stabiliteVar?: boolean;
+  direkSayisi?: number;
 }
 
 const MARGIN_LEFT = 70;
@@ -46,6 +47,7 @@ export default function TrussSchematic({ veri }: { veri: CatiKafesiSemaVeri }) {
     kafesSayisi = 2,
     gercekAralikMm = catiUzunluguMm,
     stabiliteVar = false,
+    direkSayisi = 0,
   } = veri;
   if (!acikligMm) return null;
 
@@ -90,6 +92,27 @@ export default function TrussSchematic({ veri }: { veri: CatiKafesiSemaVeri }) {
       ? [...zigzagSegmentleri(x0, xOrta, groundY, tepeY, M), ...zigzagSegmentleri(x0 + scaledAciklik, xOrta, groundY, tepeY, M)]
       : [];
 
+  // Direkler: alt başlık üzerindeki panel düğüm noktalarından üst başlığa dikey elemanlar
+  // (çapraz destekle aynı düğüm noktalarını kullanır - diyagonalPanelSayisi = direkSayisi + 1)
+  const direkCizgileri = (xA: number, xB: number, yAlt: number, yUst: number, sayisi: number, panelSayisi: number) => {
+    if (sayisi <= 0 || panelSayisi <= 0) return [];
+    const lines: { x1: number; y1: number; x2: number; y2: number }[] = [];
+    for (let k = 1; k <= sayisi; k++) {
+      const x = xA + (k / panelSayisi) * (xB - xA);
+      const yTop = yAlt + (k / panelSayisi) * (yUst - yAlt);
+      lines.push({ x1: x, y1: yAlt, x2: x, y2: yTop });
+    }
+    return lines;
+  };
+  const direkPanelSayisi = direkSayisi > 0 ? direkSayisi + 1 : M;
+  const direkCizgileriListesi =
+    direkSayisi > 0
+      ? [
+          ...direkCizgileri(x0, xOrta, groundY, tepeY, direkSayisi, direkPanelSayisi),
+          ...direkCizgileri(x0 + scaledAciklik, xOrta, groundY, tepeY, direkSayisi, direkPanelSayisi),
+        ]
+      : [];
+
   const dimAciklikY = groundY + 30;
   const dimYukseklikX = x0 - 30;
 
@@ -114,6 +137,7 @@ export default function TrussSchematic({ veri }: { veri: CatiKafesiSemaVeri }) {
   const lejant = [
     { renk: PALET.ana, etiket: "Üst/Alt Başlık" },
     { renk: PALET.ikincil, etiket: "Kral Kirişi" },
+    ...(direkSayisi > 0 ? [{ renk: PALET.yatay, etiket: "Direk" }] : []),
     ...(M > 0 ? [{ renk: PALET.destek, etiket: "Çapraz Destek" }] : []),
     ...(asikVar ? [{ renk: PALET.vurgu, etiket: "Aşık" }] : []),
     ...(stabiliteCizilecek ? [{ renk: PALET.stabilite, etiket: "Stabilite Bağlantısı" }] : []),
@@ -135,6 +159,10 @@ export default function TrussSchematic({ veri }: { veri: CatiKafesiSemaVeri }) {
       <line x1={x0 + scaledAciklik} y1={groundY} x2={xOrta} y2={tepeY} stroke={PALET.ana} strokeWidth={3} />
       {/* Kral kirişi */}
       <line x1={xOrta} y1={groundY} x2={xOrta} y2={tepeY} stroke={PALET.ikincil} strokeWidth={2} strokeDasharray="5 3" />
+      {/* Direkler */}
+      {direkCizgileriListesi.map((c, i) => (
+        <line key={i} x1={c.x1} y1={c.y1} x2={c.x2} y2={c.y2} stroke={PALET.yatay} strokeWidth={2.5} />
+      ))}
       {/* Çapraz destekler */}
       {caprazCizgileri.map((c, i) => (
         <line key={i} x1={c.x1} y1={c.y1} x2={c.x2} y2={c.y2} stroke={PALET.destek} strokeWidth={2} />

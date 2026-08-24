@@ -947,6 +947,11 @@ function CatiKafesiAlanlari({
   const [kaplamaTuru, setKaplamaTuru] = useState<string>("trapez_sac");
   const [stabiliteBaglantisiVar, setStabiliteBaglantisiVar] = useState(false);
   const [stabiliteProfilId, setStabiliteProfilId] = useState<number>();
+  const [olukluMu, setOlukluMu] = useState<boolean>(() => (baslangic?.olukluMu as boolean) ?? false);
+  const [olukMesafesiMm, setOlukMesafesiMm] = useState<number>(() => (baslangic?.olukMesafesiMm as number) ?? 150);
+  const [cikmaPayiMm, setCikmaPayiMm] = useState<number>(() => (baslangic?.cikmaPayiMm as number) ?? 300);
+  const [direkSayisi, setDirekSayisi] = useState<number>(() => (baslangic?.direkSayisi as number) ?? 0);
+  const [direkProfilId, setDirekProfilId] = useState<number>();
 
   useEffect(() => {
     onChange({
@@ -964,6 +969,11 @@ function CatiKafesiAlanlari({
       kaplamaTuru,
       stabiliteBaglantisiVar,
       stabiliteProfilId: stabiliteBaglantisiVar ? stabiliteProfilId : undefined,
+      olukluMu,
+      olukMesafesiMm: olukluMu ? olukMesafesiMm : undefined,
+      cikmaPayiMm: olukluMu ? undefined : cikmaPayiMm,
+      direkSayisi,
+      direkProfilId: direkSayisi > 0 ? direkProfilId : undefined,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -981,6 +991,11 @@ function CatiKafesiAlanlari({
     kaplamaTuru,
     stabiliteBaglantisiVar,
     stabiliteProfilId,
+    olukluMu,
+    olukMesafesiMm,
+    cikmaPayiMm,
+    direkSayisi,
+    direkProfilId,
   ]);
 
   return (
@@ -1043,6 +1058,37 @@ function CatiKafesiAlanlari({
               materials={materials}
               value={stabiliteProfilId}
               onChange={setStabiliteProfilId}
+            />
+          )}
+        </div>
+        <div className="mt-3 pt-3 border-t border-neutral-100 space-y-3">
+          <div>
+            <label className="field-label">Saçak Ucu</label>
+            <div className="flex gap-4 text-sm">
+              <label className="flex items-center gap-2">
+                <input type="radio" checked={!olukluMu} onChange={() => setOlukluMu(false)} />
+                Oluksuz (çıkma payı ile uzat)
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="radio" checked={olukluMu} onChange={() => setOlukluMu(true)} />
+                Oluklu (oluk mesafesi kadar kısalt)
+              </label>
+            </div>
+          </div>
+          {olukluMu ? (
+            <Sayi label="Oluk Mesafesi (mm)" value={olukMesafesiMm} onChange={setOlukMesafesiMm} />
+          ) : (
+            <Sayi label="Çıkma Payı (mm)" value={cikmaPayiMm} onChange={setCikmaPayiMm} />
+          )}
+        </div>
+        <div className="mt-3 pt-3 border-t border-neutral-100 space-y-3">
+          <Sayi label="Direk Sayısı (makas yarısı başına, opsiyonel)" value={direkSayisi} onChange={setDirekSayisi} />
+          {direkSayisi > 0 && (
+            <MaterialSelect
+              label="Direk Profili"
+              materials={materials}
+              value={direkProfilId}
+              onChange={setDirekProfilId}
             />
           )}
         </div>

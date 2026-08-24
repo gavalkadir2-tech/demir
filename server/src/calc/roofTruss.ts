@@ -29,6 +29,16 @@ export interface CatiKafesiGirdi {
   asikProfilKey?: string;
   /** Hedeflenen aşık aralığı (mm), eğim yönünde, örn. 1000 */
   asikAraligiHedefMm?: number;
+  /** İki makasın birleştiği yerde oluk (vadi) mu var, yoksa düz mahya + saçak çıkması mı? */
+  olukluMu?: boolean;
+  /** Oluklu ise: oluk mesafesi (mm) - üst başlık bu kadar kısaltılır. */
+  olukMesafesiMm?: number;
+  /** Oluksuz ise: saçak çıkma payı (mm) - üst başlık bu kadar uzatılır. */
+  cikmaPayiMm?: number;
+  /** Ara direk (dikey destek, alt başlıktan üst başlığa) sayısı - yarım açıklıkta eşit aralıklarla. */
+  direkSayisi?: number;
+  /** Ara direk profil kesiti - direkSayisi > 0 ise zorunlu. */
+  direkProfilKey?: string;
   /** Çatı kaplama türü */
   kaplamaTuru?: KaplamaTuru;
   kaplamaKalinlikMm?: number;
@@ -66,6 +76,8 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
     throw new HesaplamaHatasi("Çapraz destek sayısı girildi ama çapraz destek profili seçilmedi.");
   if (girdi.stabiliteBaglantisiVar && !girdi.stabiliteProfilKey)
     throw new HesaplamaHatasi("Stabilite bağlantısı seçildi ama stabilite profili seçilmedi.");
+  const direkSayisi = girdi.direkSayisi ?? 0;
+  if (direkSayisi > 0 && !girdi.direkProfilKey) throw new HesaplamaHatasi("Direk sayısı girildi ama direk profili seçilmedi.");
 
   const plakaEnMm = girdi.plakaEnMm ?? VARSAYILAN.plakaEnMm;
   const plakaBoyMm = girdi.plakaBoyMm ?? VARSAYILAN.plakaBoyMm;
@@ -83,7 +95,15 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
 
   const yariAciklikMm = acikligMm / 2;
   const mahyaYuksekligiMm = yariAciklikMm * (egimYuzde / 100);
-  const ustBaslikUzunlukMm = Math.sqrt(yariAciklikMm ** 2 + mahyaYuksekligiMm ** 2);
+  const temelUstBaslikUzunlukMm = Math.sqrt(yariAciklikMm ** 2 + mahyaYuksekligiMm ** 2);
+
+  // İki makasın birleştiği yerde oluk (vadi) varsa üst başlık oluk mesafesi kadar kısalır (oluk için boşluk
+  // bırakılır); yoksa (düz mahya) üst başlık saçak çıkma payı kadar uzar.
+  const olukluMu = girdi.olukluMu ?? false;
+  const olukMesafesiMm = girdi.olukMesafesiMm ?? 0;
+  const cikmaPayiMm = girdi.cikmaPayiMm ?? 0;
+  const ustBaslikUzunlukMm = olukluMu ? temelUstBaslikUzunlukMm - olukMesafesiMm : temelUstBaslikUzunlukMm + cikmaPayiMm;
+  if (ustBaslikUzunlukMm <= 0) throw new HesaplamaHatasi("Oluk mesafesi üst başlık uzunluğuna göre çok büyük.");
 
   const araliklarSayisi = Math.max(1, Math.ceil(catiUzunluguMm / kafesAraligiHedefMm));
   const gercekAralikMm = catiUzunluguMm / araliklarSayisi;
@@ -96,7 +116,11 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
     profilKey: ustBaslikProfilKey,
     uzunlukMm: Math.ceil(ustBaslikUzunlukMm),
     adet: 2 * kafesSayisi,
-    not: "Çatı eğimine göre hesaplanan diyagonal uzunluk.",
+    not: olukluMu
+      ? `Çatı eğimine göre hesaplanan diyagonal uzunluk, oluk mesafesi (${Math.round(olukMesafesiMm)} mm) düşülmüştür.`
+      : cikmaPayiMm > 0
+      ? `Çatı eğimine göre hesaplanan diyagonal uzunluk, saçak çıkma payı (${Math.round(cikmaPayiMm)} mm) eklenmiştir.`
+      : "Çatı eğimine göre hesaplanan diyagonal uzunluk.",
   });
 
   parcalar.push({
@@ -112,16 +136,41 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
       profilKey: girdi.kralKirisiProfilKey,
       uzunlukMm: Math.ceil(mahyaYuksekligiMm),
       adet: kafesSayisi,
+      not: "Makasın tepe (mahya) noktasında, iki makasın birleştiği yerdeki dikey eleman.",
     });
+  }
+
+  // Ara direkler: yarım açıklık, direkSayisi+1 eşit panele bölünür; her direk bu panel sınırlarında,
+  // alt başlıktan üst başlığa kadar (rafter'ın o noktadaki yüksekliği kadar) çıkar. Her direk farklı
+  // yükseklikte olduğundan tek tek ayrı satır olarak listelenir (konumu da not alanında belirtilir).
+  if (direkSayisi > 0 && girdi.direkProfilKey) {
+    const direkPanelSayisi = direkSayisi + 1;
+    for (let i = 1; i <= direkSayisi; i++) {
+      const konumMm = (i / direkPanelSayisi) * yariAciklikMm;
+      const yukseklikMm = (i / direkPanelSayisi) * mahyaYuksekligiMm;
+      parcalar.push({
+        label: `Direk ${i}`,
+        profilKey: girdi.direkProfilKey,
+        uzunlukMm: Math.ceil(yukseklikMm),
+        adet: 2 * kafesSayisi, // iki yamaçta simetrik
+        not: `Makasın alt başlığı üzerinde, saçak (eave) ucundan bağlantı noktası: ${Math.round(konumMm)} mm.`,
+      });
+    }
   }
 
   // Diyagonal ağ: yarım açıklığı panelSayisi eşit panele bölüp, alt başlık <-> üst başlık arasında
   // zikzak (Warren tipi) çapraz eleman dizisi oluşturur - tam bir kafes makası gibi, sadece ortada
-  // birkaç eleman değil. diyagonalSayisi verilmişse panel sayısını ondan türetir (yaklaşık, /4),
-  // verilmemişse açıklığa göre otomatik makul bir panel sayısı seçer.
+  // birkaç eleman değil. Direk varsa panel sınırları direk konumlarıyla birebir aynı olur (çaprazlar
+  // direklerin arasında zikzak yapar). Direk yoksa diyagonalSayisi'nden (yaklaşık /4) ya da açıklığa
+  // göre otomatik makul bir panel sayısından türetilir.
   let diyagonalPanelSayisi = 0;
   if (girdi.diyagonalProfilKey) {
-    diyagonalPanelSayisi = diyagonalSayisi > 0 ? Math.max(1, Math.round(diyagonalSayisi / 4)) : Math.max(2, Math.round(yariAciklikMm / 900));
+    diyagonalPanelSayisi =
+      direkSayisi > 0
+        ? direkSayisi + 1
+        : diyagonalSayisi > 0
+        ? Math.max(1, Math.round(diyagonalSayisi / 4))
+        : Math.max(2, Math.round(yariAciklikMm / 900));
     const panelGenislikMm = yariAciklikMm / diyagonalPanelSayisi;
     let toplamCaprazMmBirYamacBirKafes = 0;
     for (let k = 0; k < diyagonalPanelSayisi; k++) {
@@ -221,6 +270,8 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
     catiAlaniM2: Math.round(catiAlaniM2 * 100) / 100,
     asikSatirSayisi,
     diyagonalPanelSayisi,
+    direkSayisi,
+    direkAralikMm: direkSayisi > 0 ? Math.round((yariAciklikMm / (direkSayisi + 1)) * 100) / 100 : 0,
   };
 
   return sonuc;

@@ -115,6 +115,11 @@ const trussSchema = z.object({
   ankrajSayisiPerPlaka: z.number().int().optional(),
   stabiliteBaglantisiVar: z.boolean().optional(),
   stabiliteProfilId: z.number().int().optional(),
+  olukluMu: z.boolean().optional(),
+  olukMesafesiMm: z.number().optional(),
+  cikmaPayiMm: z.number().optional(),
+  direkSayisi: z.number().int().optional(),
+  direkProfilId: z.number().int().optional(),
 });
 
 const customSchema = z.object({
