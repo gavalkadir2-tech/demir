@@ -4,7 +4,7 @@
 
 import { HesaplamaHatasi } from "./units";
 import { HesaplananParca, UrunHesapSonucu, bosSonuc, profilOzetOlustur } from "./types";
-import { KAPLAMA_BILGI, KaplamaTuru } from "./kaplama";
+import { KAPLAMA_BILGI, KaplamaTuru, kaplamaHesapla } from "./kaplama";
 
 export interface CatiKafesiGirdi {
   /** Açıklık (mm) - kafesin kapattığı toplam genişlik */
@@ -246,14 +246,17 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
   });
 
   const kaplamaTuru = girdi.kaplamaTuru ?? VARSAYILAN.kaplamaTuru;
+  let kaplamaOzet: ReturnType<typeof kaplamaHesapla> | null = null;
   if (kaplamaTuru !== "yok") {
     const kaplamaBilgisi = KAPLAMA_BILGI[kaplamaTuru];
+    kaplamaOzet = kaplamaHesapla(kaplamaTuru, ustBaslikUzunlukMm, catiUzunluguMm);
     sonuc.sacKalemleri.push({
       label: kaplamaBilgisi.label,
-      enMm: Math.round(catiUzunluguMm),
+      enMm: kaplamaBilgisi.faydaliGenislikMm,
       boyMm: Math.ceil(ustBaslikUzunlukMm),
       kalinlikMm: girdi.kaplamaKalinlikMm ?? kaplamaBilgisi.varsayilanKalinlikMm,
-      adet: 2, // iki yamaç
+      adet: kaplamaOzet.panelSayisi * 2, // iki yamaç
+      not: `Her yamaçta ${kaplamaOzet.panelSayisi} panel (${kaplamaBilgisi.faydaliGenislikMm} mm faydalı genişlik) yan yana; toplam net alan ${(kaplamaOzet.netAlaniM2 * 2).toFixed(2)} m², sipariş edilecek alan (fire dahil, ~%${kaplamaBilgisi.tipikFireYuzde} bindirme/kesim payı) ${(kaplamaOzet.siparisAlaniM2 * 2).toFixed(2)} m².`,
     });
   }
 
@@ -272,6 +275,13 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
     diyagonalPanelSayisi,
     direkSayisi,
     direkAralikMm: direkSayisi > 0 ? Math.round((yariAciklikMm / (direkSayisi + 1)) * 100) / 100 : 0,
+    ...(kaplamaOzet
+      ? {
+          kaplamaSiparisAlaniM2: Math.round(kaplamaOzet.siparisAlaniM2 * 2 * 100) / 100,
+          kaplamaFireM2: Math.round(kaplamaOzet.fireM2 * 2 * 100) / 100,
+          kaplamaFireYuzde: kaplamaOzet.fireYuzde,
+        }
+      : {}),
   };
 
   return sonuc;

@@ -396,12 +396,17 @@ export function UrunFormu({
   materials,
   onSaved,
   baslangic,
+  duzenlemeItemId,
+  baslangicAd,
 }: {
   templateKey: string;
   projectId: number;
   materials: Material[];
   onSaved?: () => void;
   baslangic?: Record<string, unknown>;
+  /** Verilirse form düzenleme modunda çalışır: kaydet POST yerine bu id'ye PUT yapar. */
+  duzenlemeItemId?: number;
+  baslangicAd?: string;
 }) {
   const navigate = useNavigate();
   const [onizleme, setOnizleme] = useState<{ sonuc: UrunHesapSonucu; malzemeler: Record<string, Material> } | null>(null);
@@ -409,7 +414,7 @@ export function UrunFormu({
   const [hesaplaniyor, setHesaplaniyor] = useState(false);
   const [kaydediliyor, setKaydediliyor] = useState(false);
   const [params, setParams] = useState<Record<string, unknown>>({});
-  const [name, setName] = useState("");
+  const [name, setName] = useState(baslangicAd ?? "");
   const [aiDanisman, setAiDanisman] = useState<AiDanismanSonucu | null>(null);
   const [aiDanismanYukleniyor, setAiDanismanYukleniyor] = useState(false);
   const [aiDanismanHata, setAiDanismanHata] = useState<string | null>(null);
@@ -450,7 +455,11 @@ export function UrunFormu({
     setKaydediliyor(true);
     setHata(null);
     try {
-      await api.post(`/projects/${projectId}/items`, { templateKey, name, params });
+      if (duzenlemeItemId) {
+        await api.put(`/projects/${projectId}/items/${duzenlemeItemId}`, { name, params });
+      } else {
+        await api.post(`/projects/${projectId}/items`, { templateKey, name, params });
+      }
       if (onSaved) onSaved();
       else navigate(`/isler/${projectId}`);
     } catch (e: any) {
@@ -566,7 +575,7 @@ export function UrunFormu({
           </div>
 
           <button className="btn-primary w-full" onClick={kaydet} disabled={kaydediliyor}>
-            {kaydediliyor ? "Kaydediliyor..." : "✅ Kaydet ve İşe Git"}
+            {kaydediliyor ? "Kaydediliyor..." : duzenlemeItemId ? "✅ Değişiklikleri Kaydet" : "✅ Kaydet ve İşe Git"}
           </button>
         </div>
       )}
@@ -595,11 +604,13 @@ function KorkulukAlanlari({
   const [toplamUzunlukMm, setToplamUzunlukMm] = useState<number>(() => (baslangic?.toplamUzunlukMm as number) ?? 12000);
   const [yukseklikMm, setYukseklikMm] = useState<number>(() => (baslangic?.yukseklikMm as number) ?? 1200);
   const [dikmeAraligiHedefMm, setDikmeAraligiHedefMm] = useState<number>(() => (baslangic?.dikmeAraligiHedefMm as number) ?? 1500);
-  const [ustProfilId, setUstProfilId] = useState<number>();
-  const [altProfilId, setAltProfilId] = useState<number>();
-  const [dikmeProfilId, setDikmeProfilId] = useState<number>();
+  const [ustProfilId, setUstProfilId] = useState<number | undefined>(() => baslangic?.ustProfilId as number | undefined);
+  const [altProfilId, setAltProfilId] = useState<number | undefined>(() => baslangic?.altProfilId as number | undefined);
+  const [dikmeProfilId, setDikmeProfilId] = useState<number | undefined>(() => baslangic?.dikmeProfilId as number | undefined);
   const [araKayitSayisi, setAraKayitSayisi] = useState<number>(() => (baslangic?.araKayitSayisi as number) ?? 0);
-  const [araKayitProfilId, setAraKayitProfilId] = useState<number>();
+  const [araKayitProfilId, setAraKayitProfilId] = useState<number | undefined>(
+    () => baslangic?.araKayitProfilId as number | undefined
+  );
 
   useEffect(() => {
     onChange({ toplamUzunlukMm, yukseklikMm, dikmeAraligiHedefMm, ustProfilId, altProfilId, dikmeProfilId, araKayitSayisi, araKayitProfilId });
@@ -644,12 +655,18 @@ function MerdivenAlanlari({
     () => (baslangic?.basamakYuksekligiHedefMm as number) ?? 180
   );
   const [toplamDerinlikMm, setToplamDerinlikMm] = useState<number>(() => (baslangic?.toplamDerinlikMm as number) ?? 4590);
-  const [tasiyiciProfilId, setTasiyiciProfilId] = useState<number>();
+  const [tasiyiciProfilId, setTasiyiciProfilId] = useState<number | undefined>(
+    () => baslangic?.tasiyiciProfilId as number | undefined
+  );
   const [korkulukYuksekligiMm, setKorkulukYuksekligiMm] = useState<number | undefined>(
     () => (baslangic?.korkulukYuksekligiMm as number | undefined) ?? undefined
   );
-  const [korkulukDikmeProfilId, setKorkulukDikmeProfilId] = useState<number>();
-  const [korkulukUstProfilId, setKorkulukUstProfilId] = useState<number>();
+  const [korkulukDikmeProfilId, setKorkulukDikmeProfilId] = useState<number | undefined>(
+    () => baslangic?.korkulukDikmeProfilId as number | undefined
+  );
+  const [korkulukUstProfilId, setKorkulukUstProfilId] = useState<number | undefined>(
+    () => baslangic?.korkulukUstProfilId as number | undefined
+  );
 
   useEffect(() => {
     onChange({
@@ -703,11 +720,17 @@ function SundurmaAlanlari({
   const [yukseklikMm, setYukseklikMm] = useState<number>(() => (baslangic?.yukseklikMm as number) ?? 2200);
   const [egimYuzde, setEgimYuzde] = useState<number>(() => (baslangic?.egimYuzde as number) ?? 10);
   const [dikmeSayisi, setDikmeSayisi] = useState<number>(() => (baslangic?.dikmeSayisi as number) ?? 3);
-  const [anaTasiyiciProfilId, setAnaTasiyiciProfilId] = useState<number>();
-  const [araTasiyiciProfilId, setAraTasiyiciProfilId] = useState<number>();
-  const [dikmeProfilId, setDikmeProfilId] = useState<number>();
-  const [caprazProfilId, setCaprazProfilId] = useState<number>();
-  const [kaplamaTuru, setKaplamaTuru] = useState<string>("trapez_sac");
+  const [anaTasiyiciProfilId, setAnaTasiyiciProfilId] = useState<number | undefined>(
+    () => baslangic?.anaTasiyiciProfilId as number | undefined
+  );
+  const [araTasiyiciProfilId, setAraTasiyiciProfilId] = useState<number | undefined>(
+    () => baslangic?.araTasiyiciProfilId as number | undefined
+  );
+  const [dikmeProfilId, setDikmeProfilId] = useState<number | undefined>(() => baslangic?.dikmeProfilId as number | undefined);
+  const [caprazProfilId, setCaprazProfilId] = useState<number | undefined>(
+    () => baslangic?.caprazProfilId as number | undefined
+  );
+  const [kaplamaTuru, setKaplamaTuru] = useState<string>(() => (baslangic?.kaplamaTuru as string) ?? "trapez_sac");
 
   useEffect(() => {
     onChange({
@@ -776,8 +799,8 @@ function KapiAlanlari({
 }) {
   const [genislikMm, setGenislikMm] = useState<number>(() => (baslangic?.genislikMm as number) ?? 1000);
   const [yukseklikMm, setYukseklikMm] = useState<number>(() => (baslangic?.yukseklikMm as number) ?? 2200);
-  const [kasaProfilId, setKasaProfilId] = useState<number>();
-  const [kanatProfilId, setKanatProfilId] = useState<number>();
+  const [kasaProfilId, setKasaProfilId] = useState<number | undefined>(() => baslangic?.kasaProfilId as number | undefined);
+  const [kanatProfilId, setKanatProfilId] = useState<number | undefined>(() => baslangic?.kanatProfilId as number | undefined);
   const [sacKalinlikMm, setSacKalinlikMm] = useState<number>(() => (baslangic?.sacKalinlikMm as number) ?? 1.5);
   const [menteseAdet, setMenteseAdet] = useState<number>(() => (baslangic?.menteseAdet as number) ?? 3);
   const [kilitAdet, setKilitAdet] = useState<number>(() => (baslangic?.kilitAdet as number) ?? 1);
@@ -831,9 +854,9 @@ function DuvarAlanlari({
   const [genislikMm, setGenislikMm] = useState<number>(() => (baslangic?.genislikMm as number) ?? 4000);
   const [yukseklikMm, setYukseklikMm] = useState<number>(() => (baslangic?.yukseklikMm as number) ?? 2500);
   const [dikmeAraligiHedefMm, setDikmeAraligiHedefMm] = useState<number>(() => (baslangic?.dikmeAraligiHedefMm as number) ?? 600);
-  const [ustProfilId, setUstProfilId] = useState<number>();
-  const [altProfilId, setAltProfilId] = useState<number>();
-  const [dikmeProfilId, setDikmeProfilId] = useState<number>();
+  const [ustProfilId, setUstProfilId] = useState<number | undefined>(() => baslangic?.ustProfilId as number | undefined);
+  const [altProfilId, setAltProfilId] = useState<number | undefined>(() => baslangic?.altProfilId as number | undefined);
+  const [dikmeProfilId, setDikmeProfilId] = useState<number | undefined>(() => baslangic?.dikmeProfilId as number | undefined);
   const [bosluklar, setBosluklar] = useState<DuvarBoslukTaslak[]>(
     () => (baslangic?.bosluklar as DuvarBoslukTaslak[] | undefined) ?? []
   );
@@ -937,21 +960,33 @@ function CatiKafesiAlanlari({
   const [kafesAraligiHedefMm, setKafesAraligiHedefMm] = useState<number>(
     () => (baslangic?.kafesAraligiHedefMm as number) ?? 900
   );
-  const [ustBaslikProfilId, setUstBaslikProfilId] = useState<number>();
-  const [altBaslikProfilId, setAltBaslikProfilId] = useState<number>();
-  const [kralKirisiProfilId, setKralKirisiProfilId] = useState<number>();
-  const [diyagonalProfilId, setDiyagonalProfilId] = useState<number>();
+  const [ustBaslikProfilId, setUstBaslikProfilId] = useState<number | undefined>(
+    () => baslangic?.ustBaslikProfilId as number | undefined
+  );
+  const [altBaslikProfilId, setAltBaslikProfilId] = useState<number | undefined>(
+    () => baslangic?.altBaslikProfilId as number | undefined
+  );
+  const [kralKirisiProfilId, setKralKirisiProfilId] = useState<number | undefined>(
+    () => baslangic?.kralKirisiProfilId as number | undefined
+  );
+  const [diyagonalProfilId, setDiyagonalProfilId] = useState<number | undefined>(
+    () => baslangic?.diyagonalProfilId as number | undefined
+  );
   const [diyagonalSayisi, setDiyagonalSayisi] = useState<number>(() => (baslangic?.diyagonalSayisi as number) ?? 0);
-  const [asikProfilId, setAsikProfilId] = useState<number>();
+  const [asikProfilId, setAsikProfilId] = useState<number | undefined>(() => baslangic?.asikProfilId as number | undefined);
   const [asikAraligiHedefMm, setAsikAraligiHedefMm] = useState<number>(() => (baslangic?.asikAraligiHedefMm as number) ?? 1000);
-  const [kaplamaTuru, setKaplamaTuru] = useState<string>("trapez_sac");
-  const [stabiliteBaglantisiVar, setStabiliteBaglantisiVar] = useState(false);
-  const [stabiliteProfilId, setStabiliteProfilId] = useState<number>();
+  const [kaplamaTuru, setKaplamaTuru] = useState<string>(() => (baslangic?.kaplamaTuru as string) ?? "trapez_sac");
+  const [stabiliteBaglantisiVar, setStabiliteBaglantisiVar] = useState(
+    () => (baslangic?.stabiliteBaglantisiVar as boolean) ?? false
+  );
+  const [stabiliteProfilId, setStabiliteProfilId] = useState<number | undefined>(
+    () => baslangic?.stabiliteProfilId as number | undefined
+  );
   const [olukluMu, setOlukluMu] = useState<boolean>(() => (baslangic?.olukluMu as boolean) ?? false);
   const [olukMesafesiMm, setOlukMesafesiMm] = useState<number>(() => (baslangic?.olukMesafesiMm as number) ?? 150);
   const [cikmaPayiMm, setCikmaPayiMm] = useState<number>(() => (baslangic?.cikmaPayiMm as number) ?? 300);
   const [direkSayisi, setDirekSayisi] = useState<number>(() => (baslangic?.direkSayisi as number) ?? 0);
-  const [direkProfilId, setDirekProfilId] = useState<number>();
+  const [direkProfilId, setDirekProfilId] = useState<number | undefined>(() => baslangic?.direkProfilId as number | undefined);
 
   useEffect(() => {
     onChange({

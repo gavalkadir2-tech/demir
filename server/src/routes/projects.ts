@@ -2,6 +2,9 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { asyncHandler } from "../lib/errors";
+import { parcaAgirlikKg, sacKalemleriAgirlikKg, yuvarla1 } from "../calc/weight";
+import { UrunHesapSonucu } from "../calc/types";
+import { KaplamaTuru } from "../calc/kaplama";
 
 import projectItemsRouter from "./projectItems";
 import partsRouter from "./parts";
@@ -88,7 +91,33 @@ router.get(
         quotes: { orderBy: { createdAt: "desc" } },
       },
     });
-    res.json(proje);
+
+    let profilAgirlikKg = 0;
+    let eksikAgirlikVerisi = false;
+    for (const p of proje.parts) {
+      if (p.material.unitWeightKgPerM) {
+        profilAgirlikKg += parcaAgirlikKg(p.lengthMm, p.qty, p.material.unitWeightKgPerM);
+      } else {
+        eksikAgirlikVerisi = true;
+      }
+    }
+    let sacAgirlikKg = 0;
+    for (const item of proje.items) {
+      const sonuc = item.resultJson as unknown as UrunHesapSonucu | null;
+      if (!sonuc?.sacKalemleri?.length) continue;
+      const kaplamaTuru = (item.paramsJson as Record<string, unknown> | null)?.kaplamaTuru as KaplamaTuru | undefined;
+      sacAgirlikKg += sacKalemleriAgirlikKg(sonuc.sacKalemleri, kaplamaTuru);
+    }
+
+    res.json({
+      ...proje,
+      agirlikOzeti: {
+        profilAgirlikKg: yuvarla1(profilAgirlikKg),
+        sacAgirlikKg: yuvarla1(sacAgirlikKg),
+        toplamAgirlikKg: yuvarla1(profilAgirlikKg + sacAgirlikKg),
+        eksikAgirlikVerisi,
+      },
+    });
   })
 );
 

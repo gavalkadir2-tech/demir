@@ -83,9 +83,10 @@ test("çatı kafesi: varsayılan kaplama (trapez sac) sac kalemi ekler", () => {
   });
   const kaplama = sonuc.sacKalemleri.find((s) => s.label.includes("kaplaması"))!;
   assert.ok(kaplama);
-  assert.equal(kaplama.enMm, 9000);
+  assert.equal(kaplama.enMm, 1000); // trapez sac faydalı panel genişliği
   assert.equal(kaplama.boyMm, 3133);
-  assert.equal(kaplama.adet, 2);
+  assert.equal(kaplama.adet, 18); // 9 panel (9000/1000) x 2 yamaç
+  assert.equal(sonuc.ozetDegerler.kaplamaFireYuzde, 8); // trapez sac tipik fire oranı
 });
 
 test("çatı kafesi: kaplamaTuru 'yok' verilirse sac kalemi eklenmez", () => {
@@ -335,4 +336,18 @@ test("çatı kafesi: geçersiz girdilerde hata fırlatır", () => {
       }),
     HesaplamaHatasi
   );
+});
+
+test("çatı kafesi: çatı uzunluğu panel genişliğine tam bölünmezse ekstra yuvarlama firesi eklenir", () => {
+  const sonuc = calculateRoofTruss({
+    acikligMm: 6000,
+    egimYuzde: 30,
+    catiUzunluguMm: 9200, // 1000mm panel ile tam bölünmüyor -> 10 panel gerekir (9000 değil)
+    kafesAraligiHedefMm: 900,
+    ustBaslikProfilKey: "ust",
+    altBaslikProfilKey: "alt",
+  });
+  const kaplama = sonuc.sacKalemleri.find((s) => s.label.includes("kaplaması"))!;
+  assert.equal(kaplama.adet, 20); // 10 panel x 2 yamaç
+  assert.ok(sonuc.ozetDegerler.kaplamaFireYuzde > 8); // yuvarlama firesi, tipik %8'in üzerinde
 });

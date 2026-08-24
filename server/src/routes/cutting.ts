@@ -1,9 +1,14 @@
 import { Router } from "express";
+import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { asyncHandler } from "../lib/errors";
 import { generateCuttingListsForProject } from "../lib/cuttingService";
 
 const router = Router({ mergeParams: true });
+
+const generateSchema = z.object({
+  mod: z.enum(["malzeme", "parca"]).optional(),
+});
 
 router.get(
   "/",
@@ -20,7 +25,8 @@ router.get(
 router.post(
   "/generate",
   asyncHandler(async (req, res) => {
-    const sonuc = await generateCuttingListsForProject(Number(req.params.projectId));
+    const { mod } = generateSchema.parse(req.body ?? {});
+    const sonuc = await generateCuttingListsForProject(Number(req.params.projectId), mod);
     res.json(sonuc);
   })
 );

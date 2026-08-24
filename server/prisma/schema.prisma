@@ -251,6 +251,7 @@ model CuttingList {
   project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   materialId       Int
   material         Material @relation(fields: [materialId], references: [id])
+  groupLabel       String? // "parça başına" modunda parça etiketi (örn. "Dikme"); "malzeme türüne göre" modunda boş
   standardLengthMm Float
   kerfMm           Float
   barsJson         Json // [{ cuts:number[], wasteMm:number }]

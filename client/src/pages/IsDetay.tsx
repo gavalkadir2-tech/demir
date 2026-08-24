@@ -3,8 +3,12 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import {
   Project,
+  ProjectItem,
+  Part,
   ProjectStatus,
+  ProjectCategory,
   Material,
+  Customer,
   LaborType,
   ExpenseType,
   ProductTemplate,
@@ -49,6 +53,7 @@ export default function IsDetay() {
   const projectId = Number(id);
   const [proje, setProje] = useState<Project | null>(null);
   const [tab, setTab] = useState<SekmeKey>("ozet");
+  const [duzenleModal, setDuzenleModal] = useState(false);
 
   const yukle = () => api.get<Project>(`/projects/${projectId}`).then(setProje);
 
@@ -73,22 +78,38 @@ export default function IsDetay() {
               {proje.customer?.name} • {KATEGORI_ETIKET[proje.category]} • {tarih(proje.createdAt)}
             </div>
           </div>
-          <select
-            className="field-select w-auto"
-            value={proje.status}
-            onChange={async (e) => {
-              await api.put(`/projects/${projectId}`, { status: e.target.value });
-              yukle();
-            }}
-          >
-            {DURUMLAR.map((d) => (
-              <option key={d} value={d}>
-                {DURUM_ETIKET[d]}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center gap-2">
+            <button className="btn-secondary btn-sm" onClick={() => setDuzenleModal(true)}>
+              ✏️ Düzenle
+            </button>
+            <select
+              className="field-select w-auto"
+              value={proje.status}
+              onChange={async (e) => {
+                await api.put(`/projects/${projectId}`, { status: e.target.value });
+                yukle();
+              }}
+            >
+              {DURUMLAR.map((d) => (
+                <option key={d} value={d}>
+                  {DURUM_ETIKET[d]}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
+
+      {duzenleModal && (
+        <IsDuzenleModal
+          proje={proje}
+          onClose={() => setDuzenleModal(false)}
+          onSaved={() => {
+            setDuzenleModal(false);
+            yukle();
+          }}
+        />
+      )}
 
       <div className="flex gap-1 overflow-x-auto border-b border-neutral-200">
         {SEKMELER.map((s) => (
@@ -110,6 +131,74 @@ export default function IsDetay() {
       {tab === "maliyet" && <MaliyetTab proje={proje} onChanged={yukle} />}
       {tab === "teklifler" && <TekliflerTab proje={proje} onChanged={yukle} />}
     </div>
+  );
+}
+
+const KATEGORILER = Object.keys(KATEGORI_ETIKET) as ProjectCategory[];
+
+function IsDuzenleModal({ proje, onClose, onSaved }: { proje: Project; onClose: () => void; onSaved: () => void }) {
+  const [musteriler, setMusteriler] = useState<Customer[] | null>(null);
+  const [title, setTitle] = useState(proje.title);
+  const [customerId, setCustomerId] = useState(proje.customerId);
+  const [category, setCategory] = useState<ProjectCategory>(proje.category);
+  const [hata, setHata] = useState<string | null>(null);
+  const [kaydediliyor, setKaydediliyor] = useState(false);
+
+  useEffect(() => {
+    api.get<Customer[]>("/customers").then(setMusteriler);
+  }, []);
+
+  const kaydet = async () => {
+    if (!title.trim()) return setHata("İş adı zorunlu.");
+    setKaydediliyor(true);
+    setHata(null);
+    try {
+      await api.put(`/projects/${proje.id}`, { title, customerId, category });
+      onSaved();
+    } catch (e: any) {
+      setHata(e.message);
+    } finally {
+      setKaydediliyor(false);
+    }
+  };
+
+  return (
+    <Modal open onClose={onClose} title="İşi Düzenle">
+      <div className="space-y-3">
+        <HataKutusu mesaj={hata} />
+        <div>
+          <label className="field-label">İş Adı</label>
+          <input className="field-input" value={title} onChange={(e) => setTitle(e.target.value)} />
+        </div>
+        <div>
+          <label className="field-label">Müşteri</label>
+          {!musteriler ? (
+            <Spinner />
+          ) : (
+            <select className="field-select" value={customerId} onChange={(e) => setCustomerId(Number(e.target.value))}>
+              {musteriler.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+        <div>
+          <label className="field-label">Kategori</label>
+          <select className="field-select" value={category} onChange={(e) => setCategory(e.target.value as ProjectCategory)}>
+            {KATEGORILER.map((k) => (
+              <option key={k} value={k}>
+                {KATEGORI_ETIKET[k]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button className="btn-primary w-full" onClick={kaydet} disabled={kaydediliyor}>
+          {kaydediliyor ? "Kaydediliyor..." : "Kaydet"}
+        </button>
+      </div>
+    </Modal>
   );
 }
 
@@ -225,6 +314,8 @@ function OzetTab({ proje, onChanged }: { proje: Project; onChanged: () => void }
 function ParcalarTab({ proje, onChanged }: { proje: Project; onChanged: () => void }) {
   const [manuelModal, setManuelModal] = useState(false);
   const [urunModal, setUrunModal] = useState(false);
+  const [duzenleItem, setDuzenleItem] = useState<ProjectItem | null>(null);
+  const [duzenleParca, setDuzenleParca] = useState<Part | null>(null);
 
   const itemSil = async (itemId: number) => {
     if (!confirm("Bu ürünü ve ilgili parçalarını silmek istediğinize emin misiniz?")) return;
@@ -242,6 +333,21 @@ function ParcalarTab({ proje, onChanged }: { proje: Project; onChanged: () => vo
 
   return (
     <div className="space-y-6">
+      {proje.agirlikOzeti && (
+        <div className="card flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <div className="text-sm text-neutral-500">Tahmini toplam iş ağırlığı</div>
+            <div className="text-2xl font-bold">{sayi(proje.agirlikOzeti.toplamAgirlikKg, 1)} kg</div>
+          </div>
+          {proje.agirlikOzeti.eksikAgirlikVerisi && (
+            <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 max-w-sm">
+              ⚠️ Bazı malzemelerin kg/m ağırlığı tanımlı değil; toplam eksik hesaplanmış olabilir. Malzemeler
+              sayfasından ağırlık girin.
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex gap-2 flex-wrap">
         <button className="btn-primary" onClick={() => setUrunModal(true)}>
           ➕ Ürün Şablonundan Ekle
@@ -258,14 +364,23 @@ function ParcalarTab({ proje, onChanged }: { proje: Project; onChanged: () => vo
               <div className="font-bold">{item.name}</div>
               <div className="text-sm text-neutral-500">{item.template.name}</div>
             </div>
-            <button className="btn-danger btn-sm" onClick={() => itemSil(item.id)}>
-              Sil
-            </button>
+            <div className="flex gap-2">
+              <button className="btn-secondary btn-sm" onClick={() => setDuzenleItem(item)}>
+                ✏️ Düzenle
+              </button>
+              <button className="btn-danger btn-sm" onClick={() => itemSil(item.id)}>
+                Sil
+              </button>
+            </div>
           </div>
           <div className="mb-3">
             <SemaGorunum templateKey={item.template.key} params={item.paramsJson} ozetDegerler={item.resultJson.ozetDegerler} />
           </div>
-          <PartTable parcalar={(proje.parts ?? []).filter((p) => p.projectItemId === item.id)} onDelete={parcaSil} />
+          <PartTable
+            parcalar={(proje.parts ?? []).filter((p) => p.projectItemId === item.id)}
+            onDelete={parcaSil}
+            onEdit={setDuzenleParca}
+          />
         </div>
       ))}
 
@@ -274,7 +389,7 @@ function ParcalarTab({ proje, onChanged }: { proje: Project; onChanged: () => vo
         {manuelParcalar.length === 0 ? (
           <div className="text-sm text-neutral-500">Manuel eklenen parça yok.</div>
         ) : (
-          <PartTable parcalar={manuelParcalar} onDelete={parcaSil} />
+          <PartTable parcalar={manuelParcalar} onDelete={parcaSil} onEdit={setDuzenleParca} />
         )}
       </div>
 
@@ -292,6 +407,17 @@ function ParcalarTab({ proje, onChanged }: { proje: Project; onChanged: () => vo
           }}
         />
       )}
+      {duzenleParca && (
+        <ManuelParcaModal
+          projectId={proje.id}
+          duzenleParca={duzenleParca}
+          onClose={() => setDuzenleParca(null)}
+          onSaved={() => {
+            setDuzenleParca(null);
+            onChanged();
+          }}
+        />
+      )}
       {urunModal && (
         <UrunSablonuModal
           projectId={proje.id}
@@ -302,12 +428,37 @@ function ParcalarTab({ proje, onChanged }: { proje: Project; onChanged: () => vo
           }}
         />
       )}
+      {duzenleItem && (
+        <UrunSablonuModal
+          projectId={proje.id}
+          duzenleItem={duzenleItem}
+          onClose={() => setDuzenleItem(null)}
+          onSaved={() => {
+            setDuzenleItem(null);
+            onChanged();
+          }}
+        />
+      )}
     </div>
   );
 }
 
-function PartTable({ parcalar, onDelete }: { parcalar: Project["parts"]; onDelete: (id: number) => void }) {
+function parcaAgirlikKg(p: Part): number | null {
+  if (!p.material.unitWeightKgPerM) return null;
+  return (p.lengthMm / 1000) * p.qty * p.material.unitWeightKgPerM;
+}
+
+function PartTable({
+  parcalar,
+  onDelete,
+  onEdit,
+}: {
+  parcalar: Project["parts"];
+  onDelete: (id: number) => void;
+  onEdit?: (p: Part) => void;
+}) {
   if (!parcalar || parcalar.length === 0) return null;
+  const toplamAgirlik = parcalar.reduce((acc, p) => acc + (parcaAgirlikKg(p) ?? 0), 0);
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -317,36 +468,65 @@ function PartTable({ parcalar, onDelete }: { parcalar: Project["parts"]; onDelet
             <th className="px-3 py-2">Malzeme</th>
             <th className="px-3 py-2">Uzunluk</th>
             <th className="px-3 py-2">Adet</th>
+            <th className="px-3 py-2">Ağırlık</th>
             <th className="px-3 py-2"></th>
           </tr>
         </thead>
         <tbody className="divide-y divide-neutral-100">
-          {parcalar.map((p) => (
-            <tr key={p.id}>
-              <td className="px-3 py-2 font-medium">{p.label || "-"}</td>
-              <td className="px-3 py-2">{p.material.name}</td>
-              <td className="px-3 py-2">{mm(p.lengthMm)}</td>
-              <td className="px-3 py-2">{p.qty}</td>
-              <td className="px-3 py-2 text-right">
-                <button className="text-red-600 text-xs font-semibold" onClick={() => onDelete(p.id)}>
-                  Sil
-                </button>
-              </td>
-            </tr>
-          ))}
+          {parcalar.map((p) => {
+            const agirlik = parcaAgirlikKg(p);
+            return (
+              <tr key={p.id}>
+                <td className="px-3 py-2 font-medium">{p.label || "-"}</td>
+                <td className="px-3 py-2">{p.material.name}</td>
+                <td className="px-3 py-2">{mm(p.lengthMm)}</td>
+                <td className="px-3 py-2">{p.qty}</td>
+                <td className="px-3 py-2 text-neutral-600">{agirlik != null ? `${sayi(agirlik, 1)} kg` : "-"}</td>
+                <td className="px-3 py-2 text-right whitespace-nowrap">
+                  {onEdit && (
+                    <button className="text-brand-700 text-xs font-semibold mr-3" onClick={() => onEdit(p)}>
+                      Düzenle
+                    </button>
+                  )}
+                  <button className="text-red-600 text-xs font-semibold" onClick={() => onDelete(p.id)}>
+                    Sil
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
+        <tfoot>
+          <tr className="border-t border-neutral-200 font-semibold">
+            <td className="px-3 py-2" colSpan={4}>
+              Toplam
+            </td>
+            <td className="px-3 py-2">{sayi(toplamAgirlik, 1)} kg</td>
+            <td />
+          </tr>
+        </tfoot>
       </table>
     </div>
   );
 }
 
-function ManuelParcaModal({ projectId, onClose, onSaved }: { projectId: number; onClose: () => void; onSaved: () => void }) {
+function ManuelParcaModal({
+  projectId,
+  duzenleParca,
+  onClose,
+  onSaved,
+}: {
+  projectId: number;
+  duzenleParca?: Part;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
   const [materials, setMaterials] = useState<Material[] | null>(null);
-  const [materialId, setMaterialId] = useState<number>();
-  const [label, setLabel] = useState("");
-  const [lengthMm, setLengthMm] = useState(1000);
-  const [qty, setQty] = useState(1);
-  const [note, setNote] = useState("");
+  const [materialId, setMaterialId] = useState<number | undefined>(duzenleParca?.materialId);
+  const [label, setLabel] = useState(duzenleParca?.label ?? "");
+  const [lengthMm, setLengthMm] = useState(duzenleParca?.lengthMm ?? 1000);
+  const [qty, setQty] = useState(duzenleParca?.qty ?? 1);
+  const [note, setNote] = useState(duzenleParca?.note ?? "");
   const [hata, setHata] = useState<string | null>(null);
   const [kaydediliyor, setKaydediliyor] = useState(false);
 
@@ -359,7 +539,11 @@ function ManuelParcaModal({ projectId, onClose, onSaved }: { projectId: number; 
     setKaydediliyor(true);
     setHata(null);
     try {
-      await api.post(`/projects/${projectId}/parts`, { materialId, label, lengthMm, qty, note });
+      if (duzenleParca) {
+        await api.put(`/projects/${projectId}/parts/${duzenleParca.id}`, { materialId, label, lengthMm, qty, note });
+      } else {
+        await api.post(`/projects/${projectId}/parts`, { materialId, label, lengthMm, qty, note });
+      }
       onSaved();
     } catch (e: any) {
       setHata(e.message);
@@ -369,9 +553,15 @@ function ManuelParcaModal({ projectId, onClose, onSaved }: { projectId: number; 
   };
 
   return (
-    <Modal open onClose={onClose} title="Manuel Parça Ekle">
+    <Modal open onClose={onClose} title={duzenleParca ? "Parçayı Düzenle" : "Manuel Parça Ekle"}>
       <div className="space-y-3">
         <HataKutusu mesaj={hata} />
+        {duzenleParca?.projectItemId && (
+          <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            ⚠️ Bu parça bir ürün şablonundan otomatik üretildi. Elle değiştirirseniz, ürünü tekrar düzenleyip
+            yeniden hesapladığınızda bu değişiklik kaybolur.
+          </div>
+        )}
         {!materials ? (
           <Spinner />
         ) : (
@@ -396,17 +586,27 @@ function ManuelParcaModal({ projectId, onClose, onSaved }: { projectId: number; 
           <input className="field-input" value={note} onChange={(e) => setNote(e.target.value)} />
         </div>
         <button className="btn-primary w-full" onClick={kaydet} disabled={kaydediliyor}>
-          {kaydediliyor ? "Kaydediliyor..." : "Ekle"}
+          {kaydediliyor ? "Kaydediliyor..." : duzenleParca ? "Kaydet" : "Ekle"}
         </button>
       </div>
     </Modal>
   );
 }
 
-function UrunSablonuModal({ projectId, onClose, onSaved }: { projectId: number; onClose: () => void; onSaved: () => void }) {
+function UrunSablonuModal({
+  projectId,
+  duzenleItem,
+  onClose,
+  onSaved,
+}: {
+  projectId: number;
+  duzenleItem?: ProjectItem;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
   const [sablonlar, setSablonlar] = useState<ProductTemplate[] | null>(null);
   const [materials, setMaterials] = useState<Material[] | null>(null);
-  const [secilenTemplate, setSecilenTemplate] = useState<string | null>(null);
+  const [secilenTemplate, setSecilenTemplate] = useState<string | null>(duzenleItem?.template.key ?? null);
 
   useEffect(() => {
     api.get<ProductTemplate[]>("/product-templates").then((t) => setSablonlar(t.filter((s) => s.key !== "custom")));
@@ -414,7 +614,7 @@ function UrunSablonuModal({ projectId, onClose, onSaved }: { projectId: number; 
   }, []);
 
   return (
-    <Modal open onClose={onClose} title="Ürün Şablonundan Ekle" wide>
+    <Modal open onClose={onClose} title={duzenleItem ? `"${duzenleItem.name}" Ürününü Düzenle` : "Ürün Şablonundan Ekle"} wide>
       {!secilenTemplate ? (
         !sablonlar ? (
           <Spinner />
@@ -431,7 +631,15 @@ function UrunSablonuModal({ projectId, onClose, onSaved }: { projectId: number; 
       ) : !materials ? (
         <Spinner />
       ) : (
-        <UrunFormu templateKey={secilenTemplate} projectId={projectId} materials={materials} onSaved={onSaved} />
+        <UrunFormu
+          templateKey={secilenTemplate}
+          projectId={projectId}
+          materials={materials}
+          onSaved={onSaved}
+          baslangic={duzenleItem?.paramsJson}
+          baslangicAd={duzenleItem?.name}
+          duzenlemeItemId={duzenleItem?.id}
+        />
       )}
     </Modal>
   );
@@ -441,12 +649,13 @@ function KesimTab({ proje, onChanged }: { proje: Project; onChanged: () => void 
   const [uretiliyor, setUretiliyor] = useState(false);
   const [uyarilar, setUyarilar] = useState<string[]>([]);
   const [hata, setHata] = useState<string | null>(null);
+  const [mod, setMod] = useState<"malzeme" | "parca">("malzeme");
 
   const uret = async () => {
     setUretiliyor(true);
     setHata(null);
     try {
-      const r = await api.post<{ uyarilar: string[] }>(`/projects/${proje.id}/cutting/generate`);
+      const r = await api.post<{ uyarilar: string[] }>(`/projects/${proje.id}/cutting/generate`, { mod });
       setUyarilar(r.uyarilar);
       onChanged();
     } catch (e: any) {
@@ -460,9 +669,33 @@ function KesimTab({ proje, onChanged }: { proje: Project; onChanged: () => void 
     <div className="space-y-6">
       <HataKutusu mesaj={hata} />
       <UyariKutusu mesajlar={uyarilar} />
-      <button className="btn-primary" onClick={uret} disabled={uretiliyor}>
-        {uretiliyor ? "Hesaplanıyor..." : "✂️ Kesim Planını Oluştur / Güncelle"}
-      </button>
+      <div className="card space-y-3">
+        <div>
+          <label className="field-label">Kesim listesi nasıl gruplansın?</label>
+          <div className="flex gap-2">
+            <button
+              className={mod === "malzeme" ? "btn-primary btn-sm flex-1" : "btn-secondary btn-sm flex-1"}
+              onClick={() => setMod("malzeme")}
+            >
+              Malzeme türüne göre (en verimli)
+            </button>
+            <button
+              className={mod === "parca" ? "btn-primary btn-sm flex-1" : "btn-secondary btn-sm flex-1"}
+              onClick={() => setMod("parca")}
+            >
+              Parça başına (takibi kolay)
+            </button>
+          </div>
+          <p className="text-xs text-neutral-500 mt-1">
+            {mod === "malzeme"
+              ? "Aynı malzemedeki tüm parçalar (etiketten bağımsız) tek havuzda en az fire ile nestelenir."
+              : "Her parça türü (Dikme, Üst ray vb.) kendi çubuklarında ayrı hesaplanır; sahada takibi kolaydır ama fire biraz daha fazla olabilir."}
+          </p>
+        </div>
+        <button className="btn-primary" onClick={uret} disabled={uretiliyor}>
+          {uretiliyor ? "Hesaplanıyor..." : "✂️ Kesim Planını Oluştur / Güncelle"}
+        </button>
+      </div>
 
       {(proje.cuttingLists ?? []).length === 0 ? (
         <EmptyState title="Henüz kesim planı yok" description="Parçalar eklendikten sonra kesim planını oluşturun." />
@@ -470,7 +703,10 @@ function KesimTab({ proje, onChanged }: { proje: Project; onChanged: () => void 
         (proje.cuttingLists ?? []).map((cl) => (
           <div key={cl.id} className="card space-y-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <h2 className="font-bold text-lg">{cl.material.name}</h2>
+              <h2 className="font-bold text-lg">
+                {cl.material.name}
+                {cl.groupLabel && <span className="text-neutral-500 font-normal"> — {cl.groupLabel}</span>}
+              </h2>
               <div className="text-sm text-neutral-500">
                 Standart boy: {cl.standardLengthMm / 1000} m • Kesim payı: {cl.kerfMm} mm
               </div>

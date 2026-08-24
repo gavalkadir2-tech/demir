@@ -12,6 +12,7 @@ export default function KesimListeleri() {
   const [uretiliyor, setUretiliyor] = useState(false);
   const [uyarilar, setUyarilar] = useState<string[]>([]);
   const [hata, setHata] = useState<string | null>(null);
+  const [mod, setMod] = useState<"malzeme" | "parca">("malzeme");
 
   useEffect(() => {
     api.get<Project[]>("/projects").then((p) => {
@@ -31,7 +32,7 @@ export default function KesimListeleri() {
     setUretiliyor(true);
     setHata(null);
     try {
-      const r = await api.post<{ uyarilar: string[] }>(`/projects/${projectId}/cutting/generate`);
+      const r = await api.post<{ uyarilar: string[] }>(`/projects/${projectId}/cutting/generate`, { mod });
       setUyarilar(r.uyarilar);
       yukle(projectId);
     } catch (e: any) {
@@ -67,6 +68,21 @@ export default function KesimListeleri() {
             </button>
           </div>
 
+          <div className="flex gap-2 max-w-md">
+            <button
+              className={mod === "malzeme" ? "btn-primary btn-sm flex-1" : "btn-secondary btn-sm flex-1"}
+              onClick={() => setMod("malzeme")}
+            >
+              Malzeme türüne göre
+            </button>
+            <button
+              className={mod === "parca" ? "btn-primary btn-sm flex-1" : "btn-secondary btn-sm flex-1"}
+              onClick={() => setMod("parca")}
+            >
+              Parça başına
+            </button>
+          </div>
+
           <HataKutusu mesaj={hata} />
           <UyariKutusu mesajlar={uyarilar} />
 
@@ -78,7 +94,10 @@ export default function KesimListeleri() {
             listeler.map((cl) => (
               <div key={cl.id} className="card space-y-3">
                 <div className="flex items-center justify-between flex-wrap gap-2">
-                  <h2 className="font-bold text-lg">{cl.material.name}</h2>
+                  <h2 className="font-bold text-lg">
+                    {cl.material.name}
+                    {cl.groupLabel && <span className="text-neutral-500 font-normal"> — {cl.groupLabel}</span>}
+                  </h2>
                   <div className="text-sm text-neutral-500">
                     Standart boy: {cl.standardLengthMm / 1000} m • Kesim payı: {cl.kerfMm} mm
                   </div>

@@ -4,6 +4,8 @@ export interface SundurmaSemaVeri {
   yukseklikMm: number;
   boyMm: number;
   egimYuzde: number;
+  kirisUzunlukMm?: number;
+  egimDerece?: number;
 }
 
 const MARGIN_LEFT = 70;
@@ -13,7 +15,7 @@ const MARGIN_BOTTOM = 60;
 
 /** Sundurmanın yandan (kesit) görünüşünü ölçekli, ölçüleri etiketli SVG olarak gösterir. */
 export default function CanopySchematic({ veri }: { veri: SundurmaSemaVeri }) {
-  const { yukseklikMm, boyMm, egimYuzde } = veri;
+  const { yukseklikMm, boyMm, egimYuzde, kirisUzunlukMm, egimDerece } = veri;
   if (!yukseklikMm || !boyMm) return null;
 
   const yukselisMm = boyMm * (egimYuzde / 100);
@@ -66,6 +68,21 @@ export default function CanopySchematic({ veri }: { veri: SundurmaSemaVeri }) {
       <text x={(x0 + arkaX) / 2} y={(onTopY + arkaTopY) / 2 - 8} textAnchor="middle" fontSize={12} fill="#525252">
         eğim %{egimYuzde}
       </text>
+      {kirisUzunlukMm && (
+        <text
+          x={(x0 + arkaX) / 2}
+          y={(onTopY + arkaTopY) / 2 + 16}
+          textAnchor="middle"
+          fontSize={11}
+          fill={PALET.yatay}
+          transform={`rotate(${-Math.atan2(onTopY - arkaTopY, arkaX - x0) * (180 / Math.PI)} ${(x0 + arkaX) / 2} ${
+            (onTopY + arkaTopY) / 2 + 16
+          })`}
+        >
+          kiriş: {mmEtiket(kirisUzunlukMm)}
+          {egimDerece ? ` · ${Math.round(egimDerece)}°` : ""}
+        </text>
+      )}
 
       <Lejant kalemler={lejant} y={VIEW_H + 6} />
     </svg>

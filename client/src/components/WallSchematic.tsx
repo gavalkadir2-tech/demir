@@ -123,7 +123,7 @@ export default function WallSchematic({ veri }: { veri: DuvarPaneliSemaVeri }) {
               <rect x={x0 + b.konumMm * scale} y={bosAltY} width={b.genislikMm * scale} height={RAY_KALINLIK} fill={PALET.vurgu} />
             )}
             <text x={x0 + (b.konumMm + b.genislikMm / 2) * scale} y={bosUstY + 14} textAnchor="middle" fontSize={10} fill="#a3a3a3">
-              {b.etiket}
+              {b.etiket} ({mmEtiket(b.genislikMm)})
             </text>
           </g>
         );

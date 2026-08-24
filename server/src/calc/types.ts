@@ -21,6 +21,7 @@ export interface SacKalemi {
   boyMm: number;
   kalinlikMm?: number;
   adet: number;
+  not?: string;
 }
 
 /** Bağlantı elemanı / sarf malzeme ihtiyacı (ankraj, cıvata, menteşe, kilit vb.) */

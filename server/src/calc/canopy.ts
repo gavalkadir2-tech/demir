@@ -2,7 +2,7 @@
 
 import { HesaplamaHatasi } from "./units";
 import { HesaplananParca, UrunHesapSonucu, bosSonuc, profilOzetOlustur } from "./types";
-import { KAPLAMA_BILGI, KaplamaTuru } from "./kaplama";
+import { KAPLAMA_BILGI, KaplamaTuru, kaplamaHesapla } from "./kaplama";
 
 export interface SundurmaGirdi {
   /** En (mm) - ön cephe genişliği */
@@ -122,14 +122,17 @@ export function calculateCanopy(girdi: SundurmaGirdi): UrunHesapSonucu {
   });
 
   const catiAlaniM2 = (genislikMm / 1000) * (kirisUzunlukMm / 1000);
+  let kaplamaOzet: ReturnType<typeof kaplamaHesapla> | null = null;
   if (kaplamaTuru !== "yok") {
     const kaplamaBilgisi = KAPLAMA_BILGI[kaplamaTuru];
+    kaplamaOzet = kaplamaHesapla(kaplamaTuru, kirisUzunlukMm, genislikMm);
     sonuc.sacKalemleri.push({
       label: kaplamaBilgisi.label,
-      enMm: Math.round(genislikMm),
+      enMm: kaplamaBilgisi.faydaliGenislikMm,
       boyMm: Math.ceil(kirisUzunlukMm),
       kalinlikMm: girdi.kaplamaKalinlikMm ?? kaplamaBilgisi.varsayilanKalinlikMm,
-      adet: 1,
+      adet: kaplamaOzet.panelSayisi,
+      not: `${kaplamaOzet.panelSayisi} panel (${kaplamaBilgisi.faydaliGenislikMm} mm faydalı genişlik) yan yana; net alan ${kaplamaOzet.netAlaniM2} m², sipariş edilecek alan (fire dahil, ~%${kaplamaBilgisi.tipikFireYuzde} bindirme/kesim payı) ${kaplamaOzet.siparisAlaniM2} m².`,
     });
   }
 
@@ -145,6 +148,13 @@ export function calculateCanopy(girdi: SundurmaGirdi): UrunHesapSonucu {
     egimDerece: Math.round((egimRad * 180) / Math.PI * 100) / 100,
     catiAlaniM2: Math.round(catiAlaniM2 * 100) / 100,
     asikSatirSayisi,
+    ...(kaplamaOzet
+      ? {
+          kaplamaSiparisAlaniM2: kaplamaOzet.siparisAlaniM2,
+          kaplamaFireM2: kaplamaOzet.fireM2,
+          kaplamaFireYuzde: kaplamaOzet.fireYuzde,
+        }
+      : {}),
   };
 
   return sonuc;

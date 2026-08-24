@@ -87,6 +87,61 @@ router.post(
   })
 );
 
+router.put(
+  "/:itemId",
+  asyncHandler(async (req, res) => {
+    const projectId = Number(req.params.projectId);
+    const itemId = Number(req.params.itemId);
+    const { name, params } = gövdeSchema.omit({ templateKey: true }).parse(req.body);
+
+    const mevcut = await prisma.projectItem.findUniqueOrThrow({ where: { id: itemId }, include: { template: true } });
+    const templateKey = mevcut.template.key;
+
+    let girdi: unknown;
+    if (templateKey === "custom") {
+      const parsed = CUSTOM_SCHEMA.parse(params);
+      girdi = { parcalar: parsed.parcalar.map((p: any) => ({ ...p, profilKey: String(p.materialId) })) };
+    } else {
+      const schema = TEMPLATE_SCHEMAS[templateKey];
+      if (!schema) throw new ApiHatasi(400, `"${templateKey}" şablonu için doğrulama şeması tanımlı değil.`);
+      const parsed = schema.parse(params);
+      girdi = idToKey(parsed as Record<string, unknown>);
+    }
+
+    const sonuc = calculateByTemplateKey(templateKey, girdi);
+
+    const item = await prisma.$transaction(async (tx) => {
+      await tx.part.deleteMany({ where: { projectItemId: itemId } });
+
+      const updated = await tx.projectItem.update({
+        where: { id: itemId },
+        data: { name, paramsJson: params, resultJson: sonuc as any },
+      });
+
+      for (const parca of sonuc.parcalar) {
+        const materialId = Number(parca.profilKey);
+        if (Number.isNaN(materialId)) continue;
+        await tx.part.create({
+          data: {
+            projectId,
+            projectItemId: itemId,
+            materialId,
+            label: parca.label,
+            lengthMm: parca.uzunlukMm,
+            qty: parca.adet,
+            note: parca.not,
+          },
+        });
+      }
+
+      return updated;
+    });
+
+    const malzemeler = await malzemeSozlugu(sonuc);
+    res.json({ item, sonuc, malzemeler });
+  })
+);
+
 router.delete(
   "/:itemId",
   asyncHandler(async (req, res) => {

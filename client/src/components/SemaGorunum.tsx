@@ -51,6 +51,8 @@ export default function SemaGorunum({
             yukseklikMm: n("yukseklikMm"),
             boyMm: n("boyMm"),
             egimYuzde: n("egimYuzde"),
+            kirisUzunlukMm: ozetDegerler.kirisUzunlukMm,
+            egimDerece: ozetDegerler.egimDerece,
           }}
         />
       );

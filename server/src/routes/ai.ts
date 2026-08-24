@@ -5,7 +5,8 @@ import { asyncHandler, ApiHatasi } from "../lib/errors";
 import { prisma } from "../lib/prisma";
 import { calculateByTemplateKey } from "../calc";
 import { TEMPLATE_SCHEMAS, idToKey, malzemeSozlugu } from "./calc";
-import { KAPLAMA_BILGI, KaplamaTuru } from "../calc/kaplama";
+import { KaplamaTuru } from "../calc/kaplama";
+import { parcaAgirlikKg, sacKalemleriAgirlikKg, yuvarla1 } from "../calc/weight";
 
 const router = Router();
 
@@ -359,9 +360,6 @@ const SABLON_TURKCE: Record<string, string> = {
   truss: "Çatı Kafesi",
 };
 
-const CELIK_YOGUNLUK_KG_M3 = 7850;
-const POLIKARBON_YOGUNLUK_KG_M3 = 1200;
-
 router.post(
   "/malzeme-danismani",
   asyncHandler(async (req, res) => {
@@ -380,7 +378,7 @@ router.post(
       const malzeme = malzemeler[ozet.profilKey];
       if (!malzeme) continue;
       if (malzeme.unitWeightKgPerM) {
-        profilAgirlikKg += ozet.toplamMetre * malzeme.unitWeightKgPerM;
+        profilAgirlikKg += parcaAgirlikKg(ozet.toplamMetre * 1000, 1, malzeme.unitWeightKgPerM);
       } else {
         eksikAgirlikVerisi = true;
       }
@@ -392,19 +390,9 @@ router.post(
     }
 
     const kaplamaTuru = (parsed as Record<string, unknown>).kaplamaTuru as KaplamaTuru | undefined;
-    let sacAgirlikKg = 0;
-    for (const sac of sonuc.sacKalemleri) {
-      const alanM2 = (sac.enMm / 1000) * (sac.boyMm / 1000) * sac.adet;
-      let yogunluk = CELIK_YOGUNLUK_KG_M3;
-      if (sac.label.includes("kaplaması") && kaplamaTuru && kaplamaTuru !== "yok") {
-        yogunluk = KAPLAMA_BILGI[kaplamaTuru]?.efektifYogunlukKgM3 ?? yogunluk;
-      } else if (sac.label.toLowerCase().includes("polikarbon")) {
-        yogunluk = POLIKARBON_YOGUNLUK_KG_M3;
-      }
-      sacAgirlikKg += alanM2 * ((sac.kalinlikMm ?? 1) / 1000) * yogunluk;
-    }
+    const sacAgirlikKg = sacKalemleriAgirlikKg(sonuc.sacKalemleri, kaplamaTuru);
 
-    const toplamAgirlikKg = Math.round((profilAgirlikKg + sacAgirlikKg) * 10) / 10;
+    const toplamAgirlikKg = yuvarla1(profilAgirlikKg + sacAgirlikKg);
 
     const olculer = Object.entries(sonuc.ozetDegerler)
       .map(([k, v]) => `${k}: ${v}`)

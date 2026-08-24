@@ -145,7 +145,7 @@ export interface HesaplananParca {
 export interface UrunHesapSonucu {
   parcalar: HesaplananParca[];
   profilOzet: { profilKey: string; toplamMetre: number; toplamAdetParca: number }[];
-  sacKalemleri: { label: string; enMm: number; boyMm: number; kalinlikMm?: number; adet: number }[];
+  sacKalemleri: { label: string; enMm: number; boyMm: number; kalinlikMm?: number; adet: number; not?: string }[];
   baglantiKalemleri: { label: string; birim: string; adet: number }[];
   uyarilar: string[];
   ozetDegerler: Record<string, number>;
@@ -176,6 +176,7 @@ export interface Project {
   expenses?: Expense[];
   cuttingLists?: CuttingList[];
   quotes?: Quote[];
+  agirlikOzeti?: { profilAgirlikKg: number; sacAgirlikKg: number; toplamAgirlikKg: number; eksikAgirlikVerisi: boolean };
 }
 
 export type LaborType = "WELDING" | "CUTTING" | "ASSEMBLY" | "PAINTING" | "OTHER";
@@ -223,6 +224,7 @@ export interface CuttingList {
   projectId: number;
   materialId: number;
   material: Material;
+  groupLabel?: string | null;
   standardLengthMm: number;
   kerfMm: number;
   barsJson: KesimCubugu[];
