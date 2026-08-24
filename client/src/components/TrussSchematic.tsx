@@ -1,59 +1,120 @@
-import { OkTanimlari, YatayOlcu, DikeyOlcu, mmEtiket, PALET, Lejant, VIEW_W, VIEW_H, LEGEND_H } from "./schematicShared";
+import { OkTanimlari, YatayOlcu, DikeyOlcu, mmEtiket, PALET, Lejant, VIEW_W } from "./schematicShared";
 
 export interface CatiKafesiSemaVeri {
   acikligMm: number;
   egimYuzde: number;
+  catiUzunluguMm: number;
   asikVar?: boolean;
   asikAraligiHedefMm?: number;
+  diyagonalVar?: boolean;
+  diyagonalSayisi?: number;
+  kafesSayisi?: number;
+  gercekAralikMm?: number;
 }
 
 const MARGIN_LEFT = 70;
 const MARGIN_RIGHT = 30;
-const MARGIN_TOP = 30;
-const MARGIN_BOTTOM = 60;
 
-/** Çatı kafesinin (kral kirişi tipi) önden görünüşünü ölçekli, ölçüleri etiketli SVG olarak gösterir. */
+// Panel A: kesit görünüşü (üçgen profil)
+const PANEL_A_TOP = 20;
+const PANEL_A_H = 190;
+const PANEL_A_DIM_H = 40;
+const PANEL_A_BOTTOM = PANEL_A_TOP + PANEL_A_H + PANEL_A_DIM_H;
+
+// Panel B: aşık yerleşim planı (bir yamaç, açılmış görünüş)
+const PANEL_B_LABEL_H = 40;
+const PANEL_B_TOP = PANEL_A_BOTTOM + PANEL_B_LABEL_H;
+const PANEL_B_H = 110;
+const PANEL_B_DIM_H = 40;
+const PANEL_B_BOTTOM = PANEL_B_TOP + PANEL_B_H + PANEL_B_DIM_H;
+
+const LEGEND_Y = PANEL_B_BOTTOM + 8;
+const LEGEND_H = 32;
+const TOTAL_H = LEGEND_Y + LEGEND_H;
+
+/** Çatı kafesinin (kral kirişi tipi) kesit görünüşünü + aşık yerleşim planını ölçekli SVG olarak gösterir. */
 export default function TrussSchematic({ veri }: { veri: CatiKafesiSemaVeri }) {
-  const { acikligMm, egimYuzde, asikVar = false, asikAraligiHedefMm = 1000 } = veri;
+  const {
+    acikligMm,
+    egimYuzde,
+    catiUzunluguMm,
+    asikVar = false,
+    asikAraligiHedefMm = 1000,
+    diyagonalVar = false,
+    diyagonalSayisi = 0,
+    kafesSayisi = 2,
+    gercekAralikMm = catiUzunluguMm,
+  } = veri;
   if (!acikligMm) return null;
 
   const yariAciklikMm = acikligMm / 2;
   const mahyaYuksekligiMm = yariAciklikMm * (egimYuzde / 100);
   const ustBaslikUzunlukMm = Math.sqrt(yariAciklikMm ** 2 + mahyaYuksekligiMm ** 2);
   const asikSatirSayisiPerSide = asikVar ? Math.max(2, Math.ceil(ustBaslikUzunlukMm / asikAraligiHedefMm) + 1) : 0;
+  const diyagonalCizilecekSayi = diyagonalVar ? Math.min(diyagonalSayisi, 4) : 0;
 
-  const drawW = VIEW_W - MARGIN_LEFT - MARGIN_RIGHT;
-  const drawH = VIEW_H - MARGIN_TOP - MARGIN_BOTTOM;
-  const scale = Math.min(drawW / acikligMm, drawH / Math.max(mahyaYuksekligiMm, acikligMm / 6));
+  // --- Panel A: kesit görünüşü ---
+  const drawWA = VIEW_W - MARGIN_LEFT - MARGIN_RIGHT;
+  const scaleA = Math.min(drawWA / acikligMm, PANEL_A_H / Math.max(mahyaYuksekligiMm, acikligMm / 6));
 
-  const scaledAciklik = acikligMm * scale;
-  const scaledMahya = mahyaYuksekligiMm * scale;
+  const scaledAciklik = acikligMm * scaleA;
+  const scaledMahya = mahyaYuksekligiMm * scaleA;
 
   const x0 = MARGIN_LEFT;
-  const groundY = MARGIN_TOP + drawH;
+  const groundY = PANEL_A_TOP + PANEL_A_H;
   const xOrta = x0 + scaledAciklik / 2;
   const tepeY = groundY - scaledMahya;
 
   const gövde = `${x0},${groundY} ${xOrta},${tepeY} ${x0 + scaledAciklik},${groundY}`;
 
+  // Çapraz destekler: kral kirişi tabanından yamaç orta noktalarına, ve tepeden taban çeyrek noktalarına (W tipi)
+  const leftMidX = x0 + (xOrta - x0) / 2;
+  const leftMidY = groundY + (tepeY - groundY) / 2;
+  const rightMidX = xOrta + (x0 + scaledAciklik - xOrta) / 2;
+  const rightMidY = groundY + (tepeY - groundY) / 2;
+  const leftQuarterX = x0 + scaledAciklik / 4;
+  const rightQuarterX = x0 + (3 * scaledAciklik) / 4;
+  const caprazCizgileri = [
+    { x1: xOrta, y1: groundY, x2: leftMidX, y2: leftMidY },
+    { x1: xOrta, y1: groundY, x2: rightMidX, y2: rightMidY },
+    { x1: xOrta, y1: tepeY, x2: leftQuarterX, y2: groundY },
+    { x1: xOrta, y1: tepeY, x2: rightQuarterX, y2: groundY },
+  ].slice(0, diyagonalCizilecekSayi);
+
   const dimAciklikY = groundY + 30;
   const dimYukseklikX = x0 - 30;
+
+  // --- Panel B: aşık yerleşim planı (bir yamaç, çatı uzunluğu × üst başlık uzunluğu) ---
+  const drawWB = VIEW_W - MARGIN_LEFT - MARGIN_RIGHT;
+  const scaleBx = drawWB / catiUzunluguMm;
+  const scaleBy = PANEL_B_H / ustBaslikUzunlukMm;
+  const bx0 = MARGIN_LEFT;
+  const by0 = PANEL_B_TOP;
+  const scaledUzunluk = catiUzunluguMm * scaleBx;
+  const scaledRafter = ustBaslikUzunlukMm * scaleBy;
+
+  const kafesXPozisyonlari = Array.from({ length: kafesSayisi }, (_, i) =>
+    bx0 + Math.min(i * gercekAralikMm, catiUzunluguMm) * scaleBx
+  );
+  const asikYPozisyonlari = asikVar
+    ? Array.from({ length: asikSatirSayisiPerSide }, (_, i) => by0 + (i / (asikSatirSayisiPerSide - 1)) * scaledRafter)
+    : [];
 
   const lejant = [
     { renk: PALET.ana, etiket: "Üst/Alt Başlık" },
     { renk: PALET.ikincil, etiket: "Kral Kirişi" },
+    ...(diyagonalCizilecekSayi > 0 ? [{ renk: PALET.destek, etiket: "Çapraz Destek" }] : []),
     ...(asikVar ? [{ renk: PALET.vurgu, etiket: "Aşık" }] : []),
   ];
 
   return (
-    <svg
-      viewBox={`0 0 ${VIEW_W} ${VIEW_H + LEGEND_H}`}
-      className="w-full h-auto"
-      role="img"
-      aria-label="Çatı kafesi şematik çizimi"
-    >
+    <svg viewBox={`0 0 ${VIEW_W} ${TOTAL_H}`} className="w-full h-auto" role="img" aria-label="Çatı kafesi şematik çizimi">
       <OkTanimlari />
 
+      {/* --- Panel A: kesit görünüşü --- */}
+      <text x={x0} y={PANEL_A_TOP - 6} fontSize={11} fill="#a3a3a3">
+        Kesit görünüşü (bir kafes)
+      </text>
       <line x1={x0 - 15} y1={groundY} x2={x0 + scaledAciklik + 15} y2={groundY} stroke="#a3a3a3" strokeWidth={2} />
 
       <polygon points={gövde} fill="#e5e5e5" stroke="none" />
@@ -62,6 +123,10 @@ export default function TrussSchematic({ veri }: { veri: CatiKafesiSemaVeri }) {
       <line x1={x0 + scaledAciklik} y1={groundY} x2={xOrta} y2={tepeY} stroke={PALET.ana} strokeWidth={3} />
       {/* Kral kirişi */}
       <line x1={xOrta} y1={groundY} x2={xOrta} y2={tepeY} stroke={PALET.ikincil} strokeWidth={2} strokeDasharray="5 3" />
+      {/* Çapraz destekler */}
+      {caprazCizgileri.map((c, i) => (
+        <line key={i} x1={c.x1} y1={c.y1} x2={c.x2} y2={c.y2} stroke={PALET.destek} strokeWidth={2} />
+      ))}
 
       {/* Aşık sıraları (her iki yamaçta, eşit aralıklı noktalar) */}
       {asikVar &&
@@ -84,7 +149,33 @@ export default function TrussSchematic({ veri }: { veri: CatiKafesiSemaVeri }) {
         eğim %{egimYuzde}
       </text>
 
-      <Lejant kalemler={lejant} y={VIEW_H + 6} />
+      {/* --- Panel B: aşık yerleşim planı --- */}
+      <text x={bx0} y={by0 - 28} fontSize={11} fill="#a3a3a3">
+        Aşık yerleşim planı (bir yamaç, açılmış görünüş — üstten bakış)
+      </text>
+      <rect x={bx0} y={by0} width={scaledUzunluk} height={scaledRafter} fill="#f5f5f5" stroke="#d4d4d4" />
+      {kafesXPozisyonlari.map((px, i) => (
+        <line key={i} x1={px} y1={by0} x2={px} y2={by0 + scaledRafter} stroke={PALET.ana} strokeWidth={2.5} />
+      ))}
+      {asikYPozisyonlari.map((py, i) => (
+        <line key={i} x1={bx0} y1={py} x2={bx0 + scaledUzunluk} y2={py} stroke={PALET.vurgu} strokeWidth={2} />
+      ))}
+
+      <YatayOlcu x1={bx0} x2={bx0 + scaledUzunluk} y={by0 + scaledRafter + 30} etiket={mmEtiket(catiUzunluguMm)} />
+      <DikeyOlcu y1={by0} y2={by0 + scaledRafter} x={bx0 - 30} etiket={mmEtiket(ustBaslikUzunlukMm)} />
+      {kafesXPozisyonlari.length > 1 && (
+        <YatayOlcu
+          x1={kafesXPozisyonlari[0]}
+          x2={kafesXPozisyonlari[1]}
+          y={by0 - 12}
+          etiket={mmEtiket(gercekAralikMm)}
+          etiketAltta={false}
+          fontSize={10}
+          kalin={false}
+        />
+      )}
+
+      <Lejant kalemler={lejant} y={LEGEND_Y} />
     </svg>
   );
 }

@@ -81,8 +81,13 @@ export default function SemaGorunum({
           veri={{
             acikligMm: n("acikligMm"),
             egimYuzde: n("egimYuzde"),
+            catiUzunluguMm: n("catiUzunluguMm"),
             asikVar: Boolean(params.asikProfilId),
             asikAraligiHedefMm: n("asikAraligiHedefMm") || 1000,
+            diyagonalVar: Boolean(params.diyagonalProfilId),
+            diyagonalSayisi: n("diyagonalSayisi"),
+            kafesSayisi: ozetDegerler.kafesSayisi,
+            gercekAralikMm: ozetDegerler.gercekAralikMm,
           }}
         />
       );
