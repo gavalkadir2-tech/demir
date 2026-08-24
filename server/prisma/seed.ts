@@ -85,7 +85,10 @@ async function main() {
 
   for (const p of kutuProfiller) {
     const mevcut = await prisma.material.findFirst({ where: { section: p.boyut, category: "PROFILE" } });
-    if (!mevcut) {
+    const sekilAlanlari = { profilSekli: "BOX" as const, widthMm: p.a, heightMm: p.b };
+    if (mevcut) {
+      await prisma.material.update({ where: { id: mevcut.id }, data: sekilAlanlari });
+    } else {
       await prisma.material.create({
         data: {
           name: `${p.boyut} Kutu Profil`,
@@ -99,6 +102,7 @@ async function main() {
           kerfMm: 3,
           stockQty: 20,
           minStockQty: 5,
+          ...sekilAlanlari,
           priceHistory: { create: { price: BIRIM_FIYAT_KG } },
         },
       });
@@ -123,7 +127,10 @@ async function main() {
   ];
   for (const p of lamalar) {
     const mevcut = await prisma.material.findFirst({ where: { section: p.boyut, category: "PROFILE", name: { contains: "Lama" } } });
-    if (!mevcut) {
+    const sekilAlanlari = { profilSekli: "FLAT" as const, widthMm: p.en };
+    if (mevcut) {
+      await prisma.material.update({ where: { id: mevcut.id }, data: sekilAlanlari });
+    } else {
       await prisma.material.create({
         data: {
           name: `${p.boyut} Lama`,
@@ -137,6 +144,7 @@ async function main() {
           kerfMm: 3,
           stockQty: 10,
           minStockQty: 3,
+          ...sekilAlanlari,
           priceHistory: { create: { price: BIRIM_FIYAT_KG } },
         },
       });
@@ -147,7 +155,10 @@ async function main() {
   for (const d of yuvarlaklar) {
     const boyut = `Ø${d}`;
     const mevcut = await prisma.material.findFirst({ where: { section: boyut, category: "PROFILE", name: { contains: "Yuvarlak" } } });
-    if (!mevcut) {
+    const sekilAlanlari = { profilSekli: "ROUND_SOLID" as const, widthMm: d };
+    if (mevcut) {
+      await prisma.material.update({ where: { id: mevcut.id }, data: sekilAlanlari });
+    } else {
       await prisma.material.create({
         data: {
           name: `${boyut} Yuvarlak Demir`,
@@ -160,6 +171,7 @@ async function main() {
           kerfMm: 3,
           stockQty: 10,
           minStockQty: 3,
+          ...sekilAlanlari,
           priceHistory: { create: { price: BIRIM_FIYAT_KG } },
         },
       });
@@ -181,7 +193,10 @@ async function main() {
   ];
   for (const p of kosebentler) {
     const mevcut = await prisma.material.findFirst({ where: { section: p.boyut, category: "PROFILE", name: { contains: "Köşebent" } } });
-    if (!mevcut) {
+    const sekilAlanlari = { profilSekli: "ANGLE" as const, widthMm: p.a };
+    if (mevcut) {
+      await prisma.material.update({ where: { id: mevcut.id }, data: sekilAlanlari });
+    } else {
       await prisma.material.create({
         data: {
           name: `${p.boyut} Köşebent`,
@@ -195,6 +210,7 @@ async function main() {
           kerfMm: 3,
           stockQty: 10,
           minStockQty: 3,
+          ...sekilAlanlari,
           priceHistory: { create: { price: BIRIM_FIYAT_KG } },
         },
       });
@@ -211,7 +227,10 @@ async function main() {
   ];
   for (const p of borular) {
     const mevcut = await prisma.material.findFirst({ where: { section: p.boyut, category: "PROFILE", name: { contains: "Boru" } } });
-    if (!mevcut) {
+    const sekilAlanlari = { profilSekli: "ROUND_PIPE" as const, widthMm: p.d };
+    if (mevcut) {
+      await prisma.material.update({ where: { id: mevcut.id }, data: sekilAlanlari });
+    } else {
       await prisma.material.create({
         data: {
           name: `${p.boyut} Boru`,
@@ -225,6 +244,7 @@ async function main() {
           kerfMm: 3,
           stockQty: 10,
           minStockQty: 3,
+          ...sekilAlanlari,
           priceHistory: { create: { price: BIRIM_FIYAT_KG } },
         },
       });
@@ -241,7 +261,10 @@ async function main() {
   ];
   for (const p of uProfiller) {
     const mevcut = await prisma.material.findFirst({ where: { section: p.boyut, category: "PROFILE", name: { contains: "U Profil" } } });
-    if (!mevcut) {
+    const sekilAlanlari = { profilSekli: "CHANNEL" as const, widthMm: p.b, heightMm: p.h };
+    if (mevcut) {
+      await prisma.material.update({ where: { id: mevcut.id }, data: sekilAlanlari });
+    } else {
       await prisma.material.create({
         data: {
           name: `${p.boyut} U Profil`,
@@ -255,6 +278,7 @@ async function main() {
           kerfMm: 3,
           stockQty: 10,
           minStockQty: 3,
+          ...sekilAlanlari,
           priceHistory: { create: { price: BIRIM_FIYAT_KG } },
         },
       });

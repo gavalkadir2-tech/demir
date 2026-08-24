@@ -175,6 +175,15 @@ enum MaterialUnit {
   M2
 }
 
+enum ProfilSekli {
+  BOX // kutu profil (dikdörtgen/kare içi boş)
+  ANGLE // köşebent (eşit kollu L)
+  CHANNEL // U profil (kanal)
+  ROUND_SOLID // yuvarlak demir (dolu daire)
+  ROUND_PIPE // boru (yuvarlak, içi boş)
+  FLAT // lama (dikdörtgen dolu)
+}
+
 model Material {
   id                Int               @id @default(autoincrement())
   name              String
@@ -184,6 +193,14 @@ model Material {
   standardLengthM   Float? // profiller için standart boy
   sheetWidthMm      Float? // sac için
   sheetHeightMm     Float? // sac için
+  // Yapısal (mukavemet) hesap için kesit tipi - profiller için.
+  profilSekli       ProfilSekli?
+  // Kesit genişliği (mm, eğilme eksenine dik yön): kutu/lama için B, köşebent için kol uzunluğu a,
+  // U profil için başlık (flanş) genişliği b, yuvarlak/boru için dış çap D.
+  widthMm           Float?
+  // Kesit yüksekliği (mm, eğilme yönü/derinlik): kutu için H, U profil için gövde yüksekliği h.
+  // Köşebent/yuvarlak/boru/lama'da kullanılmaz (widthMm ve thicknessMm yeterli).
+  heightMm          Float?
   unit              MaterialUnit      @default(M)
   unitPrice         Float             @default(0) // birim (m/kg/adet/m2) başına TL
   unitWeightKgPerM  Float? // profil: kg/m

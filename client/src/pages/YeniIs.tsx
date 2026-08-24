@@ -1,10 +1,19 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
-import { Customer, Material, ProductTemplate, ProjectCategory, KATEGORI_ETIKET, UrunHesapSonucu } from "../api/types";
+import {
+  Customer,
+  Material,
+  ProductTemplate,
+  ProjectCategory,
+  KATEGORI_ETIKET,
+  UrunHesapSonucu,
+  YapiselKontrolSonucu,
+} from "../api/types";
 import { Spinner, HataKutusu, UyariKutusu, Badge } from "../components/ui";
 import MaterialSelect from "../components/MaterialSelect";
 import HesapSonucuGorunum from "../components/HesapSonucuGorunum";
+import YapiselKontrolGorunum from "../components/YapiselKontrolGorunum";
 import SemaGorunum from "../components/SemaGorunum";
 import TrussIsometricView from "../components/TrussIsometricView";
 
@@ -409,7 +418,11 @@ export function UrunFormu({
   baslangicAd?: string;
 }) {
   const navigate = useNavigate();
-  const [onizleme, setOnizleme] = useState<{ sonuc: UrunHesapSonucu; malzemeler: Record<string, Material> } | null>(null);
+  const [onizleme, setOnizleme] = useState<{
+    sonuc: UrunHesapSonucu;
+    malzemeler: Record<string, Material>;
+    yapiselKontrol?: YapiselKontrolSonucu;
+  } | null>(null);
   const [hata, setHata] = useState<string | null>(null);
   const [hesaplaniyor, setHesaplaniyor] = useState(false);
   const [kaydediliyor, setKaydediliyor] = useState(false);
@@ -428,7 +441,10 @@ export function UrunFormu({
     setAiDanismanHata(null);
     setGoster3D(false);
     try {
-      const r = await api.post<{ sonuc: UrunHesapSonucu; malzemeler: Record<string, Material> }>(`/calc/${templateKey}`, params);
+      const r = await api.post<{ sonuc: UrunHesapSonucu; malzemeler: Record<string, Material>; yapiselKontrol?: YapiselKontrolSonucu }>(
+        `/calc/${templateKey}`,
+        params
+      );
       setOnizleme(r);
     } catch (e: any) {
       setHata(e.message);
@@ -521,6 +537,8 @@ export function UrunFormu({
           )}
 
           <HesapSonucuGorunum sonuc={onizleme.sonuc} malzemeler={onizleme.malzemeler} />
+
+          {onizleme.yapiselKontrol && <YapiselKontrolGorunum kontrol={onizleme.yapiselKontrol} />}
 
           <div className="rounded-xl border border-neutral-200 p-4 space-y-3">
             <div className="flex items-center justify-between flex-wrap gap-2">

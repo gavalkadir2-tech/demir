@@ -151,6 +151,27 @@ export interface UrunHesapSonucu {
   ozetDegerler: Record<string, number>;
 }
 
+export interface YapiselKontrolKalemi {
+  eleman: string;
+  profilAdi: string;
+  yukAciklamasi: string;
+  maxSehimMm: number;
+  izinVerilenSehimMm: number;
+  sehimUygun: boolean;
+  maxGerilmeMPa: number;
+  izinVerilenGerilmeMPa: number;
+  gerilmeUygun: boolean;
+  guvenlikOrani: number;
+  durum: "uygun" | "sinirda" | "yetersiz";
+  aciklama: string;
+}
+
+export interface YapiselKontrolSonucu {
+  kalemler: YapiselKontrolKalemi[];
+  genelDurum: "uygun" | "sinirda" | "yetersiz";
+  uyari: string;
+}
+
 export interface Project {
   id: number;
   customerId: number;

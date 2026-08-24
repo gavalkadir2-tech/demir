@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma";
 import { asyncHandler } from "../lib/errors";
 import { calculateByTemplateKey, UrunHesapSonucu } from "../calc";
 import { calculateSheetItem } from "../calc/sheet";
+import { yapiselKontrolCalistir } from "../lib/structuralCheck";
 
 const router = Router();
 
@@ -189,7 +190,8 @@ router.post(
 
     const sonuc = calculateByTemplateKey(templateKey, girdi);
     const malzemeler = await malzemeSozlugu(sonuc);
-    res.json({ sonuc, malzemeler });
+    const yapiselKontrol = yapiselKontrolCalistir(templateKey, girdi as Record<string, unknown>, sonuc, malzemeler);
+    res.json({ sonuc, malzemeler, yapiselKontrol });
   })
 );
 
