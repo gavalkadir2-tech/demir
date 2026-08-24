@@ -17,39 +17,62 @@ const boslukSchema = z.object({
   yukseklikMm: z.number(),
 });
 
-const alanlarSchema = z
-  .object({
-    // korkuluk (railing)
+// Her şablon için ayrı bir alt-nesne kullanılıyor (tek, ortak "alanlar" nesnesi yerine) — bu sayede
+// modelin örn. wall'un yukseklikMm değerini yanlışlıkla truss'un catiUzunluguMm alanına yazması gibi
+// şablonlar-arası alan karışıklıkları yapısal olarak imkansız hale geliyor.
+const sablonAlanlari = {
+  railing: {
     toplamUzunlukMm: z.number().nullish(),
     yukseklikMm: z.number().nullish(),
     dikmeAraligiHedefMm: z.number().nullish(),
     araKayitSayisi: z.number().nullish(),
-    // merdiven (stairs)
+  },
+  stairs: {
     katYuksekligiMm: z.number().nullish(),
     genislikMm: z.number().nullish(),
     basamakYuksekligiHedefMm: z.number().nullish(),
     basamakDerinligiMm: z.number().nullish(),
     korkulukYuksekligiMm: z.number().nullish(),
-    // sundurma (canopy)
+  },
+  canopy: {
+    genislikMm: z.number().nullish(),
     boyMm: z.number().nullish(),
+    yukseklikMm: z.number().nullish(),
     egimYuzde: z.number().nullish(),
     dikmeSayisi: z.number().nullish(),
-    kaplamaTuru: z.enum(["trapez_sac", "polikarbon", "yok"]).nullish(),
-    // kapı (door)
+  },
+  door: {
+    genislikMm: z.number().nullish(),
+    yukseklikMm: z.number().nullish(),
     sacKalinlikMm: z.number().nullish(),
     menteseAdet: z.number().nullish(),
     kilitAdet: z.number().nullish(),
     kolAdet: z.number().nullish(),
-    // duvar paneli (wall)
+  },
+  wall: {
+    genislikMm: z.number().nullish(),
+    yukseklikMm: z.number().nullish(),
+    dikmeAraligiHedefMm: z.number().nullish(),
     lentoTasmaMm: z.number().nullish(),
-    // çatı kafesi (truss)
+  },
+  truss: {
     acikligMm: z.number().nullish(),
+    egimYuzde: z.number().nullish(),
     catiUzunluguMm: z.number().nullish(),
     kafesAraligiHedefMm: z.number().nullish(),
     asikAraligiHedefMm: z.number().nullish(),
     diyagonalSayisi: z.number().nullish(),
-  })
-  .partial();
+  },
+} as const;
+
+const alanlarSchema = z.object({
+  railing: z.object(sablonAlanlari.railing).partial(),
+  stairs: z.object(sablonAlanlari.stairs).partial(),
+  canopy: z.object(sablonAlanlari.canopy).partial(),
+  door: z.object(sablonAlanlari.door).partial(),
+  wall: z.object(sablonAlanlari.wall).partial(),
+  truss: z.object(sablonAlanlari.truss).partial(),
+});
 
 const aiCiktiSchema = z.object({
   templateKey: z.enum(["railing", "stairs", "canopy", "door", "wall", "truss"]),
@@ -63,6 +86,13 @@ const aiCiktiSchema = z.object({
 
 const SAYI = { type: "number" } as const;
 
+/** Zod'daki sablonAlanlari ile aynı alanları JSON Schema `properties` biçiminde üretir. */
+function sablonAlanJsonSchema(anahtarlar: string[]) {
+  const properties: Record<string, unknown> = {};
+  for (const k of anahtarlar) properties[k] = SAYI;
+  return { type: "object", properties };
+}
+
 const RESPONSE_JSON_SCHEMA = {
   type: "object",
   properties: {
@@ -73,31 +103,30 @@ const RESPONSE_JSON_SCHEMA = {
     belirsizlikler: { type: "array", items: { type: "string" } },
     alanlar: {
       type: "object",
+      description:
+        "Sadece 'templateKey' ile seçtiğin şablonun alt nesnesini doldur (örn. templateKey=wall ise sadece alanlar.wall). Diğer 5 alt nesneyi tamamen boş {} bırak.",
       properties: {
-        toplamUzunlukMm: SAYI,
-        yukseklikMm: SAYI,
-        dikmeAraligiHedefMm: SAYI,
-        araKayitSayisi: SAYI,
-        katYuksekligiMm: SAYI,
-        genislikMm: SAYI,
-        basamakYuksekligiHedefMm: SAYI,
-        basamakDerinligiMm: SAYI,
-        korkulukYuksekligiMm: SAYI,
-        boyMm: SAYI,
-        egimYuzde: SAYI,
-        dikmeSayisi: SAYI,
-        kaplamaTuru: { type: "string", enum: ["trapez_sac", "polikarbon", "yok"] },
-        sacKalinlikMm: SAYI,
-        menteseAdet: SAYI,
-        kilitAdet: SAYI,
-        kolAdet: SAYI,
-        lentoTasmaMm: SAYI,
-        acikligMm: SAYI,
-        catiUzunluguMm: SAYI,
-        kafesAraligiHedefMm: SAYI,
-        asikAraligiHedefMm: SAYI,
-        diyagonalSayisi: SAYI,
+        railing: sablonAlanJsonSchema(["toplamUzunlukMm", "yukseklikMm", "dikmeAraligiHedefMm", "araKayitSayisi"]),
+        stairs: sablonAlanJsonSchema([
+          "katYuksekligiMm",
+          "genislikMm",
+          "basamakYuksekligiHedefMm",
+          "basamakDerinligiMm",
+          "korkulukYuksekligiMm",
+        ]),
+        canopy: sablonAlanJsonSchema(["genislikMm", "boyMm", "yukseklikMm", "egimYuzde", "dikmeSayisi"]),
+        door: sablonAlanJsonSchema(["genislikMm", "yukseklikMm", "sacKalinlikMm", "menteseAdet", "kilitAdet", "kolAdet"]),
+        wall: sablonAlanJsonSchema(["genislikMm", "yukseklikMm", "dikmeAraligiHedefMm", "lentoTasmaMm"]),
+        truss: sablonAlanJsonSchema([
+          "acikligMm",
+          "egimYuzde",
+          "catiUzunluguMm",
+          "kafesAraligiHedefMm",
+          "asikAraligiHedefMm",
+          "diyagonalSayisi",
+        ]),
       },
+      required: ["railing", "stairs", "canopy", "door", "wall", "truss"],
     },
     bosluklar: {
       type: "array",
@@ -130,10 +159,11 @@ const SISTEM_PROMPTU = `Sen bir demirci/çelik konstrüksiyon atölyesi için si
 BOŞLUKLAR (sadece wall şablonu seçildiğinde doldurulur):
 Duvardaki her kapı/pencere açıklığı için bir eleman: etiket ("Kapı" veya "Pencere" gibi), konumMm (duvarın SOL kenarından açıklığın sol kenarına mesafe — metinde belirtilmemişse mantıklı bir yerleşim tahmin et), tabanYuksekligiMm (kapı için 0, pencere için metinde başka bir değer yoksa 900mm tipik eşik yüksekliği), genislikMm, yukseklikMm.
 
+"alanlar" nesnesinin yapısı: her şablon için ayrı bir alt nesne var (alanlar.railing, alanlar.stairs, alanlar.canopy, alanlar.door, alanlar.wall, alanlar.truss). templateKey olarak SEÇTİĞİN şablona karşılık gelen TEK bir alt nesneyi doldur (örn. templateKey="wall" ise sadece alanlar.wall'u doldur), DİĞER 5 alt nesneyi tamamen boş {} bırak. Bir alt nesnenin alanlarını başka bir alt nesneye YAZMA — örneğin wall'un yükseklik değerini asla alanlar.truss.catiUzunluguMm gibi başka bir şablonun alanına yazma, sadece alanlar.wall.yukseklikMm'e yaz.
+
 KURALLAR:
-- Metinde açıkça belirtilmeyen veya güçlü şekilde ima edilmeyen sayısal alanları "alanlar" nesnesine hiç ekleme (anahtarı tamamen atla) — uygulama zaten mantıklı varsayılan değerler kullanacak. Var olmayan bilgiyi uydurma.
+- Metinde açıkça belirtilmeyen veya güçlü şekilde ima edilmeyen sayısal alanları hiç ekleme (anahtarı tamamen atla) — uygulama zaten mantıklı varsayılan değerler kullanacak. Var olmayan bilgiyi uydurma.
 - Ölçü birimi belirtilmemişse metre (m) varsayılır; ondalıklı/tam sayılar metre kabul edilir (örn. "3 metre" veya "3" → 3000 mm); "cm" belirtilmişse ×10 yap; "mm" olduğu gibi kullan.
-- Sadece SEÇTİĞİN şablona ait alanları doldur; diğer şablonlara özgü alanları ekleme.
 - baslik: kısa, açıklayıcı bir ürün/iş adı üret (örn. "Bahçe Korkuluğu", "Ön Cephe Duvar Paneli").
 - musteriAdiTahmini: metinde bir müşteri/kişi/firma adı geçiyorsa döndür, yoksa bu alanı hiç ekleme.
 - guven: metnin şablonu ve ana ölçüleri ne kadar net belirttiğine göre "yuksek" | "orta" | "dusuk".
@@ -157,7 +187,7 @@ router.post(
     let metinYaniti: string | undefined;
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.6-flash",
         contents: metin,
         config: {
           systemInstruction: SISTEM_PROMPTU,
@@ -188,7 +218,8 @@ router.post(
       throw new ApiHatasi(502, "Yapay zeka yanıtı beklenen formatta değil. Lütfen tekrar deneyin.");
     }
 
-    res.json(sonuc.data);
+    const { alanlar, ...geri } = sonuc.data;
+    res.json({ ...geri, alanlar: alanlar[sonuc.data.templateKey] });
   })
 );
 
