@@ -88,6 +88,7 @@ export default function SemaGorunum({
             diyagonalSayisi: n("diyagonalSayisi"),
             kafesSayisi: ozetDegerler.kafesSayisi,
             gercekAralikMm: ozetDegerler.gercekAralikMm,
+            stabiliteVar: Boolean(params.stabiliteBaglantisiVar && params.stabiliteProfilId),
           }}
         />
       );

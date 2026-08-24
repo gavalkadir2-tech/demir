@@ -129,6 +129,60 @@ test("çatı kafesi: geniş açıklıkta diyagonal yoksa uyarı üretir", () => 
   assert.ok(sonuc.uyarilar.some((u) => u.includes("çapraz")));
 });
 
+test("çatı kafesi: sandviç panel kaplaması kendi varsayılan kalınlığını kullanır", () => {
+  const sonuc = calculateRoofTruss({
+    acikligMm: 6000,
+    egimYuzde: 30,
+    catiUzunluguMm: 9000,
+    kafesAraligiHedefMm: 900,
+    ustBaslikProfilKey: "ust",
+    altBaslikProfilKey: "alt",
+    kaplamaTuru: "sandvic_panel",
+  });
+  const kaplama = sonuc.sacKalemleri.find((s) => s.label.includes("kaplaması"))!;
+  assert.ok(kaplama.label.includes("sandviç panel"));
+  assert.equal(kaplama.kalinlikMm, 40);
+});
+
+test("çatı kafesi: stabilite bağlantısı ilk açıklıkta yatay+düşey çapraz ekler", () => {
+  const sonuc = calculateRoofTruss({
+    acikligMm: 6000,
+    egimYuzde: 30,
+    catiUzunluguMm: 9000,
+    kafesAraligiHedefMm: 900,
+    ustBaslikProfilKey: "ust",
+    altBaslikProfilKey: "alt",
+    stabiliteBaglantisiVar: true,
+    stabiliteProfilKey: "L50",
+  });
+
+  const yatay = sonuc.parcalar.find((p) => p.label === "Stabilite bağlantısı (yatay)")!;
+  assert.ok(yatay);
+  assert.equal(yatay.uzunlukMm, 3259);
+  assert.equal(yatay.adet, 4);
+
+  const dusey = sonuc.parcalar.find((p) => p.label === "Stabilite bağlantısı (düşey)")!;
+  assert.ok(dusey);
+  assert.equal(dusey.uzunlukMm, 1273);
+  assert.equal(dusey.adet, 2);
+});
+
+test("çatı kafesi: stabilite bağlantısı seçilip profili girilmezse hata verir", () => {
+  assert.throws(
+    () =>
+      calculateRoofTruss({
+        acikligMm: 6000,
+        egimYuzde: 30,
+        catiUzunluguMm: 9000,
+        kafesAraligiHedefMm: 900,
+        ustBaslikProfilKey: "ust",
+        altBaslikProfilKey: "alt",
+        stabiliteBaglantisiVar: true,
+      }),
+    HesaplamaHatasi
+  );
+});
+
 test("çatı kafesi: geçersiz girdilerde hata fırlatır", () => {
   assert.throws(
     () =>

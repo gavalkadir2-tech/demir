@@ -7,6 +7,8 @@ import { calculateSheetItem } from "../calc/sheet";
 
 const router = Router();
 
+const kaplamaTuruEnum = z.enum(["trapez_sac", "sandvic_panel", "etermit", "plastik_etermit", "polikarbon", "yok"]);
+
 const railingSchema = z.object({
   toplamUzunlukMm: z.number(),
   yukseklikMm: z.number(),
@@ -48,7 +50,7 @@ const canopySchema = z.object({
   dikmeProfilId: z.number().int(),
   caprazProfilId: z.number().int().optional(),
   asikAraligiHedefMm: z.number().optional(),
-  kaplamaTuru: z.enum(["trapez_sac", "polikarbon", "yok"]).optional(),
+  kaplamaTuru: kaplamaTuruEnum.optional(),
   kaplamaKalinlikMm: z.number().optional(),
   plakaEnMm: z.number().optional(),
   plakaBoyMm: z.number().optional(),
@@ -105,12 +107,14 @@ const trussSchema = z.object({
   diyagonalSayisi: z.number().int().optional(),
   asikProfilId: z.number().int().optional(),
   asikAraligiHedefMm: z.number().optional(),
-  kaplamaTuru: z.enum(["trapez_sac", "polikarbon", "yok"]).optional(),
+  kaplamaTuru: kaplamaTuruEnum.optional(),
   kaplamaKalinlikMm: z.number().optional(),
   plakaEnMm: z.number().optional(),
   plakaBoyMm: z.number().optional(),
   plakaKalinlikMm: z.number().optional(),
   ankrajSayisiPerPlaka: z.number().int().optional(),
+  stabiliteBaglantisiVar: z.boolean().optional(),
+  stabiliteProfilId: z.number().int().optional(),
 });
 
 const customSchema = z.object({

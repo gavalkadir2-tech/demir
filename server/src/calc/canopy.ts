@@ -2,6 +2,7 @@
 
 import { HesaplamaHatasi } from "./units";
 import { HesaplananParca, UrunHesapSonucu, bosSonuc, profilOzetOlustur } from "./types";
+import { KAPLAMA_BILGI, KaplamaTuru } from "./kaplama";
 
 export interface SundurmaGirdi {
   /** En (mm) - ön cephe genişliği */
@@ -24,8 +25,8 @@ export interface SundurmaGirdi {
   caprazProfilKey?: string;
   /** Aşıklar arası hedef aralık (mm), varsayılan 1000 */
   asikAraligiHedefMm?: number;
-  /** Çatı kaplama türü: trapez_sac | polikarbon | yok */
-  kaplamaTuru?: "trapez_sac" | "polikarbon" | "yok";
+  /** Çatı kaplama türü */
+  kaplamaTuru?: KaplamaTuru;
   kaplamaKalinlikMm?: number;
   plakaEnMm?: number;
   plakaBoyMm?: number;
@@ -36,7 +37,6 @@ export interface SundurmaGirdi {
 const VARSAYILAN = {
   asikAraligiHedefMm: 1000,
   kaplamaTuru: "trapez_sac" as const,
-  kaplamaKalinlikMm: 0.5,
   plakaEnMm: 120,
   plakaBoyMm: 120,
   plakaKalinlikMm: 10,
@@ -123,11 +123,12 @@ export function calculateCanopy(girdi: SundurmaGirdi): UrunHesapSonucu {
 
   const catiAlaniM2 = (genislikMm / 1000) * (kirisUzunlukMm / 1000);
   if (kaplamaTuru !== "yok") {
+    const kaplamaBilgisi = KAPLAMA_BILGI[kaplamaTuru];
     sonuc.sacKalemleri.push({
-      label: kaplamaTuru === "polikarbon" ? "Çatı kaplaması (polikarbon)" : "Çatı kaplaması (trapez sac)",
+      label: kaplamaBilgisi.label,
       enMm: Math.round(genislikMm),
       boyMm: Math.ceil(kirisUzunlukMm),
-      kalinlikMm: girdi.kaplamaKalinlikMm ?? VARSAYILAN.kaplamaKalinlikMm,
+      kalinlikMm: girdi.kaplamaKalinlikMm ?? kaplamaBilgisi.varsayilanKalinlikMm,
       adet: 1,
     });
   }

@@ -5,6 +5,7 @@ import { asyncHandler, ApiHatasi } from "../lib/errors";
 import { prisma } from "../lib/prisma";
 import { calculateByTemplateKey } from "../calc";
 import { TEMPLATE_SCHEMAS, idToKey, malzemeSozlugu } from "./calc";
+import { KAPLAMA_BILGI, KaplamaTuru } from "../calc/kaplama";
 
 const router = Router();
 
@@ -319,6 +320,7 @@ const danismanCiktiSchema = z.object({
   tahminiTasimaKapasitesiKg: z.number().nullish(),
   tasimaKapasitesiAciklamasi: z.string(),
   oneriler: z.array(z.string()),
+  sarfMalzemeOnerileri: z.array(z.string()),
 });
 
 const DANISMAN_RESPONSE_JSON_SCHEMA = {
@@ -330,11 +332,12 @@ const DANISMAN_RESPONSE_JSON_SCHEMA = {
     tahminiTasimaKapasitesiKg: { type: "number" },
     tasimaKapasitesiAciklamasi: { type: "string" },
     oneriler: { type: "array", items: { type: "string" } },
+    sarfMalzemeOnerileri: { type: "array", items: { type: "string" } },
   },
-  required: ["degerlendirme", "malzemeUygunlugu", "tasimaKapasitesiAciklamasi", "oneriler"],
+  required: ["degerlendirme", "malzemeUygunlugu", "tasimaKapasitesiAciklamasi", "oneriler", "sarfMalzemeOnerileri"],
 };
 
-const DANISMAN_SISTEM_PROMPTU = `Sen bir çelik konstrüksiyon/demirci atölyesi için deneyimli bir teknik danışmansın. Sana bir ürünün hesaplanmış ölçüleri, kullanılan profil/malzeme bilgileri ve toplam ağırlığı verilecek. Görevin, bu seçimleri teknik açıdan kısaca değerlendirmek ve kullanıcıya (genellikle teknik olmayan bir usta) anlaşılır, pratik bir görüş sunmak.
+const DANISMAN_SISTEM_PROMPTU = `Sen bir çelik konstrüksiyon/demirci atölyesi için deneyimli bir teknik danışmansın. Sana bir ürünün hesaplanmış ölçüleri, kullanılan profil/malzeme bilgileri, sac/kaplama kalemleri, zaten hesaba dahil edilen bağlantı elemanları ve toplam ağırlığı verilecek. Görevin, bu seçimleri teknik açıdan kısaca değerlendirmek ve kullanıcıya (genellikle teknik olmayan bir usta) anlaşılır, pratik bir görüş sunmak.
 
 ÇOK ÖNEMLİ - SORUMLULUK REDDİ: Verdiğin taşıma kapasitesi tahmini KESİN BİR MÜHENDİSLİK HESABI DEĞİLDİR, sadece kabaca fikir vermek içindir. Merdiven, çatı, korkuluk gibi can güvenliği içeren yapılarda gerçek yük hesabı; kesit modülü, malzeme akma dayanımı, burkulma, emniyet katsayısı gibi faktörleri içeren resmi bir statik hesap gerektirir. "tasimaKapasitesiAciklamasi" alanında bunu HER ZAMAN açıkça belirt ve kritik/ağır yük durumlarında bir statik mühendisinden onay alınmasını öner.
 
@@ -342,7 +345,8 @@ Değerlendirirken dikkat et:
 - malzemeUygunlugu: verilen ölçüler/açıklık için seçilen profil kesiti ve kalınlığı genel tecrübeye göre "yeterli" mi, "sinirda" mı (biraz büyütülmesi önerilir), yoksa "yetersiz" mi (mutlaka değiştirilmeli)?
 - onerilenAlternatif: malzemeUygunlugu "sinirda" veya "yetersiz" ise hangi profil kesiti/kalınlığının daha uygun olacağını öner (örn. "120x120x4 Kutu Profil"). "yeterli" ise bu alanı hiç ekleme.
 - tahminiTasimaKapasitesiKg: ürün tipine uygun tipik bir kullanım senaryosu için (korkulukta yatay itme yükü, merdivende yayılı yaşam yükü, çatıda kar+rüzgar yükü vb.) kabaca bir sayısal tahmin ver.
-- oneriler: montaj, korozyon koruması (galvaniz/boya), bakım gibi pratik ek öneriler, en fazla 4 madde.
+- oneriler: montaj, korozyon koruması, bakım gibi pratik ek öneriler, en fazla 4 madde.
+- sarfMalzemeOnerileri: kaynak/montaj için gereken SARF MALZEMELERİNİ somut olarak öner - örn. kaynak elektrotu türü ve yaklaşık tüketimi (profil kesit kalınlığına göre E6013/E7018 gibi), sac/panel kaplaması varsa hangi tür vida (self-drilling sac vidası, sandviç panel vidası vb.) ve yaklaşık adedi (m² başına tipik 6-8 adet), korozyon koruması için astar+son kat boya veya galvaniz spreyi, gerekiyorsa silikon/conta bandı. Kaplama türüne göre uyarla (örn. etermit için özel etermit vidası ve contası, polikarbon için ısı genleşmeli özel vida). En fazla 5 madde.
 
 Kısa, anlaşılır, teknik jargonu gerekirse kısaca açıklayarak yaz. Türkçe yanıt ver, yalnızca geçerli JSON döndür.`;
 
@@ -387,10 +391,16 @@ router.post(
       );
     }
 
+    const kaplamaTuru = (parsed as Record<string, unknown>).kaplamaTuru as KaplamaTuru | undefined;
     let sacAgirlikKg = 0;
     for (const sac of sonuc.sacKalemleri) {
       const alanM2 = (sac.enMm / 1000) * (sac.boyMm / 1000) * sac.adet;
-      const yogunluk = sac.label.toLowerCase().includes("polikarbon") ? POLIKARBON_YOGUNLUK_KG_M3 : CELIK_YOGUNLUK_KG_M3;
+      let yogunluk = CELIK_YOGUNLUK_KG_M3;
+      if (sac.label.includes("kaplaması") && kaplamaTuru && kaplamaTuru !== "yok") {
+        yogunluk = KAPLAMA_BILGI[kaplamaTuru]?.efektifYogunlukKgM3 ?? yogunluk;
+      } else if (sac.label.toLowerCase().includes("polikarbon")) {
+        yogunluk = POLIKARBON_YOGUNLUK_KG_M3;
+      }
       sacAgirlikKg += alanM2 * ((sac.kalinlikMm ?? 1) / 1000) * yogunluk;
     }
 
@@ -400,10 +410,19 @@ router.post(
       .map(([k, v]) => `${k}: ${v}`)
       .join(", ");
 
+    const sacSatirlari = sonuc.sacKalemleri
+      .map((s) => `- ${s.label}: ${s.enMm}x${s.boyMm}mm, ${s.kalinlikMm ?? "?"}mm kalınlık, ${s.adet} adet`)
+      .join("\n");
+    const baglantiSatirlari = sonuc.baglantiKalemleri.map((b) => `- ${b.label}: ${b.adet} ${b.birim}`).join("\n");
+
     const girdiMetni = `Ürün tipi: ${SABLON_TURKCE[templateKey] ?? templateKey}
 Hesaplanan ara değerler: ${olculer || "yok"}
-Kullanılan malzemeler:
-${malzemeSatirlari.join("\n") || "- (malzeme bilgisi bulunamadı)"}
+Kullanılan profil malzemeler:
+${malzemeSatirlari.join("\n") || "- (profil bulunamadı)"}
+Sac/panel/kaplama kalemleri:
+${sacSatirlari || "- yok"}
+Zaten hesaba dahil edilen bağlantı elemanları:
+${baglantiSatirlari || "- yok"}
 Hesaplanan toplam ağırlık: ${toplamAgirlikKg} kg
 Hesaplama motorunun ürettiği uyarılar: ${sonuc.uyarilar.length > 0 ? sonuc.uyarilar.join("; ") : "yok"}`;
 

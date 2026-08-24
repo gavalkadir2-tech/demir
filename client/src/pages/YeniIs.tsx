@@ -28,6 +28,15 @@ export const URUN_EMOJI: Record<string, string> = {
 };
 const EMOJI = URUN_EMOJI;
 
+const KAPLAMA_TURU_SECENEKLERI = [
+  { key: "trapez_sac", label: "Trapez Sac" },
+  { key: "sandvic_panel", label: "Sandviç Panel" },
+  { key: "etermit", label: "Etermit" },
+  { key: "plastik_etermit", label: "Plastik Etermit" },
+  { key: "polikarbon", label: "Polikarbon" },
+  { key: "yok", label: "Kaplama Yok" },
+];
+
 const KATEGORILER = Object.keys(KATEGORI_ETIKET) as ProjectCategory[];
 
 interface AiDanismanSonucu {
@@ -37,6 +46,7 @@ interface AiDanismanSonucu {
   tahminiTasimaKapasitesiKg?: number | null;
   tasimaKapasitesiAciklamasi: string;
   oneriler: string[];
+  sarfMalzemeOnerileri: string[];
   hesaplananAgirlikKg: number;
   agirlikNotu?: string | null;
 }
@@ -504,6 +514,16 @@ export function UrunFormu({
                     ))}
                   </ul>
                 )}
+                {aiDanisman.sarfMalzemeOnerileri.length > 0 && (
+                  <div>
+                    <div className="font-medium text-neutral-700 mb-1">🔩 Önerilen sarf malzemeleri</div>
+                    <ul className="list-disc list-inside space-y-1">
+                      {aiDanisman.sarfMalzemeOnerileri.map((o, i) => (
+                        <li key={i}>{o}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {aiDanisman.tahminiTasimaKapasitesiKg != null && (
                   <div className="rounded-lg bg-amber-50 border border-amber-300 text-amber-900 px-3 py-2">
                     <div className="font-semibold">
@@ -655,11 +675,34 @@ function SundurmaAlanlari({
   const [araTasiyiciProfilId, setAraTasiyiciProfilId] = useState<number>();
   const [dikmeProfilId, setDikmeProfilId] = useState<number>();
   const [caprazProfilId, setCaprazProfilId] = useState<number>();
+  const [kaplamaTuru, setKaplamaTuru] = useState<string>("trapez_sac");
 
   useEffect(() => {
-    onChange({ genislikMm, boyMm, yukseklikMm, egimYuzde, dikmeSayisi, anaTasiyiciProfilId, araTasiyiciProfilId, dikmeProfilId, caprazProfilId });
+    onChange({
+      genislikMm,
+      boyMm,
+      yukseklikMm,
+      egimYuzde,
+      dikmeSayisi,
+      anaTasiyiciProfilId,
+      araTasiyiciProfilId,
+      dikmeProfilId,
+      caprazProfilId,
+      kaplamaTuru,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [genislikMm, boyMm, yukseklikMm, egimYuzde, dikmeSayisi, anaTasiyiciProfilId, araTasiyiciProfilId, dikmeProfilId, caprazProfilId]);
+  }, [
+    genislikMm,
+    boyMm,
+    yukseklikMm,
+    egimYuzde,
+    dikmeSayisi,
+    anaTasiyiciProfilId,
+    araTasiyiciProfilId,
+    dikmeProfilId,
+    caprazProfilId,
+    kaplamaTuru,
+  ]);
 
   return (
     <div className="space-y-3">
@@ -675,6 +718,16 @@ function SundurmaAlanlari({
         <MaterialSelect label="Ara Taşıyıcı (Aşık)" materials={materials} value={araTasiyiciProfilId} onChange={setAraTasiyiciProfilId} />
         <MaterialSelect label="Dikme Profili" materials={materials} value={dikmeProfilId} onChange={setDikmeProfilId} />
         <MaterialSelect label="Çapraz Profili (opsiyonel)" materials={materials} value={caprazProfilId} onChange={setCaprazProfilId} allowEmpty />
+      </div>
+      <div>
+        <label className="field-label">Çatı Kaplaması</label>
+        <select className="field-select" value={kaplamaTuru} onChange={(e) => setKaplamaTuru(e.target.value)}>
+          {KAPLAMA_TURU_SECENEKLERI.map((s) => (
+            <option key={s.key} value={s.key}>
+              {s.label}
+            </option>
+          ))}
+        </select>
       </div>
     </div>
   );
@@ -859,6 +912,9 @@ function CatiKafesiAlanlari({
   const [diyagonalSayisi, setDiyagonalSayisi] = useState<number>(() => (baslangic?.diyagonalSayisi as number) ?? 0);
   const [asikProfilId, setAsikProfilId] = useState<number>();
   const [asikAraligiHedefMm, setAsikAraligiHedefMm] = useState<number>(() => (baslangic?.asikAraligiHedefMm as number) ?? 1000);
+  const [kaplamaTuru, setKaplamaTuru] = useState<string>("trapez_sac");
+  const [stabiliteBaglantisiVar, setStabiliteBaglantisiVar] = useState(false);
+  const [stabiliteProfilId, setStabiliteProfilId] = useState<number>();
 
   useEffect(() => {
     onChange({
@@ -873,6 +929,9 @@ function CatiKafesiAlanlari({
       diyagonalSayisi,
       asikProfilId,
       asikAraligiHedefMm,
+      kaplamaTuru,
+      stabiliteBaglantisiVar,
+      stabiliteProfilId: stabiliteBaglantisiVar ? stabiliteProfilId : undefined,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -887,6 +946,9 @@ function CatiKafesiAlanlari({
     diyagonalSayisi,
     asikProfilId,
     asikAraligiHedefMm,
+    kaplamaTuru,
+    stabiliteBaglantisiVar,
+    stabiliteProfilId,
   ]);
 
   return (
@@ -905,8 +967,18 @@ function CatiKafesiAlanlari({
         <MaterialSelect label="Aşık Profili (opsiyonel)" materials={materials} value={asikProfilId} onChange={setAsikProfilId} allowEmpty />
         <Sayi label="Aşık Aralığı (mm)" value={asikAraligiHedefMm} onChange={setAsikAraligiHedefMm} />
       </div>
+      <div>
+        <label className="field-label">Çatı Kaplaması</label>
+        <select className="field-select" value={kaplamaTuru} onChange={(e) => setKaplamaTuru(e.target.value)}>
+          {KAPLAMA_TURU_SECENEKLERI.map((s) => (
+            <option key={s.key} value={s.key}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+      </div>
       <details className="rounded-xl border border-neutral-200 p-3">
-        <summary className="font-semibold cursor-pointer">Gelişmiş: Kral Kirişi ve Çapraz Destek</summary>
+        <summary className="font-semibold cursor-pointer">Gelişmiş: Kral Kirişi, Çapraz Destek ve Stabilite</summary>
         <div className="grid grid-cols-2 gap-3 mt-3">
           <MaterialSelect
             label="Kral Kirişi Profili"
@@ -923,6 +995,24 @@ function CatiKafesiAlanlari({
             allowEmpty
           />
           <Sayi label="Kafes Başına Çapraz Sayısı" value={diyagonalSayisi} onChange={setDiyagonalSayisi} />
+        </div>
+        <div className="mt-3 pt-3 border-t border-neutral-100 space-y-3">
+          <label className="flex items-center gap-2 text-sm font-medium">
+            <input
+              type="checkbox"
+              checked={stabiliteBaglantisiVar}
+              onChange={(e) => setStabiliteBaglantisiVar(e.target.checked)}
+            />
+            İlk açıklığa stabilite bağlantısı (rüzgar/deprem çaprazı) ekle
+          </label>
+          {stabiliteBaglantisiVar && (
+            <MaterialSelect
+              label="Stabilite Bağlantısı Profili (genelde L profil)"
+              materials={materials}
+              value={stabiliteProfilId}
+              onChange={setStabiliteProfilId}
+            />
+          )}
         </div>
       </details>
     </div>

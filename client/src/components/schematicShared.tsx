@@ -11,6 +11,7 @@ export const PALET = {
   vurgu: "#f97316", // ikincil / ara eleman (ara kayıt, lento, eşik) - turuncu
   destek: "#16a34a", // çapraz / destek elemanı - yeşil
   ikincil: "#7c3aed", // özel eleman (kral kirişi, kanat, aşık) - mor
+  stabilite: "#dc2626", // stabilite/rüzgar-deprem çaprazı - kırmızı
 } as const;
 
 export interface LejantKalemi {

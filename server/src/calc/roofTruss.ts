@@ -4,6 +4,7 @@
 
 import { HesaplamaHatasi } from "./units";
 import { HesaplananParca, UrunHesapSonucu, bosSonuc, profilOzetOlustur } from "./types";
+import { KAPLAMA_BILGI, KaplamaTuru } from "./kaplama";
 
 export interface CatiKafesiGirdi {
   /** Açıklık (mm) - kafesin kapattığı toplam genişlik */
@@ -28,20 +29,23 @@ export interface CatiKafesiGirdi {
   asikProfilKey?: string;
   /** Hedeflenen aşık aralığı (mm), eğim yönünde, örn. 1000 */
   asikAraligiHedefMm?: number;
-  /** Çatı kaplama türü: trapez_sac | polikarbon | yok */
-  kaplamaTuru?: "trapez_sac" | "polikarbon" | "yok";
+  /** Çatı kaplama türü */
+  kaplamaTuru?: KaplamaTuru;
   kaplamaKalinlikMm?: number;
   plakaEnMm?: number;
   plakaBoyMm?: number;
   plakaKalinlikMm?: number;
   ankrajSayisiPerPlaka?: number;
+  /** İlk açıklıkta (ilk iki kafes arası) yatay+düşey stabilite (rüzgar/deprem) çaprazları eklensin mi. */
+  stabiliteBaglantisiVar?: boolean;
+  /** Stabilite çaprazı profil kesiti (genellikle L profil) - stabiliteBaglantisiVar true ise zorunlu. */
+  stabiliteProfilKey?: string;
 }
 
 const VARSAYILAN = {
   diyagonalSayisi: 0,
   asikAraligiHedefMm: 1000,
   kaplamaTuru: "trapez_sac" as const,
-  kaplamaKalinlikMm: 0.5,
   plakaEnMm: 120,
   plakaBoyMm: 120,
   plakaKalinlikMm: 10,
@@ -60,6 +64,8 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
   const diyagonalSayisi = girdi.diyagonalSayisi ?? VARSAYILAN.diyagonalSayisi;
   if (diyagonalSayisi > 0 && !girdi.diyagonalProfilKey)
     throw new HesaplamaHatasi("Çapraz destek sayısı girildi ama çapraz destek profili seçilmedi.");
+  if (girdi.stabiliteBaglantisiVar && !girdi.stabiliteProfilKey)
+    throw new HesaplamaHatasi("Stabilite bağlantısı seçildi ama stabilite profili seçilmedi.");
 
   const plakaEnMm = girdi.plakaEnMm ?? VARSAYILAN.plakaEnMm;
   const plakaBoyMm = girdi.plakaBoyMm ?? VARSAYILAN.plakaBoyMm;
@@ -134,6 +140,29 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
     });
   }
 
+  if (girdi.stabiliteBaglantisiVar && girdi.stabiliteProfilKey) {
+    if (kafesSayisi < 2) {
+      sonuc.uyarilar.push("Stabilite bağlantısı için en az 2 kafes gerekir; tek kafeste eklenmedi.");
+    } else {
+      const yatayCaprazUzunlukMm = Math.sqrt(gercekAralikMm ** 2 + ustBaslikUzunlukMm ** 2);
+      const duseyCaprazUzunlukMm = Math.sqrt(gercekAralikMm ** 2 + mahyaYuksekligiMm ** 2);
+      parcalar.push({
+        label: "Stabilite bağlantısı (yatay)",
+        profilKey: girdi.stabiliteProfilKey,
+        uzunlukMm: Math.ceil(yatayCaprazUzunlukMm),
+        adet: 4, // iki yamaçta X şeklinde (2+2), ilk açıklık
+        not: "Üst başlık düzleminde, ilk açıklıkta rüzgar/deprem çaprazı (X). Uzun çatılarda ek açıklıklara da eklenmesi önerilir.",
+      });
+      parcalar.push({
+        label: "Stabilite bağlantısı (düşey)",
+        profilKey: girdi.stabiliteProfilKey,
+        uzunlukMm: Math.ceil(duseyCaprazUzunlukMm),
+        adet: 2, // kral kirişleri arasında X şeklinde, ilk açıklık
+        not: "Kral kirişleri arasında, ilk açıklıkta düşey çapraz (X).",
+      });
+    }
+  }
+
   sonuc.parcalar = parcalar;
   sonuc.profilOzet = profilOzetOlustur(parcalar);
 
@@ -153,11 +182,12 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
 
   const kaplamaTuru = girdi.kaplamaTuru ?? VARSAYILAN.kaplamaTuru;
   if (kaplamaTuru !== "yok") {
+    const kaplamaBilgisi = KAPLAMA_BILGI[kaplamaTuru];
     sonuc.sacKalemleri.push({
-      label: kaplamaTuru === "polikarbon" ? "Çatı kaplaması (polikarbon)" : "Çatı kaplaması (trapez sac)",
+      label: kaplamaBilgisi.label,
       enMm: Math.round(catiUzunluguMm),
       boyMm: Math.ceil(ustBaslikUzunlukMm),
-      kalinlikMm: girdi.kaplamaKalinlikMm ?? VARSAYILAN.kaplamaKalinlikMm,
+      kalinlikMm: girdi.kaplamaKalinlikMm ?? kaplamaBilgisi.varsayilanKalinlikMm,
       adet: 2, // iki yamaç
     });
   }

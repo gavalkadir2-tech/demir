@@ -10,6 +10,7 @@ export interface CatiKafesiSemaVeri {
   diyagonalSayisi?: number;
   kafesSayisi?: number;
   gercekAralikMm?: number;
+  stabiliteVar?: boolean;
 }
 
 const MARGIN_LEFT = 70;
@@ -44,6 +45,7 @@ export default function TrussSchematic({ veri }: { veri: CatiKafesiSemaVeri }) {
     diyagonalSayisi = 0,
     kafesSayisi = 2,
     gercekAralikMm = catiUzunluguMm,
+    stabiliteVar = false,
   } = veri;
   if (!acikligMm) return null;
 
@@ -100,11 +102,14 @@ export default function TrussSchematic({ veri }: { veri: CatiKafesiSemaVeri }) {
     ? Array.from({ length: asikSatirSayisiPerSide }, (_, i) => by0 + (i / (asikSatirSayisiPerSide - 1)) * scaledRafter)
     : [];
 
+  const stabiliteCizilecek = stabiliteVar && kafesSayisi >= 2;
+
   const lejant = [
     { renk: PALET.ana, etiket: "Üst/Alt Başlık" },
     { renk: PALET.ikincil, etiket: "Kral Kirişi" },
     ...(diyagonalCizilecekSayi > 0 ? [{ renk: PALET.destek, etiket: "Çapraz Destek" }] : []),
     ...(asikVar ? [{ renk: PALET.vurgu, etiket: "Aşık" }] : []),
+    ...(stabiliteCizilecek ? [{ renk: PALET.stabilite, etiket: "Stabilite Bağlantısı" }] : []),
   ];
 
   return (
@@ -160,6 +165,26 @@ export default function TrussSchematic({ veri }: { veri: CatiKafesiSemaVeri }) {
       {asikYPozisyonlari.map((py, i) => (
         <line key={i} x1={bx0} y1={py} x2={bx0 + scaledUzunluk} y2={py} stroke={PALET.vurgu} strokeWidth={2} />
       ))}
+      {stabiliteCizilecek && (
+        <g>
+          <line
+            x1={kafesXPozisyonlari[0]}
+            y1={by0}
+            x2={kafesXPozisyonlari[1]}
+            y2={by0 + scaledRafter}
+            stroke={PALET.stabilite}
+            strokeWidth={2.5}
+          />
+          <line
+            x1={kafesXPozisyonlari[0]}
+            y1={by0 + scaledRafter}
+            x2={kafesXPozisyonlari[1]}
+            y2={by0}
+            stroke={PALET.stabilite}
+            strokeWidth={2.5}
+          />
+        </g>
+      )}
 
       <YatayOlcu x1={bx0} x2={bx0 + scaledUzunluk} y={by0 + scaledRafter + 30} etiket={mmEtiket(catiUzunluguMm)} />
       <DikeyOlcu y1={by0} y2={by0 + scaledRafter} x={bx0 - 30} etiket={mmEtiket(ustBaslikUzunlukMm)} />
