@@ -1,4 +1,4 @@
-import { OkTanimlari, YatayOlcu, DikeyOlcu, mmEtiket, KOYU, VIEW_W, VIEW_H } from "./schematicShared";
+import { OkTanimlari, YatayOlcu, DikeyOlcu, mmEtiket, PALET, Lejant, VIEW_W, VIEW_H, LEGEND_H } from "./schematicShared";
 
 export interface CatiKafesiSemaVeri {
   acikligMm: number;
@@ -39,29 +39,40 @@ export default function TrussSchematic({ veri }: { veri: CatiKafesiSemaVeri }) {
   const dimAciklikY = groundY + 30;
   const dimYukseklikX = x0 - 30;
 
+  const lejant = [
+    { renk: PALET.ana, etiket: "Üst/Alt Başlık" },
+    { renk: PALET.ikincil, etiket: "Kral Kirişi" },
+    ...(asikVar ? [{ renk: PALET.vurgu, etiket: "Aşık" }] : []),
+  ];
+
   return (
-    <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} className="w-full h-auto" role="img" aria-label="Çatı kafesi şematik çizimi">
+    <svg
+      viewBox={`0 0 ${VIEW_W} ${VIEW_H + LEGEND_H}`}
+      className="w-full h-auto"
+      role="img"
+      aria-label="Çatı kafesi şematik çizimi"
+    >
       <OkTanimlari />
 
       <line x1={x0 - 15} y1={groundY} x2={x0 + scaledAciklik + 15} y2={groundY} stroke="#a3a3a3" strokeWidth={2} />
 
       <polygon points={gövde} fill="#e5e5e5" stroke="none" />
-      <line x1={x0} y1={groundY} x2={x0 + scaledAciklik} y2={groundY} stroke={KOYU} strokeWidth={3} />
-      <line x1={x0} y1={groundY} x2={xOrta} y2={tepeY} stroke={KOYU} strokeWidth={3} />
-      <line x1={x0 + scaledAciklik} y1={groundY} x2={xOrta} y2={tepeY} stroke={KOYU} strokeWidth={3} />
+      <line x1={x0} y1={groundY} x2={x0 + scaledAciklik} y2={groundY} stroke={PALET.ana} strokeWidth={3} />
+      <line x1={x0} y1={groundY} x2={xOrta} y2={tepeY} stroke={PALET.ana} strokeWidth={3} />
+      <line x1={x0 + scaledAciklik} y1={groundY} x2={xOrta} y2={tepeY} stroke={PALET.ana} strokeWidth={3} />
       {/* Kral kirişi */}
-      <line x1={xOrta} y1={groundY} x2={xOrta} y2={tepeY} stroke={KOYU} strokeWidth={2} strokeDasharray="5 3" />
+      <line x1={xOrta} y1={groundY} x2={xOrta} y2={tepeY} stroke={PALET.ikincil} strokeWidth={2} strokeDasharray="5 3" />
 
       {/* Aşık sıraları (her iki yamaçta, eşit aralıklı noktalar) */}
       {asikVar &&
         Array.from({ length: asikSatirSayisiPerSide }, (_, i) => i / (asikSatirSayisiPerSide - 1)).map((oran, i) => (
           <g key={i}>
-            <circle cx={x0 + oran * (xOrta - x0)} cy={groundY + oran * (tepeY - groundY)} r={3.5} fill="#f97316" />
+            <circle cx={x0 + oran * (xOrta - x0)} cy={groundY + oran * (tepeY - groundY)} r={3.5} fill={PALET.vurgu} />
             <circle
               cx={x0 + scaledAciklik - oran * (x0 + scaledAciklik - xOrta)}
               cy={groundY + oran * (tepeY - groundY)}
               r={3.5}
-              fill="#f97316"
+              fill={PALET.vurgu}
             />
           </g>
         ))}
@@ -72,6 +83,8 @@ export default function TrussSchematic({ veri }: { veri: CatiKafesiSemaVeri }) {
       <text x={xOrta} y={tepeY - 10} textAnchor="middle" fontSize={12} fill="#525252">
         eğim %{egimYuzde}
       </text>
+
+      <Lejant kalemler={lejant} y={VIEW_H + 6} />
     </svg>
   );
 }

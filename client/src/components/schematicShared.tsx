@@ -1,9 +1,43 @@
 import { sayi } from "../lib/format";
 
-export const KOYU = "#404040";
-export const VURGU = "#f97316";
+const KOYU = "#404040";
 export const OK_MARKER_ID = "sema-ok";
 export const OK_TERS_MARKER_ID = "sema-ok-ters";
+
+/** Parça tipine göre tutarlı renk paleti - tüm şema çizimlerinde aynı anlamda kullanılır. */
+export const PALET = {
+  ana: "#404040", // ana taşıyıcı / dikme / kasa - koyu gri
+  yatay: "#2563eb", // yatay ray / profil / başlık - mavi
+  vurgu: "#f97316", // ikincil / ara eleman (ara kayıt, lento, eşik) - turuncu
+  destek: "#16a34a", // çapraz / destek elemanı - yeşil
+  ikincil: "#7c3aed", // özel eleman (kral kirişi, kanat, aşık) - mor
+} as const;
+
+export interface LejantKalemi {
+  renk: string;
+  etiket: string;
+}
+
+export const LEGEND_H = 32;
+
+/** Şema altında, kullanılan renklerin ne anlama geldiğini gösteren küçük bir lejant. */
+export function Lejant({ kalemler, y }: { kalemler: LejantKalemi[]; y: number }) {
+  if (kalemler.length === 0) return null;
+  const itemW = Math.min(170, (VIEW_W - 20) / kalemler.length);
+  const startX = (VIEW_W - itemW * kalemler.length) / 2;
+  return (
+    <g>
+      {kalemler.map((k, i) => (
+        <g key={i} transform={`translate(${startX + i * itemW}, ${y})`}>
+          <rect x={0} y={0} width={12} height={12} rx={2} fill={k.renk} />
+          <text x={18} y={10} fontSize={11} fill="#525252">
+            {k.etiket}
+          </text>
+        </g>
+      ))}
+    </g>
+  );
+}
 
 /** Ölçü çizgilerinde kullanılan ok başı tanımları. Her şema SVG'sinde bir kez <defs> içine konur. */
 export function OkTanimlari() {

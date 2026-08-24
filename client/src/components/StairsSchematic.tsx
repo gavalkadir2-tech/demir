@@ -1,4 +1,4 @@
-import { OkTanimlari, YatayOlcu, DikeyOlcu, mmEtiket, KOYU, VIEW_W, VIEW_H } from "./schematicShared";
+import { OkTanimlari, YatayOlcu, DikeyOlcu, mmEtiket, PALET, Lejant, VIEW_W, VIEW_H, LEGEND_H } from "./schematicShared";
 
 export interface MerdivenSemaVeri {
   katYuksekligiMm: number;
@@ -49,17 +49,27 @@ export default function StairsSchematic({ veri }: { veri: MerdivenSemaVeri }) {
   const dimDerinlikY = groundY + 30;
   const dimYukseklikX = x0 - 30;
 
+  const lejant = [
+    { renk: PALET.ana, etiket: "Basamak" },
+    { renk: PALET.destek, etiket: "Taşıyıcı (kiriş)" },
+  ];
+
   return (
-    <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} className="w-full h-auto" role="img" aria-label="Merdiven şematik çizimi">
+    <svg
+      viewBox={`0 0 ${VIEW_W} ${VIEW_H + LEGEND_H}`}
+      className="w-full h-auto"
+      role="img"
+      aria-label="Merdiven şematik çizimi"
+    >
       <OkTanimlari />
 
       <line x1={x0 - 15} y1={groundY} x2={x + 15} y2={groundY} stroke="#a3a3a3" strokeWidth={2} />
 
       {/* Basamak silueti */}
       <polygon points={doluAlan} fill="#e5e5e5" stroke="none" />
-      <polyline points={cizgiNoktalari} fill="none" stroke={KOYU} strokeWidth={2.5} />
+      <polyline points={cizgiNoktalari} fill="none" stroke={PALET.ana} strokeWidth={2.5} />
       {/* Taşıyıcı diyagonal (yaklaşık) */}
-      <line x1={x0} y1={groundY} x2={x} y2={topY} stroke="#9ca3af" strokeWidth={1.5} strokeDasharray="4 3" />
+      <line x1={x0} y1={groundY} x2={x} y2={topY} stroke={PALET.destek} strokeWidth={2} strokeDasharray="4 3" />
 
       <YatayOlcu x1={x0} x2={x} y={dimDerinlikY} etiket={mmEtiket(toplamDerinlikMm)} />
       <DikeyOlcu y1={topY} y2={groundY} x={dimYukseklikX} etiket={mmEtiket(katYuksekligiMm)} />
@@ -67,6 +77,8 @@ export default function StairsSchematic({ veri }: { veri: MerdivenSemaVeri }) {
       <text x={(x0 + x) / 2} y={topY - 10} textAnchor="middle" fontSize={12} fill="#525252">
         {basamakSayisi} basamak × ({mmEtiket(basamakDerinligiMm)} × {mmEtiket(gercekBasamakYuksekligiMm)})
       </text>
+
+      <Lejant kalemler={lejant} y={VIEW_H + 6} />
     </svg>
   );
 }

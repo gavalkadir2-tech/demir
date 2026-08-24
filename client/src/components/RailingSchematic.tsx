@@ -1,4 +1,4 @@
-import { OkTanimlari, YatayOlcu, DikeyOlcu, mmEtiket, KOYU, VURGU, VIEW_W, VIEW_H } from "./schematicShared";
+import { OkTanimlari, YatayOlcu, DikeyOlcu, mmEtiket, PALET, Lejant, VIEW_W, VIEW_H, LEGEND_H } from "./schematicShared";
 
 export interface KorkulukSemaVeri {
   toplamUzunlukMm: number;
@@ -45,8 +45,19 @@ export default function RailingSchematic({ veri }: { veri: KorkulukSemaVeri }) {
   const dimUzunlukY = groundY + 30;
   const dimYukseklikX = x0 - 30;
 
+  const lejant = [
+    { renk: PALET.ana, etiket: "Dikme" },
+    { renk: PALET.yatay, etiket: "Üst/Alt Profil" },
+    ...(araKayitSayisi > 0 ? [{ renk: PALET.vurgu, etiket: "Ara Kayıt" }] : []),
+  ];
+
   return (
-    <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} className="w-full h-auto" role="img" aria-label="Korkuluk şematik çizimi">
+    <svg
+      viewBox={`0 0 ${VIEW_W} ${VIEW_H + LEGEND_H}`}
+      className="w-full h-auto"
+      role="img"
+      aria-label="Korkuluk şematik çizimi"
+    >
       <OkTanimlari />
 
       {/* Zemin çizgisi */}
@@ -54,16 +65,16 @@ export default function RailingSchematic({ veri }: { veri: KorkulukSemaVeri }) {
 
       {/* Dikmeler */}
       {postXs.map((px, i) => (
-        <rect key={i} x={px - POST_WIDTH / 2} y={topY} width={POST_WIDTH} height={scaledH} fill={KOYU} />
+        <rect key={i} x={px - POST_WIDTH / 2} y={topY} width={POST_WIDTH} height={scaledH} fill={PALET.ana} />
       ))}
 
       {/* Üst profil */}
-      <rect x={x0} y={topY} width={scaledW} height={RAIL_THICKNESS} fill={KOYU} />
+      <rect x={x0} y={topY} width={scaledW} height={RAIL_THICKNESS} fill={PALET.yatay} />
       {/* Alt profil */}
-      <rect x={x0} y={groundY - RAIL_THICKNESS} width={scaledW} height={RAIL_THICKNESS} fill={KOYU} />
+      <rect x={x0} y={groundY - RAIL_THICKNESS} width={scaledW} height={RAIL_THICKNESS} fill={PALET.yatay} />
       {/* Ara kayıt(lar) */}
       {araKayitYlar.map((y, i) => (
-        <rect key={i} x={x0} y={y - RAIL_THICKNESS / 2} width={scaledW} height={RAIL_THICKNESS} fill={VURGU} />
+        <rect key={i} x={x0} y={y - RAIL_THICKNESS / 2} width={scaledW} height={RAIL_THICKNESS} fill={PALET.vurgu} />
       ))}
 
       <YatayOlcu x1={x0} x2={x0 + scaledW} y={dimUzunlukY} etiket={mmEtiket(toplamUzunlukMm)} />
@@ -81,6 +92,8 @@ export default function RailingSchematic({ veri }: { veri: KorkulukSemaVeri }) {
           kalin={false}
         />
       )}
+
+      <Lejant kalemler={lejant} y={VIEW_H + 6} />
     </svg>
   );
 }
