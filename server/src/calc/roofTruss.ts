@@ -24,6 +24,10 @@ export interface CatiKafesiGirdi {
   diyagonalProfilKey?: string;
   /** Kafes başına çapraz destek sayısı (0, 2 veya 4 gibi) */
   diyagonalSayisi?: number;
+  /** Aşık (üst başlıklar üzerine, çatı uzunluğu boyunca döşenen) profil kesiti - opsiyonel */
+  asikProfilKey?: string;
+  /** Hedeflenen aşık aralığı (mm), eğim yönünde, örn. 1000 */
+  asikAraligiHedefMm?: number;
   plakaEnMm?: number;
   plakaBoyMm?: number;
   plakaKalinlikMm?: number;
@@ -32,6 +36,7 @@ export interface CatiKafesiGirdi {
 
 const VARSAYILAN = {
   diyagonalSayisi: 0,
+  asikAraligiHedefMm: 1000,
   plakaEnMm: 120,
   plakaBoyMm: 120,
   plakaKalinlikMm: 10,
@@ -110,6 +115,20 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
     });
   }
 
+  let asikSatirSayisi = 0;
+  if (girdi.asikProfilKey) {
+    const asikAraligiHedefMm = girdi.asikAraligiHedefMm ?? VARSAYILAN.asikAraligiHedefMm;
+    const asikSatirSayisiPerSide = Math.max(2, Math.ceil(ustBaslikUzunlukMm / asikAraligiHedefMm) + 1);
+    asikSatirSayisi = 2 * asikSatirSayisiPerSide;
+    parcalar.push({
+      label: "Aşık",
+      profilKey: girdi.asikProfilKey,
+      uzunlukMm: Math.round(catiUzunluguMm),
+      adet: asikSatirSayisi,
+      not: "Çatının iki eğimine (sol+sağ) eşit dağıtılmış aşık sıraları; kesim listesinde standart boya göre bölünecektir.",
+    });
+  }
+
   sonuc.parcalar = parcalar;
   sonuc.profilOzet = profilOzetOlustur(parcalar);
 
@@ -138,6 +157,7 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
     ustBaslikUzunlukMm: Math.round(ustBaslikUzunlukMm),
     egimDerece: Math.round(egimDerece * 100) / 100,
     catiAlaniM2: Math.round(catiAlaniM2 * 100) / 100,
+    asikSatirSayisi,
   };
 
   return sonuc;

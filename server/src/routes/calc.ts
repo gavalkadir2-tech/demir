@@ -103,6 +103,8 @@ const trussSchema = z.object({
   kralKirisiProfilId: z.number().int().optional(),
   diyagonalProfilId: z.number().int().optional(),
   diyagonalSayisi: z.number().int().optional(),
+  asikProfilId: z.number().int().optional(),
+  asikAraligiHedefMm: z.number().optional(),
   plakaEnMm: z.number().optional(),
   plakaBoyMm: z.number().optional(),
   plakaKalinlikMm: z.number().optional(),

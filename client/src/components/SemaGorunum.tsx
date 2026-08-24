@@ -76,7 +76,16 @@ export default function SemaGorunum({
         />
       );
     case "truss":
-      return <TrussSchematic veri={{ acikligMm: n("acikligMm"), egimYuzde: n("egimYuzde") }} />;
+      return (
+        <TrussSchematic
+          veri={{
+            acikligMm: n("acikligMm"),
+            egimYuzde: n("egimYuzde"),
+            asikVar: Boolean(params.asikProfilId),
+            asikAraligiHedefMm: n("asikAraligiHedefMm") || 1000,
+          }}
+        />
+      );
     default:
       return null;
   }

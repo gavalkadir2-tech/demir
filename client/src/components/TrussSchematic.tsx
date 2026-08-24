@@ -3,6 +3,8 @@ import { OkTanimlari, YatayOlcu, DikeyOlcu, mmEtiket, KOYU, VIEW_W, VIEW_H } fro
 export interface CatiKafesiSemaVeri {
   acikligMm: number;
   egimYuzde: number;
+  asikVar?: boolean;
+  asikAraligiHedefMm?: number;
 }
 
 const MARGIN_LEFT = 70;
@@ -12,11 +14,13 @@ const MARGIN_BOTTOM = 60;
 
 /** Çatı kafesinin (kral kirişi tipi) önden görünüşünü ölçekli, ölçüleri etiketli SVG olarak gösterir. */
 export default function TrussSchematic({ veri }: { veri: CatiKafesiSemaVeri }) {
-  const { acikligMm, egimYuzde } = veri;
+  const { acikligMm, egimYuzde, asikVar = false, asikAraligiHedefMm = 1000 } = veri;
   if (!acikligMm) return null;
 
   const yariAciklikMm = acikligMm / 2;
   const mahyaYuksekligiMm = yariAciklikMm * (egimYuzde / 100);
+  const ustBaslikUzunlukMm = Math.sqrt(yariAciklikMm ** 2 + mahyaYuksekligiMm ** 2);
+  const asikSatirSayisiPerSide = asikVar ? Math.max(2, Math.ceil(ustBaslikUzunlukMm / asikAraligiHedefMm) + 1) : 0;
 
   const drawW = VIEW_W - MARGIN_LEFT - MARGIN_RIGHT;
   const drawH = VIEW_H - MARGIN_TOP - MARGIN_BOTTOM;
@@ -47,6 +51,20 @@ export default function TrussSchematic({ veri }: { veri: CatiKafesiSemaVeri }) {
       <line x1={x0 + scaledAciklik} y1={groundY} x2={xOrta} y2={tepeY} stroke={KOYU} strokeWidth={3} />
       {/* Kral kirişi */}
       <line x1={xOrta} y1={groundY} x2={xOrta} y2={tepeY} stroke={KOYU} strokeWidth={2} strokeDasharray="5 3" />
+
+      {/* Aşık sıraları (her iki yamaçta, eşit aralıklı noktalar) */}
+      {asikVar &&
+        Array.from({ length: asikSatirSayisiPerSide }, (_, i) => i / (asikSatirSayisiPerSide - 1)).map((oran, i) => (
+          <g key={i}>
+            <circle cx={x0 + oran * (xOrta - x0)} cy={groundY + oran * (tepeY - groundY)} r={3.5} fill="#f97316" />
+            <circle
+              cx={x0 + scaledAciklik - oran * (x0 + scaledAciklik - xOrta)}
+              cy={groundY + oran * (tepeY - groundY)}
+              r={3.5}
+              fill="#f97316"
+            />
+          </g>
+        ))}
 
       <YatayOlcu x1={x0} x2={x0 + scaledAciklik} y={dimAciklikY} etiket={mmEtiket(acikligMm)} />
       <DikeyOlcu y1={tepeY} y2={groundY} x={dimYukseklikX} etiket={mmEtiket(mahyaYuksekligiMm)} />

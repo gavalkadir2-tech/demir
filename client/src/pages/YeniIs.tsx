@@ -577,6 +577,8 @@ function CatiKafesiAlanlari({ materials, onChange }: { materials: Material[]; on
   const [kralKirisiProfilId, setKralKirisiProfilId] = useState<number>();
   const [diyagonalProfilId, setDiyagonalProfilId] = useState<number>();
   const [diyagonalSayisi, setDiyagonalSayisi] = useState(0);
+  const [asikProfilId, setAsikProfilId] = useState<number>();
+  const [asikAraligiHedefMm, setAsikAraligiHedefMm] = useState(1000);
 
   useEffect(() => {
     onChange({
@@ -589,6 +591,8 @@ function CatiKafesiAlanlari({ materials, onChange }: { materials: Material[]; on
       kralKirisiProfilId,
       diyagonalProfilId,
       diyagonalSayisi,
+      asikProfilId,
+      asikAraligiHedefMm,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -601,6 +605,8 @@ function CatiKafesiAlanlari({ materials, onChange }: { materials: Material[]; on
     kralKirisiProfilId,
     diyagonalProfilId,
     diyagonalSayisi,
+    asikProfilId,
+    asikAraligiHedefMm,
   ]);
 
   return (
@@ -614,6 +620,10 @@ function CatiKafesiAlanlari({ materials, onChange }: { materials: Material[]; on
       <div className="grid grid-cols-2 gap-3">
         <MaterialSelect label="Üst Başlık Profili" materials={materials} value={ustBaslikProfilId} onChange={setUstBaslikProfilId} />
         <MaterialSelect label="Alt Başlık Profili" materials={materials} value={altBaslikProfilId} onChange={setAltBaslikProfilId} />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <MaterialSelect label="Aşık Profili (opsiyonel)" materials={materials} value={asikProfilId} onChange={setAsikProfilId} allowEmpty />
+        <Sayi label="Aşık Aralığı (mm)" value={asikAraligiHedefMm} onChange={setAsikAraligiHedefMm} />
       </div>
       <details className="rounded-xl border border-neutral-200 p-3">
         <summary className="font-semibold cursor-pointer">Gelişmiş: Kral Kirişi ve Çapraz Destek</summary>

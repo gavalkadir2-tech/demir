@@ -39,6 +39,39 @@ test("çatı kafesi: temel hesap doğru (Pisagor + kafes sayısı)", () => {
   assert.equal(sonuc.baglantiKalemleri[0].adet, 88);
 });
 
+test("çatı kafesi: aşık profili verilirse aşık sıraları hesaplanır", () => {
+  const sonuc = calculateRoofTruss({
+    acikligMm: 6000,
+    egimYuzde: 30,
+    catiUzunluguMm: 9000,
+    kafesAraligiHedefMm: 900,
+    ustBaslikProfilKey: "ust",
+    altBaslikProfilKey: "alt",
+    asikProfilKey: "asik",
+    asikAraligiHedefMm: 1000,
+  });
+
+  // üst başlık ≈ 3132mm, bir yamaçta ceil(3132/1000)+1 = 5 sıra, iki yamaç = 10
+  assert.equal(sonuc.ozetDegerler.asikSatirSayisi, 10);
+
+  const asik = sonuc.parcalar.find((p) => p.label === "Aşık")!;
+  assert.equal(asik.uzunlukMm, 9000);
+  assert.equal(asik.adet, 10);
+});
+
+test("çatı kafesi: aşık profili verilmezse aşık parçası oluşmaz", () => {
+  const sonuc = calculateRoofTruss({
+    acikligMm: 6000,
+    egimYuzde: 30,
+    catiUzunluguMm: 9000,
+    kafesAraligiHedefMm: 900,
+    ustBaslikProfilKey: "ust",
+    altBaslikProfilKey: "alt",
+  });
+  assert.ok(!sonuc.parcalar.some((p) => p.label === "Aşık"));
+  assert.equal(sonuc.ozetDegerler.asikSatirSayisi, 0);
+});
+
 test("çatı kafesi: diyagonal sayısı girilip profili girilmezse hata verir", () => {
   assert.throws(
     () =>
