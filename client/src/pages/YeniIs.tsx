@@ -643,7 +643,7 @@ function MerdivenAlanlari({
   const [basamakYuksekligiHedefMm, setBasamakYuksekligiHedefMm] = useState<number>(
     () => (baslangic?.basamakYuksekligiHedefMm as number) ?? 180
   );
-  const [basamakDerinligiMm, setBasamakDerinligiMm] = useState<number>(() => (baslangic?.basamakDerinligiMm as number) ?? 270);
+  const [toplamDerinlikMm, setToplamDerinlikMm] = useState<number>(() => (baslangic?.toplamDerinlikMm as number) ?? 4590);
   const [tasiyiciProfilId, setTasiyiciProfilId] = useState<number>();
   const [korkulukYuksekligiMm, setKorkulukYuksekligiMm] = useState<number | undefined>(
     () => (baslangic?.korkulukYuksekligiMm as number | undefined) ?? undefined
@@ -656,14 +656,14 @@ function MerdivenAlanlari({
       katYuksekligiMm,
       genislikMm,
       basamakYuksekligiHedefMm,
-      basamakDerinligiMm,
+      toplamDerinlikMm,
       tasiyiciProfilId,
       korkulukYuksekligiMm: korkulukYuksekligiMm || undefined,
       korkulukDikmeProfilId,
       korkulukUstProfilId,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [katYuksekligiMm, genislikMm, basamakYuksekligiHedefMm, basamakDerinligiMm, tasiyiciProfilId, korkulukYuksekligiMm, korkulukDikmeProfilId, korkulukUstProfilId]);
+  }, [katYuksekligiMm, genislikMm, basamakYuksekligiHedefMm, toplamDerinlikMm, tasiyiciProfilId, korkulukYuksekligiMm, korkulukDikmeProfilId, korkulukUstProfilId]);
 
   return (
     <div className="space-y-3">
@@ -671,8 +671,11 @@ function MerdivenAlanlari({
         <Sayi label="Kat Yüksekliği (mm)" value={katYuksekligiMm} onChange={setKatYuksekligiMm} />
         <Sayi label="Merdiven Genişliği (mm)" value={genislikMm} onChange={setGenislikMm} />
         <Sayi label="Hedef Basamak Yüksekliği (mm)" value={basamakYuksekligiHedefMm} onChange={setBasamakYuksekligiHedefMm} />
-        <Sayi label="Basamak Derinliği (mm)" value={basamakDerinligiMm} onChange={setBasamakDerinligiMm} />
+        <Sayi label="Toplam Yatay Uzunluk / Merdiven Boşluğu (mm)" value={toplamDerinlikMm} onChange={setToplamDerinlikMm} />
       </div>
+      <p className="text-xs text-neutral-500 -mt-1">
+        Basamak derinliği, kiriş (hipotenüs) uzunluğu ve eğim açısı bu iki ölçüden otomatik hesaplanır.
+      </p>
       <MaterialSelect label="Taşıyıcı (Kiriş) Profili" materials={materials} value={tasiyiciProfilId} onChange={setTasiyiciProfilId} />
       <details className="rounded-xl border border-neutral-200 p-3">
         <summary className="font-semibold cursor-pointer">Gelişmiş: Merdiven Korkuluğu</summary>

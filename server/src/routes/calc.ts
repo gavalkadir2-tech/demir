@@ -29,7 +29,7 @@ const stairsSchema = z.object({
   katYuksekligiMm: z.number(),
   genislikMm: z.number(),
   basamakYuksekligiHedefMm: z.number(),
-  basamakDerinligiMm: z.number(),
+  toplamDerinlikMm: z.number(),
   tasiyiciProfilId: z.number().int(),
   tasiyiciAdet: z.number().int().optional(),
   basamakKalinlikMm: z.number().optional(),

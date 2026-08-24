@@ -36,9 +36,11 @@ export default function SemaGorunum({
         <StairsSchematic
           veri={{
             katYuksekligiMm: n("katYuksekligiMm"),
-            basamakDerinligiMm: n("basamakDerinligiMm"),
+            basamakDerinligiMm: ozetDegerler.basamakDerinligiMm,
             basamakSayisi: ozetDegerler.basamakSayisi,
             gercekBasamakYuksekligiMm: ozetDegerler.gercekBasamakYuksekligiMm,
+            kosegenMm: ozetDegerler.kosegenMm,
+            egimAcisiDerece: ozetDegerler.egimAcisiDerece,
           }}
         />
       );
@@ -85,7 +87,7 @@ export default function SemaGorunum({
             asikVar: Boolean(params.asikProfilId),
             asikAraligiHedefMm: n("asikAraligiHedefMm") || 1000,
             diyagonalVar: Boolean(params.diyagonalProfilId),
-            diyagonalSayisi: n("diyagonalSayisi"),
+            diyagonalPanelSayisi: ozetDegerler.diyagonalPanelSayisi,
             kafesSayisi: ozetDegerler.kafesSayisi,
             gercekAralikMm: ozetDegerler.gercekAralikMm,
             stabiliteVar: Boolean(params.stabiliteBaglantisiVar && params.stabiliteProfilId),

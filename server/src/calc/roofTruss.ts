@@ -77,7 +77,7 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
   if (egimYuzde < 15) {
     sonuc.uyarilar.push("Eğim %15'in altında; çatı kafesi için genellikle daha dik bir eğim tercih edilir.");
   }
-  if (acikligMm > 8000 && diyagonalSayisi === 0) {
+  if (acikligMm > 8000 && !girdi.diyagonalProfilKey) {
     sonuc.uyarilar.push("Açıklık 8 metreden geniş; ek çapraz destek (diyagonal) eklemeyi düşünün.");
   }
 
@@ -115,14 +115,30 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
     });
   }
 
-  if (diyagonalSayisi > 0 && girdi.diyagonalProfilKey) {
-    const diyagonalUzunlukMm = Math.sqrt((yariAciklikMm / 2) ** 2 + (mahyaYuksekligiMm / 2) ** 2);
+  // Diyagonal ağ: yarım açıklığı panelSayisi eşit panele bölüp, alt başlık <-> üst başlık arasında
+  // zikzak (Warren tipi) çapraz eleman dizisi oluşturur - tam bir kafes makası gibi, sadece ortada
+  // birkaç eleman değil. diyagonalSayisi verilmişse panel sayısını ondan türetir (yaklaşık, /4),
+  // verilmemişse açıklığa göre otomatik makul bir panel sayısı seçer.
+  let diyagonalPanelSayisi = 0;
+  if (girdi.diyagonalProfilKey) {
+    diyagonalPanelSayisi = diyagonalSayisi > 0 ? Math.max(1, Math.round(diyagonalSayisi / 4)) : Math.max(2, Math.round(yariAciklikMm / 900));
+    const panelGenislikMm = yariAciklikMm / diyagonalPanelSayisi;
+    let toplamCaprazMmBirYamacBirKafes = 0;
+    for (let k = 0; k < diyagonalPanelSayisi; k++) {
+      const ustYukseklik = ((k + 1) / diyagonalPanelSayisi) * mahyaYuksekligiMm;
+      const altYukseklik = (k / diyagonalPanelSayisi) * mahyaYuksekligiMm;
+      toplamCaprazMmBirYamacBirKafes += Math.sqrt(panelGenislikMm ** 2 + ustYukseklik ** 2); // alt(k) -> üst(k+1)
+      toplamCaprazMmBirYamacBirKafes += Math.sqrt(panelGenislikMm ** 2 + altYukseklik ** 2); // üst(k) -> alt(k+1)
+    }
+    const toplamDiyagonalAdet = 4 * diyagonalPanelSayisi * kafesSayisi; // 2 yamaç x (2 x panel) segment x kafes sayısı
+    const toplamCaprazMmTumKafesler = toplamCaprazMmBirYamacBirKafes * 2 * kafesSayisi; // 2 yamaç
+    const ortalamaUzunlukMm = toplamCaprazMmTumKafesler / toplamDiyagonalAdet;
     parcalar.push({
-      label: "Çapraz destek",
+      label: "Çapraz destek (diyagonal ağ)",
       profilKey: girdi.diyagonalProfilKey,
-      uzunlukMm: Math.ceil(diyagonalUzunlukMm),
-      adet: diyagonalSayisi * kafesSayisi,
-      not: "Yaklaşık diyagonal destek uzunluğu, sahada son ayar gerekebilir.",
+      uzunlukMm: Math.ceil(ortalamaUzunlukMm),
+      adet: toplamDiyagonalAdet,
+      not: `Tam diyagonal ağ (yarım açıklıkta ${diyagonalPanelSayisi} panel, zikzak/Warren tipi); gösterilen ortalama uzunluktur, panel konumuna göre gerçek uzunluklar farklılık gösterir - sahada ölçüp kesilmesi önerilir.`,
     });
   }
 
@@ -204,6 +220,7 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
     egimDerece: Math.round(egimDerece * 100) / 100,
     catiAlaniM2: Math.round(catiAlaniM2 * 100) / 100,
     asikSatirSayisi,
+    diyagonalPanelSayisi,
   };
 
   return sonuc;

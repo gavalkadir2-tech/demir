@@ -97,7 +97,7 @@ const sablonAlanlari = {
     katYuksekligiMm: z.number().nullish(),
     genislikMm: z.number().nullish(),
     basamakYuksekligiHedefMm: z.number().nullish(),
-    basamakDerinligiMm: z.number().nullish(),
+    toplamDerinlikMm: z.number().nullish(),
     korkulukYuksekligiMm: z.number().nullish(),
   },
   canopy: {
@@ -177,7 +177,7 @@ const RESPONSE_JSON_SCHEMA = {
           "katYuksekligiMm",
           "genislikMm",
           "basamakYuksekligiHedefMm",
-          "basamakDerinligiMm",
+          "toplamDerinlikMm",
           "korkulukYuksekligiMm",
         ]),
         canopy: sablonAlanJsonSchema(["genislikMm", "boyMm", "yukseklikMm", "egimYuzde", "dikmeSayisi"]),
@@ -214,7 +214,7 @@ const RESPONSE_JSON_SCHEMA = {
 
 const SABLON_ACIKLAMALARI = `ŞABLONLAR:
 1. railing (Korkuluk): Düz, bağımsız bir korkuluk/parmaklık. Alanlar: toplamUzunlukMm, yukseklikMm, dikmeAraligiHedefMm (dikmeler arası hedef mesafe), araKayitSayisi (üst-alt profil arasına eklenen yatay ara çıta sayısı).
-2. stairs (Merdiven): Kat yüksekliği boyunca basamaklı merdiven, opsiyonel kendi korkuluğuyla. Alanlar: katYuksekligiMm, genislikMm (merdiven genişliği), basamakYuksekligiHedefMm, basamakDerinligiMm, korkulukYuksekligiMm (merdivenin kendi korkuluğu isteniyorsa).
+2. stairs (Merdiven): Kat yüksekliği boyunca basamaklı merdiven, opsiyonel kendi korkuluğuyla. Alanlar: katYuksekligiMm, genislikMm (merdiven genişliği), basamakYuksekligiHedefMm, toplamDerinlikMm (merdivenin toplam yatay uzunluğu/boşluğu), korkulukYuksekligiMm (merdivenin kendi korkuluğu isteniyorsa).
 3. canopy (Sundurma/Kanopi): Bir duvara/yapıya dayalı eğimli çatılı sundurma, örn. araba sundurması, giriş sundurması. Alanlar: genislikMm (en), boyMm (duvardan dışa çıkma/derinlik), yukseklikMm (ön dikme yüksekliği), egimYuzde, dikmeSayisi.
 4. door (Kapı): TEK BAŞINA menteşeli/kanatlı bir kapı ürünü (kasa+kanat), bir duvarın parçası değil, kapının kendisi isteniyor. Alanlar: genislikMm, yukseklikMm, sacKalinlikMm, menteseAdet, kilitAdet, kolAdet.
 5. wall (Çelik Duvar Paneli): Prefabrik ev/atölye/konteyner gibi yapılarda kullanılan, dikme + üst/alt raydan oluşan düz bir duvar paneli; içinde kapı ve/veya pencere boşlukları olabilir. "Duvar" veya "panel" kelimesi geçiyorsa, ya da bir kapı/pencere açıklığı bir duvarın parçası olarak tarif ediliyorsa bu şablonu kullan. Alanlar: genislikMm (duvar genişliği), yukseklikMm (duvar yüksekliği), dikmeAraligiHedefMm, lentoTasmaMm. Ayrıca varsa "bosluklar" dizisini doldur (aşağıya bak).

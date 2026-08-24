@@ -10,8 +10,8 @@ export interface MerdivenGirdi {
   genislikMm: number;
   /** Hedeflenen basamak yüksekliği / rıht (mm), örn. 180 */
   basamakYuksekligiHedefMm: number;
-  /** Basamak derinliği / aynakol (mm), örn. 280 */
-  basamakDerinligiMm: number;
+  /** Merdivenin toplam yatay uzunluğu / merdiven boşluğu (mm) - basamak derinliği (aynakol) bundan hesaplanır */
+  toplamDerinlikMm: number;
   /** Taşıyıcı (kiriş) profil kesiti */
   tasiyiciProfilKey: string;
   /** Taşıyıcı adedi (varsayılan 2) */
@@ -37,7 +37,7 @@ export function calculateStairs(girdi: MerdivenGirdi): UrunHesapSonucu {
     katYuksekligiMm,
     genislikMm,
     basamakYuksekligiHedefMm,
-    basamakDerinligiMm,
+    toplamDerinlikMm,
     tasiyiciProfilKey,
   } = girdi;
   const tasiyiciAdet = girdi.tasiyiciAdet ?? VARSAYILAN.tasiyiciAdet;
@@ -46,13 +46,14 @@ export function calculateStairs(girdi: MerdivenGirdi): UrunHesapSonucu {
   if (katYuksekligiMm <= 0) throw new HesaplamaHatasi("Kat yüksekliği 0'dan büyük olmalı.");
   if (genislikMm <= 0) throw new HesaplamaHatasi("Merdiven genişliği 0'dan büyük olmalı.");
   if (basamakYuksekligiHedefMm <= 0) throw new HesaplamaHatasi("Basamak yüksekliği 0'dan büyük olmalı.");
-  if (basamakDerinligiMm <= 0) throw new HesaplamaHatasi("Basamak derinliği 0'dan büyük olmalı.");
+  if (toplamDerinlikMm <= 0) throw new HesaplamaHatasi("Toplam yatay uzunluk 0'dan büyük olmalı.");
   if (!tasiyiciProfilKey) throw new HesaplamaHatasi("Taşıyıcı profil seçilmelidir.");
 
   const sonuc = bosSonuc();
 
   const basamakSayisi = Math.max(1, Math.round(katYuksekligiMm / basamakYuksekligiHedefMm));
   const gercekBasamakYuksekligiMm = katYuksekligiMm / basamakSayisi;
+  const basamakDerinligiMm = toplamDerinlikMm / basamakSayisi;
 
   // Konfor / adım formülü kontrolü: 2*rıht + aynakol yaklaşık 600-650 mm olmalı.
   const adimFormulu = 2 * gercekBasamakYuksekligiMm + basamakDerinligiMm;
@@ -69,8 +70,8 @@ export function calculateStairs(girdi: MerdivenGirdi): UrunHesapSonucu {
     );
   }
 
-  const toplamDerinlikMm = basamakSayisi * basamakDerinligiMm;
   const kosegenMm = Math.sqrt(katYuksekligiMm ** 2 + toplamDerinlikMm ** 2);
+  const egimAcisiDerece = (Math.atan(katYuksekligiMm / toplamDerinlikMm) * 180) / Math.PI;
 
   const parcalar: HesaplananParca[] = [];
 
@@ -126,7 +127,9 @@ export function calculateStairs(girdi: MerdivenGirdi): UrunHesapSonucu {
   sonuc.ozetDegerler = {
     basamakSayisi,
     gercekBasamakYuksekligiMm: Math.round(gercekBasamakYuksekligiMm * 100) / 100,
+    basamakDerinligiMm: Math.round(basamakDerinligiMm * 100) / 100,
     kosegenMm: Math.round(kosegenMm),
+    egimAcisiDerece: Math.round(egimAcisiDerece * 100) / 100,
     korkulukDikmeSayisi,
   };
 

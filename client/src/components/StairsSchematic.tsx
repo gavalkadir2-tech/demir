@@ -5,6 +5,8 @@ export interface MerdivenSemaVeri {
   basamakDerinligiMm: number;
   basamakSayisi: number;
   gercekBasamakYuksekligiMm: number;
+  kosegenMm?: number;
+  egimAcisiDerece?: number;
 }
 
 const MARGIN_LEFT = 70;
@@ -14,7 +16,7 @@ const MARGIN_BOTTOM = 60;
 
 /** Merdivenin yandan görünüşünü (basamak silueti) ölçekli, ölçüleri etiketli SVG olarak gösterir. */
 export default function StairsSchematic({ veri }: { veri: MerdivenSemaVeri }) {
-  const { katYuksekligiMm, basamakDerinligiMm, basamakSayisi, gercekBasamakYuksekligiMm } = veri;
+  const { katYuksekligiMm, basamakDerinligiMm, basamakSayisi, gercekBasamakYuksekligiMm, kosegenMm, egimAcisiDerece } = veri;
 
   if (!katYuksekligiMm || !basamakDerinligiMm || basamakSayisi < 1) return null;
 
@@ -77,6 +79,22 @@ export default function StairsSchematic({ veri }: { veri: MerdivenSemaVeri }) {
       <text x={(x0 + x) / 2} y={topY - 10} textAnchor="middle" fontSize={12} fill="#525252">
         {basamakSayisi} basamak × ({mmEtiket(basamakDerinligiMm)} × {mmEtiket(gercekBasamakYuksekligiMm)})
       </text>
+      {(kosegenMm || egimAcisiDerece) && (
+        <text
+          x={(x0 + x) / 2 + 40}
+          y={(topY + groundY) / 2 - 10}
+          textAnchor="middle"
+          fontSize={11}
+          fill={PALET.destek}
+          transform={`rotate(${-Math.atan2(groundY - topY, x - x0) * (180 / Math.PI)} ${(x0 + x) / 2 + 40} ${
+            (topY + groundY) / 2 - 10
+          })`}
+        >
+          {kosegenMm ? `kiriş: ${mmEtiket(kosegenMm)}` : ""}
+          {kosegenMm && egimAcisiDerece ? " · " : ""}
+          {egimAcisiDerece ? `${Math.round(egimAcisiDerece)}°` : ""}
+        </text>
+      )}
 
       <Lejant kalemler={lejant} y={VIEW_H + 6} />
     </svg>

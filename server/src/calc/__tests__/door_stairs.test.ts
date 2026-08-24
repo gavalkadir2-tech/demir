@@ -34,12 +34,17 @@ test("merdiven: basamak sayısı ve adım formülü kontrolü", () => {
     katYuksekligiMm: 3000,
     genislikMm: 900,
     basamakYuksekligiHedefMm: 180,
-    basamakDerinligiMm: 270,
+    toplamDerinlikMm: 4590, // 17 basamak x 270mm
     tasiyiciProfilKey: "100x50x3",
   });
   // 3000/180 = 16.67 -> round -> 17 basamak
   assert.equal(sonuc.ozetDegerler.basamakSayisi, 17);
   assert.ok(sonuc.ozetDegerler.gercekBasamakYuksekligiMm > 170 && sonuc.ozetDegerler.gercekBasamakYuksekligiMm < 180);
+  // toplamDerinlikMm/basamakSayisi = 4590/17 = 270
+  assert.equal(sonuc.ozetDegerler.basamakDerinligiMm, 270);
+  // kiriş (hipotenüs) ve eğim açısı da hesaplanmalı
+  assert.equal(sonuc.ozetDegerler.kosegenMm, Math.round(Math.sqrt(3000 ** 2 + 4590 ** 2)));
+  assert.ok(sonuc.ozetDegerler.egimAcisiDerece > 0 && sonuc.ozetDegerler.egimAcisiDerece < 90);
 });
 
 test("merdiven: uygunsuz geometri uyarı üretir", () => {
@@ -47,7 +52,7 @@ test("merdiven: uygunsuz geometri uyarı üretir", () => {
     katYuksekligiMm: 3000,
     genislikMm: 900,
     basamakYuksekligiHedefMm: 260, // çok yüksek rıht
-    basamakDerinligiMm: 200,
+    toplamDerinlikMm: 2400, // 12 basamak x 200mm
     tasiyiciProfilKey: "100x50x3",
   });
   assert.ok(sonuc.uyarilar.length > 0);

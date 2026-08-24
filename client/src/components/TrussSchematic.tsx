@@ -7,7 +7,7 @@ export interface CatiKafesiSemaVeri {
   asikVar?: boolean;
   asikAraligiHedefMm?: number;
   diyagonalVar?: boolean;
-  diyagonalSayisi?: number;
+  diyagonalPanelSayisi?: number;
   kafesSayisi?: number;
   gercekAralikMm?: number;
   stabiliteVar?: boolean;
@@ -42,7 +42,7 @@ export default function TrussSchematic({ veri }: { veri: CatiKafesiSemaVeri }) {
     asikVar = false,
     asikAraligiHedefMm = 1000,
     diyagonalVar = false,
-    diyagonalSayisi = 0,
+    diyagonalPanelSayisi = 0,
     kafesSayisi = 2,
     gercekAralikMm = catiUzunluguMm,
     stabiliteVar = false,
@@ -53,7 +53,7 @@ export default function TrussSchematic({ veri }: { veri: CatiKafesiSemaVeri }) {
   const mahyaYuksekligiMm = yariAciklikMm * (egimYuzde / 100);
   const ustBaslikUzunlukMm = Math.sqrt(yariAciklikMm ** 2 + mahyaYuksekligiMm ** 2);
   const asikSatirSayisiPerSide = asikVar ? Math.max(2, Math.ceil(ustBaslikUzunlukMm / asikAraligiHedefMm) + 1) : 0;
-  const diyagonalCizilecekSayi = diyagonalVar ? Math.min(diyagonalSayisi, 4) : 0;
+  const M = diyagonalVar ? diyagonalPanelSayisi : 0;
 
   // --- Panel A: kesit görünüşü ---
   const drawWA = VIEW_W - MARGIN_LEFT - MARGIN_RIGHT;
@@ -69,19 +69,26 @@ export default function TrussSchematic({ veri }: { veri: CatiKafesiSemaVeri }) {
 
   const gövde = `${x0},${groundY} ${xOrta},${tepeY} ${x0 + scaledAciklik},${groundY}`;
 
-  // Çapraz destekler: kral kirişi tabanından yamaç orta noktalarına, ve tepeden taban çeyrek noktalarına (W tipi)
-  const leftMidX = x0 + (xOrta - x0) / 2;
-  const leftMidY = groundY + (tepeY - groundY) / 2;
-  const rightMidX = xOrta + (x0 + scaledAciklik - xOrta) / 2;
-  const rightMidY = groundY + (tepeY - groundY) / 2;
-  const leftQuarterX = x0 + scaledAciklik / 4;
-  const rightQuarterX = x0 + (3 * scaledAciklik) / 4;
-  const caprazCizgileri = [
-    { x1: xOrta, y1: groundY, x2: leftMidX, y2: leftMidY },
-    { x1: xOrta, y1: groundY, x2: rightMidX, y2: rightMidY },
-    { x1: xOrta, y1: tepeY, x2: leftQuarterX, y2: groundY },
-    { x1: xOrta, y1: tepeY, x2: rightQuarterX, y2: groundY },
-  ].slice(0, diyagonalCizilecekSayi);
+  // Çapraz destekler: yarım açıklığı M eşit panele bölüp, alt başlık <-> üst başlık arasında zikzak
+  // (Warren tipi) tam bir diyagonal ağ oluşturur - gerçek bir kafes makasındaki gibi.
+  const zigzagSegmentleri = (xA: number, xB: number, yAlt: number, yUst: number, panelSayisi: number) => {
+    const alt = (k: number) => ({ x: xA + (k / panelSayisi) * (xB - xA), y: yAlt });
+    const ust = (k: number) => ({ x: xA + (k / panelSayisi) * (xB - xA), y: yAlt + (k / panelSayisi) * (yUst - yAlt) });
+    const segs: { x1: number; y1: number; x2: number; y2: number }[] = [];
+    for (let k = 0; k < panelSayisi; k++) {
+      const b0 = alt(k),
+        t1 = ust(k + 1),
+        t0 = ust(k),
+        b1 = alt(k + 1);
+      segs.push({ x1: b0.x, y1: b0.y, x2: t1.x, y2: t1.y });
+      segs.push({ x1: t0.x, y1: t0.y, x2: b1.x, y2: b1.y });
+    }
+    return segs;
+  };
+  const caprazCizgileri =
+    M > 0
+      ? [...zigzagSegmentleri(x0, xOrta, groundY, tepeY, M), ...zigzagSegmentleri(x0 + scaledAciklik, xOrta, groundY, tepeY, M)]
+      : [];
 
   const dimAciklikY = groundY + 30;
   const dimYukseklikX = x0 - 30;
@@ -107,7 +114,7 @@ export default function TrussSchematic({ veri }: { veri: CatiKafesiSemaVeri }) {
   const lejant = [
     { renk: PALET.ana, etiket: "Üst/Alt Başlık" },
     { renk: PALET.ikincil, etiket: "Kral Kirişi" },
-    ...(diyagonalCizilecekSayi > 0 ? [{ renk: PALET.destek, etiket: "Çapraz Destek" }] : []),
+    ...(M > 0 ? [{ renk: PALET.destek, etiket: "Çapraz Destek" }] : []),
     ...(asikVar ? [{ renk: PALET.vurgu, etiket: "Aşık" }] : []),
     ...(stabiliteCizilecek ? [{ renk: PALET.stabilite, etiket: "Stabilite Bağlantısı" }] : []),
   ];

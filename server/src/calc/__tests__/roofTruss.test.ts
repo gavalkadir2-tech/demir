@@ -101,6 +101,40 @@ test("çatı kafesi: kaplamaTuru 'yok' verilirse sac kalemi eklenmez", () => {
   assert.ok(!sonuc.sacKalemleri.some((s) => s.label.includes("kaplaması")));
 });
 
+test("çatı kafesi: diyagonal profili verilirse tam zikzak ağı otomatik panel sayısıyla hesaplanır", () => {
+  const sonuc = calculateRoofTruss({
+    acikligMm: 6000,
+    egimYuzde: 30,
+    catiUzunluguMm: 9000,
+    kafesAraligiHedefMm: 900,
+    ustBaslikProfilKey: "ust",
+    altBaslikProfilKey: "alt",
+    diyagonalProfilKey: "diyagonal",
+  });
+  // yarıAçıklık 3000 / hedef panel 900 -> round(3.33) -> 3 panel
+  assert.equal(sonuc.ozetDegerler.diyagonalPanelSayisi, 3);
+
+  const caprazlar = sonuc.parcalar.find((p) => p.label === "Çapraz destek (diyagonal ağ)")!;
+  assert.ok(caprazlar);
+  // 4 panel-segmenti/panel x 3 panel x 11 kafes
+  assert.equal(caprazlar.adet, 132);
+  assert.equal(caprazlar.uzunlukMm, 1128);
+});
+
+test("çatı kafesi: diyagonalSayisi verilirse panel sayısını (yaklaşık /4) geçersiz kılar", () => {
+  const sonuc = calculateRoofTruss({
+    acikligMm: 6000,
+    egimYuzde: 30,
+    catiUzunluguMm: 9000,
+    kafesAraligiHedefMm: 900,
+    ustBaslikProfilKey: "ust",
+    altBaslikProfilKey: "alt",
+    diyagonalProfilKey: "diyagonal",
+    diyagonalSayisi: 8,
+  });
+  assert.equal(sonuc.ozetDegerler.diyagonalPanelSayisi, 2);
+});
+
 test("çatı kafesi: diyagonal sayısı girilip profili girilmezse hata verir", () => {
   assert.throws(
     () =>
