@@ -14,6 +14,8 @@ import expensesRouter from "./expenses";
 import cuttingRouter from "./cutting";
 import quotesRouter from "./quotes";
 import stockRouter from "./stock";
+import productionTasksRouter from "./productionTasks";
+import projectPhotosRouter from "./projectPhotos";
 
 const router = Router();
 
@@ -45,12 +47,16 @@ const PROJECT_STATUSES = [
   "CANCELLED",
 ] as const;
 
+const PROJECT_PRIORITIES = ["LOW", "NORMAL", "HIGH", "URGENT"] as const;
+
 const projeSchema = z.object({
   customerId: z.number().int(),
   title: z.string().min(1),
   category: z.enum(PROJECT_CATEGORIES).default("OTHER"),
   note: z.string().optional().nullable(),
   date: z.string().datetime().optional(),
+  dueDate: z.string().datetime().optional().nullable(),
+  priority: z.enum(PROJECT_PRIORITIES).optional(),
   laborMode: z.enum(["PER_METER", "PER_HOUR", "FIXED"]).optional(),
   laborRate: z.number().nonnegative().optional(),
   overheadPercent: z.number().nonnegative().optional(),
@@ -90,6 +96,8 @@ router.get(
         expenses: { orderBy: { createdAt: "asc" } },
         cuttingLists: { include: { material: true }, orderBy: { generatedAt: "desc" } },
         quotes: { orderBy: { createdAt: "desc" } },
+        tasks: { include: { worker: true }, orderBy: { order: "asc" } },
+        photos: { orderBy: { createdAt: "desc" } },
       },
     });
 
@@ -133,7 +141,11 @@ router.post(
   asyncHandler(async (req, res) => {
     const data = projeSchema.parse(req.body);
     const proje = await prisma.project.create({
-      data: { ...data, date: data.date ? new Date(data.date) : undefined },
+      data: {
+        ...data,
+        date: data.date ? new Date(data.date) : undefined,
+        dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
+      },
     });
     res.status(201).json(proje);
   })
@@ -145,7 +157,11 @@ router.put(
     const data = projeSchema.partial().extend({ status: z.enum(PROJECT_STATUSES).optional() }).parse(req.body);
     const proje = await prisma.project.update({
       where: { id: Number(req.params.id) },
-      data: { ...data, date: data.date ? new Date(data.date) : undefined },
+      data: {
+        ...data,
+        date: data.date ? new Date(data.date) : undefined,
+        dueDate: data.dueDate === undefined ? undefined : data.dueDate ? new Date(data.dueDate) : null,
+      },
     });
     res.json(proje);
   })
@@ -166,5 +182,7 @@ router.use("/:projectId/expenses", expensesRouter);
 router.use("/:projectId/cutting", cuttingRouter);
 router.use("/:projectId/quotes", quotesRouter);
 router.use("/:projectId/stock", stockRouter);
+router.use("/:projectId/tasks", productionTasksRouter);
+router.use("/:projectId/photos", projectPhotosRouter);
 
 export default router;

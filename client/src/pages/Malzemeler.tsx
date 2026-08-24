@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
-import { Material, MaterialCategory, MaterialUnit, MALZEME_KATEGORI_ETIKET } from "../api/types";
+import { Material, MaterialCategory, MaterialUnit, MaterialPrice, MALZEME_KATEGORI_ETIKET } from "../api/types";
 import { Modal, Spinner, EmptyState, HataKutusu } from "../components/ui";
-import { tl, sayi } from "../lib/format";
+import { tl, sayi, tarih } from "../lib/format";
 
 const KATEGORILER: MaterialCategory[] = ["PROFILE", "SHEET", "CONSUMABLE", "FASTENER", "OTHER"];
 const BIRIMLER: MaterialUnit[] = ["M", "KG", "ADET", "M2"];
@@ -194,8 +194,86 @@ function MalzemeModal({ malzeme, onClose, onSaved }: { malzeme: Material | null;
         <button className="btn-primary w-full" onClick={kaydet} disabled={kaydediliyor}>
           {kaydediliyor ? "Kaydediliyor..." : "Kaydet"}
         </button>
+
+        {malzeme && <TedarikciFiyatlariBolumu materialId={malzeme.id} />}
       </div>
     </Modal>
+  );
+}
+
+function TedarikciFiyatlariBolumu({ materialId }: { materialId: number }) {
+  const [fiyatlar, setFiyatlar] = useState<MaterialPrice[] | null>(null);
+  const [tedarikci, setTedarikci] = useState("");
+  const [fiyat, setFiyat] = useState(0);
+  const [hata, setHata] = useState<string | null>(null);
+  const [kaydediliyor, setKaydediliyor] = useState(false);
+
+  const yukle = () =>
+    api.get<Material & { priceHistory: MaterialPrice[] }>(`/materials/${materialId}`).then((m) => setFiyatlar(m.priceHistory));
+
+  useEffect(() => {
+    yukle();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [materialId]);
+
+  const ekle = async () => {
+    if (!tedarikci.trim() || fiyat <= 0) return setHata("Tedarikçi adı ve fiyat girin.");
+    setKaydediliyor(true);
+    setHata(null);
+    try {
+      await api.post(`/materials/${materialId}/tedarikci-fiyati`, { supplier: tedarikci, price: fiyat });
+      setTedarikci("");
+      setFiyat(0);
+      yukle();
+    } catch (e: any) {
+      setHata(e.message);
+    } finally {
+      setKaydediliyor(false);
+    }
+  };
+
+  const tedarikciliFiyatlar = (fiyatlar ?? []).filter((f) => f.supplier);
+  const enUcuz =
+    tedarikciliFiyatlar.length > 0 ? Math.min(...tedarikciliFiyatlar.map((f) => f.price)) : null;
+
+  return (
+    <div className="pt-3 border-t border-neutral-200 space-y-3">
+      <h3 className="font-bold text-sm">🏷️ Tedarikçi Fiyat Karşılaştırması</h3>
+      <HataKutusu mesaj={hata} />
+      <div className="flex gap-2 flex-wrap items-end">
+        <div className="flex-1 min-w-[140px]">
+          <label className="field-label">Tedarikçi</label>
+          <input className="field-input" value={tedarikci} onChange={(e) => setTedarikci(e.target.value)} />
+        </div>
+        <div className="w-32">
+          <label className="field-label">Fiyat (TL)</label>
+          <input type="number" className="field-input" value={fiyat || ""} onChange={(e) => setFiyat(Number(e.target.value))} />
+        </div>
+        <button className="btn-secondary btn-sm" onClick={ekle} disabled={kaydediliyor}>
+          Ekle
+        </button>
+      </div>
+      {!fiyatlar ? (
+        <Spinner />
+      ) : tedarikciliFiyatlar.length === 0 ? (
+        <div className="text-xs text-neutral-500">Henüz tedarikçi fiyatı kaydedilmedi.</div>
+      ) : (
+        <div className="divide-y divide-neutral-100 text-sm">
+          {tedarikciliFiyatlar.map((f) => (
+            <div key={f.id} className="py-1.5 flex items-center justify-between">
+              <div>
+                <span className="font-medium">{f.supplier}</span>
+                <span className="text-neutral-400 text-xs ml-2">{tarih(f.effectiveDate)}</span>
+              </div>
+              <span className={`font-bold ${f.price === enUcuz ? "text-emerald-600" : ""}`}>
+                {tl(f.price)}
+                {f.price === enUcuz && " ✓ en ucuz"}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
-import { Project, ProjectStatus, DURUM_ETIKET, DURUM_RENK, KATEGORI_ETIKET } from "../api/types";
+import { Project, ProjectStatus, DURUM_ETIKET, DURUM_RENK, KATEGORI_ETIKET, ONCELIK_ETIKET, ONCELIK_RENK } from "../api/types";
 import { Spinner, EmptyState, Badge } from "../components/ui";
 import { tarih } from "../lib/format";
 
@@ -52,9 +52,15 @@ export default function Isler() {
           {isler.map((p) => (
             <Link to={`/isler/${p.id}`} key={p.id} className="card flex items-center justify-between hover:shadow-md">
               <div>
-                <div className="font-bold text-lg">{p.title}</div>
+                <div className="font-bold text-lg flex items-center gap-2 flex-wrap">
+                  {p.title}
+                  {p.priority !== "NORMAL" && (
+                    <Badge className={ONCELIK_RENK[p.priority]}>{ONCELIK_ETIKET[p.priority]}</Badge>
+                  )}
+                </div>
                 <div className="text-sm text-neutral-500">
                   {p.customer.name} • {KATEGORI_ETIKET[p.category]} • {tarih(p.createdAt)}
+                  {p.dueDate && ` • Teslim: ${tarih(p.dueDate)}`}
                 </div>
               </div>
               <Badge className={DURUM_RENK[p.status]}>{DURUM_ETIKET[p.status]}</Badge>

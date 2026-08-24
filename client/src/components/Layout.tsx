@@ -5,12 +5,14 @@ const NAV_ITEMS = [
   { to: "/", label: "Dashboard", emoji: "🏠" },
   { to: "/yeni-is", label: "Yeni İş", emoji: "➕" },
   { to: "/isler", label: "İşler", emoji: "🗂️" },
+  { to: "/takvim", label: "Üretim Takvimi", emoji: "📅" },
   { to: "/urunler", label: "Ürünler", emoji: "📐" },
   { to: "/malzemeler", label: "Malzemeler", emoji: "🧱" },
   { to: "/kesim-listeleri", label: "Kesim Listeleri", emoji: "✂️" },
   { to: "/teklifler", label: "Teklifler", emoji: "📄" },
   { to: "/stok", label: "Stok", emoji: "📦" },
   { to: "/musteriler", label: "Müşteriler", emoji: "👤" },
+  { to: "/isciler", label: "İşçiler", emoji: "👷" },
   { to: "/ayarlar", label: "Ayarlar", emoji: "⚙️" },
 ];
 

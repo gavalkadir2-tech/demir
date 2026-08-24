@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { asyncHandler } from "../lib/errors";
+import customerNotesRouter from "./customerNotes";
 
 const router = Router();
 
@@ -36,6 +37,7 @@ router.get(
           orderBy: { createdAt: "desc" },
           include: { quotes: { orderBy: { createdAt: "desc" }, take: 1 } },
         },
+        notes: { orderBy: { createdAt: "desc" } },
       },
     });
     res.json(musteri);
@@ -70,5 +72,7 @@ router.delete(
     res.status(204).end();
   })
 );
+
+router.use("/:customerId/notes", customerNotesRouter);
 
 export default router;

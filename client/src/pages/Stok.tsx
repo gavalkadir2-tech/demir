@@ -1,16 +1,8 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
-import { Material } from "../api/types";
+import { Material, StockMovement } from "../api/types";
 import { Modal, Spinner, HataKutusu } from "../components/ui";
-import { sayi, tarih } from "../lib/format";
-
-interface StockMovement {
-  id: number;
-  qtyDelta: number;
-  reason: string;
-  createdAt: string;
-  project?: { id: number; title: string } | null;
-}
+import { sayi, tarih, tl } from "../lib/format";
 
 export default function Stok() {
   const [malzemeler, setMalzemeler] = useState<Material[] | null>(null);
@@ -85,6 +77,8 @@ function StokHareketModal({ malzeme, onClose, onSaved }: { malzeme: Material; on
   const [yon, setYon] = useState<"giris" | "cikis">("giris");
   const [miktar, setMiktar] = useState(1);
   const [sebep, setSebep] = useState("");
+  const [tedarikci, setTedarikci] = useState("");
+  const [birimMaliyet, setBirimMaliyet] = useState(0);
   const [hata, setHata] = useState<string | null>(null);
   const [kaydediliyor, setKaydediliyor] = useState(false);
 
@@ -97,7 +91,11 @@ function StokHareketModal({ malzeme, onClose, onSaved }: { malzeme: Material; on
     setHata(null);
     try {
       const qtyDelta = yon === "giris" ? Math.abs(miktar) : -Math.abs(miktar);
-      await api.post(`/materials/${malzeme.id}/stock-adjust`, { qtyDelta, reason: sebep });
+      await api.post(`/materials/${malzeme.id}/stock-adjust`, {
+        qtyDelta,
+        reason: sebep,
+        ...(yon === "giris" && tedarikci.trim() ? { supplier: tedarikci, unitCost: birimMaliyet || undefined } : {}),
+      });
       onSaved();
     } catch (e: any) {
       setHata(e.message);
@@ -126,6 +124,23 @@ function StokHareketModal({ malzeme, onClose, onSaved }: { malzeme: Material; on
           <label className="field-label">Sebep</label>
           <input className="field-input" value={sebep} onChange={(e) => setSebep(e.target.value)} placeholder="örn. Yeni sevkiyat, sayım düzeltmesi..." />
         </div>
+        {yon === "giris" && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="field-label">Tedarikçi (opsiyonel)</label>
+              <input className="field-input" value={tedarikci} onChange={(e) => setTedarikci(e.target.value)} />
+            </div>
+            <div>
+              <label className="field-label">Birim Maliyet (TL)</label>
+              <input
+                type="number"
+                className="field-input"
+                value={birimMaliyet || ""}
+                onChange={(e) => setBirimMaliyet(Number(e.target.value))}
+              />
+            </div>
+          </div>
+        )}
         <button className="btn-primary w-full" onClick={kaydet} disabled={kaydediliyor}>
           {kaydediliyor ? "Kaydediliyor..." : "Kaydet"}
         </button>
@@ -156,6 +171,8 @@ function StokGecmisModal({ malzeme, onClose }: { malzeme: Material; onClose: () 
                 <div className="text-neutral-500">
                   {tarih(h.createdAt)}
                   {h.project && ` • ${h.project.title}`}
+                  {h.supplier && ` • ${h.supplier}`}
+                  {h.unitCost != null && ` • ${tl(h.unitCost)}/birim`}
                 </div>
               </div>
               <div className={`font-bold ${h.qtyDelta >= 0 ? "text-emerald-600" : "text-red-600"}`}>

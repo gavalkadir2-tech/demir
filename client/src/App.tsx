@@ -13,6 +13,8 @@ import Stok from "./pages/Stok";
 import Musteriler from "./pages/Musteriler";
 import MusteriDetay from "./pages/MusteriDetay";
 import Ayarlar from "./pages/Ayarlar";
+import Takvim from "./pages/Takvim";
+import Isciler from "./pages/Isciler";
 
 export default function App() {
   return (
@@ -30,6 +32,8 @@ export default function App() {
         <Route path="/stok" element={<Stok />} />
         <Route path="/musteriler" element={<Musteriler />} />
         <Route path="/musteriler/:id" element={<MusteriDetay />} />
+        <Route path="/takvim" element={<Takvim />} />
+        <Route path="/isciler" element={<Isciler />} />
         <Route path="/ayarlar" element={<Ayarlar />} />
       </Route>
     </Routes>

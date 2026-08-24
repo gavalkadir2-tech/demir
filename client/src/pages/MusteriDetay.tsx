@@ -1,16 +1,20 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
-import { Customer, Project, DURUM_ETIKET, DURUM_RENK, KATEGORI_ETIKET } from "../api/types";
-import { Spinner, Badge } from "../components/ui";
+import { Customer, Project, CustomerNote, DURUM_ETIKET, DURUM_RENK, KATEGORI_ETIKET } from "../api/types";
+import { Spinner, Badge, HataKutusu } from "../components/ui";
 import { tarih } from "../lib/format";
 
 export default function MusteriDetay() {
   const { id } = useParams();
-  const [musteri, setMusteri] = useState<(Customer & { projects: Project[] }) | null>(null);
+  const [musteri, setMusteri] = useState<(Customer & { projects: Project[]; notes: CustomerNote[] }) | null>(null);
+
+  const yukle = () =>
+    api.get<Customer & { projects: Project[]; notes: CustomerNote[] }>(`/customers/${id}`).then(setMusteri);
 
   useEffect(() => {
-    api.get<Customer & { projects: Project[] }>(`/customers/${id}`).then(setMusteri);
+    yukle();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   if (!musteri) return <Spinner />;
@@ -29,6 +33,8 @@ export default function MusteriDetay() {
           {musteri.note && <div>📝 {musteri.note}</div>}
         </div>
       </div>
+
+      <MusteriNotlariBolumu musteriId={musteri.id} notlar={musteri.notes} onChanged={yukle} />
 
       <div>
         <h2 className="text-lg font-bold mb-3">Geçmiş İşler</h2>
@@ -50,6 +56,76 @@ export default function MusteriDetay() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function MusteriNotlariBolumu({
+  musteriId,
+  notlar,
+  onChanged,
+}: {
+  musteriId: number;
+  notlar: CustomerNote[];
+  onChanged: () => void;
+}) {
+  const [yeniNot, setYeniNot] = useState("");
+  const [hata, setHata] = useState<string | null>(null);
+  const [kaydediliyor, setKaydediliyor] = useState(false);
+
+  const ekle = async () => {
+    if (!yeniNot.trim()) return;
+    setKaydediliyor(true);
+    setHata(null);
+    try {
+      await api.post(`/customers/${musteriId}/notes`, { note: yeniNot });
+      setYeniNot("");
+      onChanged();
+    } catch (e: any) {
+      setHata(e.message);
+    } finally {
+      setKaydediliyor(false);
+    }
+  };
+
+  const sil = async (noteId: number) => {
+    await api.del(`/customers/${musteriId}/notes/${noteId}`);
+    onChanged();
+  };
+
+  return (
+    <div className="card space-y-3">
+      <h2 className="font-bold">📝 İletişim Notları</h2>
+      <HataKutusu mesaj={hata} />
+      <div className="flex gap-2">
+        <input
+          className="field-input flex-1"
+          placeholder="örn. Aradı, teslim tarihini sordu."
+          value={yeniNot}
+          onChange={(e) => setYeniNot(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && ekle()}
+        />
+        <button className="btn-primary btn-sm" onClick={ekle} disabled={kaydediliyor}>
+          Ekle
+        </button>
+      </div>
+      {notlar.length === 0 ? (
+        <div className="text-sm text-neutral-500">Henüz not eklenmedi.</div>
+      ) : (
+        <div className="divide-y divide-neutral-100">
+          {notlar.map((n) => (
+            <div key={n.id} className="py-2 flex items-start justify-between gap-3 text-sm">
+              <div>
+                <div>{n.note}</div>
+                <div className="text-xs text-neutral-400">{tarih(n.createdAt)}</div>
+              </div>
+              <button className="text-red-600 text-xs font-semibold shrink-0" onClick={() => sil(n.id)}>
+                Sil
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

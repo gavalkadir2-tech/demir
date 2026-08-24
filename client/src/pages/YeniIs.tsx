@@ -6,6 +6,8 @@ import {
   Material,
   ProductTemplate,
   ProjectCategory,
+  ProjectPriority,
+  ONCELIK_ETIKET,
   KATEGORI_ETIKET,
   UrunHesapSonucu,
   YapiselKontrolSonucu,
@@ -187,6 +189,8 @@ function IsBilgisiAdimi({
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState<ProjectCategory>(templateKey ? TEMPLATE_KATEGORI[templateKey] : "OTHER");
   const [note, setNote] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [priority, setPriority] = useState<ProjectPriority>("NORMAL");
   const [hata, setHata] = useState<string | null>(null);
   const [kaydediliyor, setKaydediliyor] = useState(false);
 
@@ -272,7 +276,14 @@ function IsBilgisiAdimi({
         const musteri = await api.post<Customer>("/customers", { name: yeniAd, phone: yeniTelefon });
         cid = musteri.id;
       }
-      const proje = await api.post<{ id: number }>("/projects", { customerId: cid, title, category, note });
+      const proje = await api.post<{ id: number }>("/projects", {
+        customerId: cid,
+        title,
+        category,
+        note,
+        priority,
+        dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
+      });
       onDevam(proje.id);
     } catch (e: any) {
       setHata(e.message);
@@ -386,6 +397,23 @@ function IsBilgisiAdimi({
               </option>
             ))}
           </select>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="field-label">Teslim Tarihi (opsiyonel)</label>
+            <input type="date" className="field-input" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+          </div>
+          <div>
+            <label className="field-label">Öncelik</label>
+            <select className="field-select" value={priority} onChange={(e) => setPriority(e.target.value as ProjectPriority)}>
+              {(Object.keys(ONCELIK_ETIKET) as ProjectPriority[]).map((p) => (
+                <option key={p} value={p}>
+                  {ONCELIK_ETIKET[p]}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div>

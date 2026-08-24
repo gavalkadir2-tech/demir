@@ -113,18 +113,49 @@ router.get(
   })
 );
 
-const stokAyarSchema = z.object({ qtyDelta: z.number(), reason: z.string().min(1) });
+const stokAyarSchema = z.object({
+  qtyDelta: z.number(),
+  reason: z.string().min(1),
+  supplier: z.string().optional(),
+  unitCost: z.number().nonnegative().optional(),
+});
 
 router.post(
   "/:id/stock-adjust",
   asyncHandler(async (req, res) => {
-    const { qtyDelta, reason } = stokAyarSchema.parse(req.body);
+    const { qtyDelta, reason, supplier, unitCost } = stokAyarSchema.parse(req.body);
     const id = Number(req.params.id);
     const [malzeme] = await prisma.$transaction([
       prisma.material.update({ where: { id }, data: { stockQty: { increment: qtyDelta } } }),
-      prisma.stockMovement.create({ data: { materialId: id, qtyDelta, reason } }),
+      prisma.stockMovement.create({ data: { materialId: id, qtyDelta, reason, supplier, unitCost } }),
     ]);
     res.json(malzeme);
+  })
+);
+
+/** Bir tedarikçiden alınan fiyat teklifini kaydeder (unitPrice'ı değiştirmez, sadece karşılaştırma için loglar). */
+const tedarikciFiyatSchema = z.object({ supplier: z.string().min(1), price: z.number().nonnegative() });
+
+router.post(
+  "/:id/tedarikci-fiyati",
+  asyncHandler(async (req, res) => {
+    const { supplier, price } = tedarikciFiyatSchema.parse(req.body);
+    const fiyat = await prisma.materialPrice.create({
+      data: { materialId: Number(req.params.id), supplier, price },
+    });
+    res.status(201).json(fiyat);
+  })
+);
+
+/** Satın alma geçmişi: bu malzeme için tedarikçi bilgisiyle kaydedilmiş stok giriş hareketleri. */
+router.get(
+  "/:id/satin-alma-gecmisi",
+  asyncHandler(async (req, res) => {
+    const hareketler = await prisma.stockMovement.findMany({
+      where: { materialId: Number(req.params.id), qtyDelta: { gt: 0 }, supplier: { not: null } },
+      orderBy: { createdAt: "desc" },
+    });
+    res.json(hareketler);
   })
 );
 

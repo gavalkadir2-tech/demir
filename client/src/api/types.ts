@@ -73,6 +73,73 @@ export interface Customer {
   note?: string | null;
   createdAt: string;
   _count?: { projects: number };
+  notes?: CustomerNote[];
+}
+
+export interface CustomerNote {
+  id: number;
+  customerId: number;
+  note: string;
+  createdAt: string;
+}
+
+export interface Worker {
+  id: number;
+  name: string;
+  role?: string | null;
+  active: boolean;
+  createdAt: string;
+}
+
+export type ProductionTaskType = "CUTTING" | "WELDING" | "PAINTING" | "ASSEMBLY" | "INSTALLATION" | "OTHER";
+export const GOREV_TURU_ETIKET: Record<ProductionTaskType, string> = {
+  CUTTING: "Kesim",
+  WELDING: "Kaynak",
+  PAINTING: "Boya",
+  ASSEMBLY: "Montaj",
+  INSTALLATION: "Saha Montajı",
+  OTHER: "Diğer",
+};
+
+export interface ProductionTask {
+  id: number;
+  projectId: number;
+  type: ProductionTaskType;
+  label: string;
+  order: number;
+  done: boolean;
+  doneAt?: string | null;
+  workerId?: number | null;
+  worker?: Worker | null;
+  createdAt: string;
+}
+
+export interface ProjectPhoto {
+  id: number;
+  projectId: number;
+  caption?: string | null;
+  dataBase64: string;
+  mimeType: string;
+  createdAt: string;
+}
+
+export interface StockMovement {
+  id: number;
+  materialId: number;
+  qtyDelta: number;
+  reason: string;
+  supplier?: string | null;
+  unitCost?: number | null;
+  createdAt: string;
+  project?: { id: number; title: string } | null;
+}
+
+export interface MaterialPrice {
+  id: number;
+  materialId: number;
+  price: number;
+  supplier?: string | null;
+  effectiveDate: string;
 }
 
 export type MaterialCategory = "PROFILE" | "SHEET" | "CONSUMABLE" | "FASTENER" | "OTHER";
@@ -102,6 +169,7 @@ export interface Material {
   kerfMm: number;
   stockQty: number;
   minStockQty: number;
+  priceHistory?: MaterialPrice[];
   supplier?: string | null;
 }
 
@@ -172,6 +240,20 @@ export interface YapiselKontrolSonucu {
   uyari: string;
 }
 
+export type ProjectPriority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
+export const ONCELIK_ETIKET: Record<ProjectPriority, string> = {
+  LOW: "Düşük",
+  NORMAL: "Normal",
+  HIGH: "Yüksek",
+  URGENT: "Acil",
+};
+export const ONCELIK_RENK: Record<ProjectPriority, string> = {
+  LOW: "bg-neutral-100 text-neutral-600",
+  NORMAL: "bg-blue-100 text-blue-700",
+  HIGH: "bg-amber-100 text-amber-700",
+  URGENT: "bg-red-100 text-red-700",
+};
+
 export interface Project {
   id: number;
   customerId: number;
@@ -181,6 +263,8 @@ export interface Project {
   status: ProjectStatus;
   note?: string | null;
   date: string;
+  dueDate?: string | null;
+  priority: ProjectPriority;
   laborMode: "PER_METER" | "PER_HOUR" | "FIXED";
   laborRate: number;
   overheadPercent: number;
@@ -197,6 +281,8 @@ export interface Project {
   expenses?: Expense[];
   cuttingLists?: CuttingList[];
   quotes?: Quote[];
+  tasks?: ProductionTask[];
+  photos?: ProjectPhoto[];
   agirlikOzeti?: { profilAgirlikKg: number; sacAgirlikKg: number; toplamAgirlikKg: number; eksikAgirlikVerisi: boolean };
   sarfTahmini?: { yuzeyAlaniM2: number; yuzeyAlaniEksikVeri: boolean; kaynakTeliTahminiKg: number; boyaTahminiKg: number };
 }
@@ -324,4 +410,24 @@ export interface Dashboard {
   tahminiKar: number;
   kritikStoklar: Material[];
   sonIsler: (Project & { customer: { name: string } })[];
+  gecikmisIsler: (Project & { customer: { name: string } })[];
+  yaklasanIsler: (Project & { customer: { name: string } })[];
+}
+
+export interface AylikTrendVeri {
+  ay: string;
+  ciro: number;
+  kar: number;
+}
+
+export interface KategoriKarliligiVeri {
+  kategori: ProjectCategory;
+  ciro: number;
+  kar: number;
+}
+
+export interface EnCokKullanilanMalzeme {
+  id: number;
+  name: string;
+  toplamMetre: number;
 }

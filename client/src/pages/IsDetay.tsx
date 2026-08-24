@@ -7,8 +7,13 @@ import {
   Part,
   ProjectStatus,
   ProjectCategory,
+  ProjectPriority,
   Material,
   Customer,
+  Worker,
+  ProductionTask,
+  ProductionTaskType,
+  ProjectPhoto,
   LaborType,
   ExpenseType,
   ProductTemplate,
@@ -18,6 +23,9 @@ import {
   DURUM_RENK,
   KATEGORI_ETIKET,
   TEKLIF_DURUM_ETIKET,
+  GOREV_TURU_ETIKET,
+  ONCELIK_ETIKET,
+  ONCELIK_RENK,
 } from "../api/types";
 import { Spinner, HataKutusu, UyariKutusu, Badge, Modal, EmptyState } from "../components/ui";
 import MaterialSelect from "../components/MaterialSelect";
@@ -40,6 +48,7 @@ const DURUMLAR: ProjectStatus[] = [
 
 const SEKMELER = [
   { key: "ozet", label: "Özet" },
+  { key: "uretim", label: "Üretim" },
   { key: "parcalar", label: "Parçalar" },
   { key: "kesim", label: "Kesim Listesi" },
   { key: "maliyet", label: "İşçilik & Giderler" },
@@ -73,9 +82,13 @@ export default function IsDetay() {
       <div className="card">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
-            <h1 className="text-2xl font-bold">{proje.title}</h1>
+            <h1 className="text-2xl font-bold flex items-center gap-2 flex-wrap">
+              {proje.title}
+              <Badge className={ONCELIK_RENK[proje.priority]}>{ONCELIK_ETIKET[proje.priority]}</Badge>
+            </h1>
             <div className="text-neutral-500">
               {proje.customer?.name} • {KATEGORI_ETIKET[proje.category]} • {tarih(proje.createdAt)}
+              {proje.dueDate && ` • Teslim: ${tarih(proje.dueDate)}`}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -126,6 +139,7 @@ export default function IsDetay() {
       </div>
 
       {tab === "ozet" && <OzetTab proje={proje} onChanged={yukle} />}
+      {tab === "uretim" && <UretimTab proje={proje} onChanged={yukle} />}
       {tab === "parcalar" && <ParcalarTab proje={proje} onChanged={yukle} />}
       {tab === "kesim" && <KesimTab proje={proje} onChanged={yukle} />}
       {tab === "maliyet" && <MaliyetTab proje={proje} onChanged={yukle} />}
@@ -141,6 +155,8 @@ function IsDuzenleModal({ proje, onClose, onSaved }: { proje: Project; onClose: 
   const [title, setTitle] = useState(proje.title);
   const [customerId, setCustomerId] = useState(proje.customerId);
   const [category, setCategory] = useState<ProjectCategory>(proje.category);
+  const [dueDate, setDueDate] = useState(proje.dueDate ? proje.dueDate.slice(0, 10) : "");
+  const [priority, setPriority] = useState<ProjectPriority>(proje.priority);
   const [hata, setHata] = useState<string | null>(null);
   const [kaydediliyor, setKaydediliyor] = useState(false);
 
@@ -153,7 +169,13 @@ function IsDuzenleModal({ proje, onClose, onSaved }: { proje: Project; onClose: 
     setKaydediliyor(true);
     setHata(null);
     try {
-      await api.put(`/projects/${proje.id}`, { title, customerId, category });
+      await api.put(`/projects/${proje.id}`, {
+        title,
+        customerId,
+        category,
+        priority,
+        dueDate: dueDate ? new Date(dueDate).toISOString() : null,
+      });
       onSaved();
     } catch (e: any) {
       setHata(e.message);
@@ -194,11 +216,238 @@ function IsDuzenleModal({ proje, onClose, onSaved }: { proje: Project; onClose: 
             ))}
           </select>
         </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="field-label">Teslim Tarihi</label>
+            <input type="date" className="field-input" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+          </div>
+          <div>
+            <label className="field-label">Öncelik</label>
+            <select className="field-select" value={priority} onChange={(e) => setPriority(e.target.value as ProjectPriority)}>
+              {(Object.keys(ONCELIK_ETIKET) as ProjectPriority[]).map((p) => (
+                <option key={p} value={p}>
+                  {ONCELIK_ETIKET[p]}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
         <button className="btn-primary w-full" onClick={kaydet} disabled={kaydediliyor}>
           {kaydediliyor ? "Kaydediliyor..." : "Kaydet"}
         </button>
       </div>
     </Modal>
+  );
+}
+
+function UretimTab({ proje, onChanged }: { proje: Project; onChanged: () => void }) {
+  return (
+    <div className="space-y-6">
+      <GorevlerBolumu proje={proje} onChanged={onChanged} />
+      <FotograflarBolumu proje={proje} onChanged={onChanged} />
+    </div>
+  );
+}
+
+const GOREV_TURLERI = Object.keys(GOREV_TURU_ETIKET) as ProductionTaskType[];
+
+function GorevlerBolumu({ proje, onChanged }: { proje: Project; onChanged: () => void }) {
+  const [isciler, setIsciler] = useState<Worker[] | null>(null);
+  const [olusturuluyor, setOlusturuluyor] = useState(false);
+  const [ekleAcik, setEkleAcik] = useState(false);
+  const [yeniEtiket, setYeniEtiket] = useState("");
+  const [yeniTur, setYeniTur] = useState<ProductionTaskType>("OTHER");
+
+  useEffect(() => {
+    api.get<Worker[]>("/workers?active=true").then(setIsciler);
+  }, []);
+
+  const gorevler = proje.tasks ?? [];
+
+  const varsayilanOlustur = async () => {
+    setOlusturuluyor(true);
+    try {
+      await api.post(`/projects/${proje.id}/tasks/varsayilan-olustur`);
+      onChanged();
+    } finally {
+      setOlusturuluyor(false);
+    }
+  };
+
+  const toggleDone = async (task: ProductionTask) => {
+    await api.put(`/projects/${proje.id}/tasks/${task.id}`, { done: !task.done });
+    onChanged();
+  };
+
+  const isciAta = async (task: ProductionTask, workerId: string) => {
+    await api.put(`/projects/${proje.id}/tasks/${task.id}`, { workerId: workerId ? Number(workerId) : null });
+    onChanged();
+  };
+
+  const sil = async (taskId: number) => {
+    await api.del(`/projects/${proje.id}/tasks/${taskId}`);
+    onChanged();
+  };
+
+  const gorevEkle = async () => {
+    if (!yeniEtiket.trim()) return;
+    await api.post(`/projects/${proje.id}/tasks`, { label: yeniEtiket, type: yeniTur });
+    setYeniEtiket("");
+    setEkleAcik(false);
+    onChanged();
+  };
+
+  const tamamlanan = gorevler.filter((g) => g.done).length;
+
+  return (
+    <div className="card space-y-3">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h2 className="font-bold">🛠️ Üretim Aşamaları (Checklist)</h2>
+        {gorevler.length > 0 && (
+          <span className="text-sm text-neutral-500">
+            {tamamlanan}/{gorevler.length} tamamlandı
+          </span>
+        )}
+      </div>
+
+      {gorevler.length === 0 ? (
+        <div className="space-y-2">
+          <div className="text-sm text-neutral-500">Henüz üretim aşaması eklenmedi.</div>
+          <button className="btn-secondary btn-sm" onClick={varsayilanOlustur} disabled={olusturuluyor}>
+            {olusturuluyor ? "Oluşturuluyor..." : "➕ Varsayılan Aşamaları Oluştur (Kesim/Kaynak/Boya/Montaj)"}
+          </button>
+        </div>
+      ) : (
+        <div className="divide-y divide-neutral-100">
+          {gorevler.map((g) => (
+            <div key={g.id} className="py-2.5 flex items-center gap-3 flex-wrap">
+              <input type="checkbox" checked={g.done} onChange={() => toggleDone(g)} className="w-5 h-5" />
+              <div className="flex-1 min-w-[140px]">
+                <div className={`font-medium ${g.done ? "line-through text-neutral-400" : ""}`}>{g.label}</div>
+                <div className="text-xs text-neutral-400">{GOREV_TURU_ETIKET[g.type]}</div>
+              </div>
+              <select
+                className="field-select w-auto text-sm"
+                value={g.workerId ?? ""}
+                onChange={(e) => isciAta(g, e.target.value)}
+              >
+                <option value="">İşçi ata...</option>
+                {isciler?.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.name}
+                  </option>
+                ))}
+              </select>
+              <button className="text-red-600 text-xs font-semibold" onClick={() => sil(g.id)}>
+                Sil
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {ekleAcik ? (
+        <div className="flex gap-2 flex-wrap items-end pt-2 border-t border-neutral-100">
+          <div className="flex-1 min-w-[160px]">
+            <label className="field-label">Aşama Adı</label>
+            <input className="field-input" value={yeniEtiket} onChange={(e) => setYeniEtiket(e.target.value)} />
+          </div>
+          <div>
+            <label className="field-label">Tür</label>
+            <select className="field-select" value={yeniTur} onChange={(e) => setYeniTur(e.target.value as ProductionTaskType)}>
+              {GOREV_TURLERI.map((t) => (
+                <option key={t} value={t}>
+                  {GOREV_TURU_ETIKET[t]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button className="btn-primary btn-sm" onClick={gorevEkle}>
+            Ekle
+          </button>
+          <button className="btn-secondary btn-sm" onClick={() => setEkleAcik(false)}>
+            Vazgeç
+          </button>
+        </div>
+      ) : (
+        <button className="btn-secondary btn-sm" onClick={() => setEkleAcik(true)}>
+          ➕ Özel Aşama Ekle
+        </button>
+      )}
+    </div>
+  );
+}
+
+function FotograflarBolumu({ proje, onChanged }: { proje: Project; onChanged: () => void }) {
+  const [yukleniyor, setYukleniyor] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+  const fotograflar = proje.photos ?? [];
+
+  const dosyaSec = (dosya: File) => {
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUrl = String(reader.result);
+      setYukleniyor(true);
+      setHata(null);
+      try {
+        await api.post(`/projects/${proje.id}/photos`, {
+          imageBase64: dataUrl.slice(dataUrl.indexOf(",") + 1),
+          mimeType: dosya.type,
+        });
+        onChanged();
+      } catch (e: any) {
+        setHata(e.message);
+      } finally {
+        setYukleniyor(false);
+      }
+    };
+    reader.readAsDataURL(dosya);
+  };
+
+  const sil = async (photoId: number) => {
+    if (!confirm("Bu fotoğrafı silmek istediğinize emin misiniz?")) return;
+    await api.del(`/projects/${proje.id}/photos/${photoId}`);
+    onChanged();
+  };
+
+  return (
+    <div className="card space-y-3">
+      <h2 className="font-bold">📷 İş Fotoğrafları</h2>
+      <HataKutusu mesaj={hata} />
+      <input
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="field-input"
+        disabled={yukleniyor}
+        onChange={(e) => {
+          const dosya = e.target.files?.[0];
+          if (dosya) dosyaSec(dosya);
+        }}
+      />
+      {yukleniyor && <div className="text-sm text-neutral-500">Yükleniyor...</div>}
+      {fotograflar.length === 0 ? (
+        <div className="text-sm text-neutral-500">Henüz fotoğraf eklenmedi.</div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {fotograflar.map((f) => (
+            <div key={f.id} className="relative group">
+              <img
+                src={`data:${f.mimeType};base64,${f.dataBase64}`}
+                alt={f.caption ?? "İş fotoğrafı"}
+                className="w-full aspect-square object-cover rounded-lg border border-neutral-200"
+              />
+              <button
+                className="absolute top-1 right-1 bg-white/90 rounded-full w-6 h-6 text-red-600 text-xs font-bold opacity-0 group-hover:opacity-100 transition"
+                onClick={() => sil(f.id)}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
