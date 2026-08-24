@@ -6,7 +6,9 @@
     "dev": "concurrently -n SERVER,CLIENT -c blue,green \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
     "dev:server": "npm run dev --prefix server",
     "dev:client": "npm run dev --prefix client",
-    "test": "npm test --prefix server"
+    "test": "npm test --prefix server",
+    "build": "npm run build --prefix client && npm run prisma:generate --prefix server && npm run prisma:migrate:deploy --prefix server && npm run build --prefix server",
+    "start": "npm start --prefix server"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

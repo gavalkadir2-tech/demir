@@ -1,5 +1,7 @@
 import express from "express";
 import cors from "cors";
+import path from "path";
+import fs from "fs";
 import { hataMiddleware } from "./lib/errors";
 
 import customersRouter from "./routes/customers";
@@ -27,6 +29,16 @@ app.use("/api/quotes", quoteDetailRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/reports", reportsRouter);
 app.use("/api/settings", settingsRouter);
+
+// Üretimde (Render vb.) client build'i backend'in kendisinden sun (tek servis, tek URL).
+// Yerel geliştirmede client/dist yoktur (Vite ayrı çalışır), bu blok o zaman devre dışı kalır.
+const clientDistPath = path.join(__dirname, "..", "..", "client", "dist");
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
+  app.get(/^\/(?!api\/).*/, (_req, res) => {
+    res.sendFile(path.join(clientDistPath, "index.html"));
+  });
+}
 
 app.use(hataMiddleware);
 

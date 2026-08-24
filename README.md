@@ -54,6 +54,27 @@ veya `npm run dev:client`.
 
 Testleri çalıştırmak için (kökten): `npm test`
 
+## Yayınlama (Render.com)
+
+Uygulama tek bir servis olarak yayınlanacak şekilde hazırlandı: backend (Express), build edilmiş
+frontend'i (`client/dist`) kendi içinden sunuyor, yani tek bir URL yeterli.
+
+Repo kökündeki `render.yaml` bir "Blueprint" tanımıdır. Render.com'da:
+
+1. Ücretsiz hesap açın (https://render.com), GitHub hesabınızla bağlanın.
+2. **New → Blueprint** seçin, bu repoyu (`gavalkadir2-tech/demir`) seçin. Render `render.yaml`'ı
+   otomatik okuyup servis ayarlarını dolduracaktır.
+3. İstenen ortam değişkenlerini girin (Supabase projenizin **Connect → ORMs → Prisma** ekranından alın):
+   - `DATABASE_URL` (havuzlu, port 6543)
+   - `DIRECT_URL` (doğrudan, port 5432)
+4. **Apply** / **Create** ile onaylayın. İlk build birkaç dakika sürer (client build + prisma
+   migrate deploy + server build).
+5. Build bitince Render size bir adres verir (örn. `https://demirci-atolye.onrender.com`) — uygulama
+   o adreste canlı olur.
+
+Not: Ücretsiz Render servisleri 15 dakika kullanılmazsa uykuya geçer; uyandıktan sonra ilk istek
+~30 saniye sürebilir, sonrası normal hızda çalışır.
+
 ## MVP Kapsamı
 
 Uygulanan (uçtan uca çalışır durumda):
