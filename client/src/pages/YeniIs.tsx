@@ -13,6 +13,7 @@ const TEMPLATE_KATEGORI: Record<string, ProjectCategory> = {
   canopy: "CANOPY",
   door: "DOOR",
   wall: "STEEL_STRUCTURE",
+  truss: "ROOF",
   custom: "OTHER",
 };
 
@@ -22,6 +23,7 @@ export const URUN_EMOJI: Record<string, string> = {
   canopy: "⛺",
   door: "🚪",
   wall: "🏗️",
+  truss: "🔺",
   custom: "🔩",
 };
 const EMOJI = URUN_EMOJI;
@@ -278,6 +280,7 @@ export function UrunFormu({
         {templateKey === "canopy" && <SundurmaAlanlari materials={materials} onChange={setParams} />}
         {templateKey === "door" && <KapiAlanlari materials={materials} onChange={setParams} />}
         {templateKey === "wall" && <DuvarAlanlari materials={materials} onChange={setParams} />}
+        {templateKey === "truss" && <CatiKafesiAlanlari materials={materials} onChange={setParams} />}
 
         <button className="btn-primary w-full" onClick={hesapla} disabled={hesaplaniyor}>
           {hesaplaniyor ? "Hesaplanıyor..." : "🧮 Hesapla"}
@@ -560,6 +563,78 @@ function DuvarAlanlari({ materials, onChange }: { materials: Material[]; onChang
         ))}
         {bosluklar.length === 0 && <div className="text-sm text-neutral-500">Boşluk eklenmedi, duvar tam dolu hesaplanacak.</div>}
       </div>
+    </div>
+  );
+}
+
+function CatiKafesiAlanlari({ materials, onChange }: { materials: Material[]; onChange: (p: Record<string, unknown>) => void }) {
+  const [acikligMm, setAcikligMm] = useState(6000);
+  const [egimYuzde, setEgimYuzde] = useState(30);
+  const [catiUzunluguMm, setCatiUzunluguMm] = useState(9000);
+  const [kafesAraligiHedefMm, setKafesAraligiHedefMm] = useState(900);
+  const [ustBaslikProfilId, setUstBaslikProfilId] = useState<number>();
+  const [altBaslikProfilId, setAltBaslikProfilId] = useState<number>();
+  const [kralKirisiProfilId, setKralKirisiProfilId] = useState<number>();
+  const [diyagonalProfilId, setDiyagonalProfilId] = useState<number>();
+  const [diyagonalSayisi, setDiyagonalSayisi] = useState(0);
+
+  useEffect(() => {
+    onChange({
+      acikligMm,
+      egimYuzde,
+      catiUzunluguMm,
+      kafesAraligiHedefMm,
+      ustBaslikProfilId,
+      altBaslikProfilId,
+      kralKirisiProfilId,
+      diyagonalProfilId,
+      diyagonalSayisi,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    acikligMm,
+    egimYuzde,
+    catiUzunluguMm,
+    kafesAraligiHedefMm,
+    ustBaslikProfilId,
+    altBaslikProfilId,
+    kralKirisiProfilId,
+    diyagonalProfilId,
+    diyagonalSayisi,
+  ]);
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <Sayi label="Açıklık (mm)" value={acikligMm} onChange={setAcikligMm} />
+        <Sayi label="Eğim (%)" value={egimYuzde} onChange={setEgimYuzde} />
+        <Sayi label="Çatı Uzunluğu (mm)" value={catiUzunluguMm} onChange={setCatiUzunluguMm} />
+        <Sayi label="Kafesler Arası Aralık (mm)" value={kafesAraligiHedefMm} onChange={setKafesAraligiHedefMm} />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <MaterialSelect label="Üst Başlık Profili" materials={materials} value={ustBaslikProfilId} onChange={setUstBaslikProfilId} />
+        <MaterialSelect label="Alt Başlık Profili" materials={materials} value={altBaslikProfilId} onChange={setAltBaslikProfilId} />
+      </div>
+      <details className="rounded-xl border border-neutral-200 p-3">
+        <summary className="font-semibold cursor-pointer">Gelişmiş: Kral Kirişi ve Çapraz Destek</summary>
+        <div className="grid grid-cols-2 gap-3 mt-3">
+          <MaterialSelect
+            label="Kral Kirişi Profili"
+            materials={materials}
+            value={kralKirisiProfilId}
+            onChange={setKralKirisiProfilId}
+            allowEmpty
+          />
+          <MaterialSelect
+            label="Çapraz Destek Profili"
+            materials={materials}
+            value={diyagonalProfilId}
+            onChange={setDiyagonalProfilId}
+            allowEmpty
+          />
+          <Sayi label="Kafes Başına Çapraz Sayısı" value={diyagonalSayisi} onChange={setDiyagonalSayisi} />
+        </div>
+      </details>
     </div>
   );
 }

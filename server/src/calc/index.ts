@@ -5,6 +5,7 @@ export * from "./stairs";
 export * from "./canopy";
 export * from "./door";
 export * from "./wall";
+export * from "./roofTruss";
 export * from "./customProduct";
 export * from "./sheet";
 export * from "./cutting";
@@ -15,6 +16,7 @@ import { calculateStairs } from "./stairs";
 import { calculateCanopy } from "./canopy";
 import { calculateDoor } from "./door";
 import { calculateWallPanel } from "./wall";
+import { calculateRoofTruss } from "./roofTruss";
 import { calculateCustomProduct } from "./customProduct";
 import { UrunHesapSonucu } from "./types";
 import { HesaplamaHatasi } from "./units";
@@ -26,6 +28,7 @@ export const URUN_HESAPLAYICILAR: Record<string, (girdi: any) => UrunHesapSonucu
   canopy: calculateCanopy,
   door: calculateDoor,
   wall: calculateWallPanel,
+  truss: calculateRoofTruss,
   custom: calculateCustomProduct,
 };
 

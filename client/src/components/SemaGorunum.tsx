@@ -3,6 +3,7 @@ import StairsSchematic from "./StairsSchematic";
 import CanopySchematic from "./CanopySchematic";
 import DoorSchematic from "./DoorSchematic";
 import WallSchematic, { DuvarBoslukVeri } from "./WallSchematic";
+import TrussSchematic from "./TrussSchematic";
 
 /** Ürün şablonuna göre uygun şematik çizimi seçip render eder (railing/stairs/canopy/door). */
 export default function SemaGorunum({
@@ -74,6 +75,8 @@ export default function SemaGorunum({
           }}
         />
       );
+    case "truss":
+      return <TrussSchematic veri={{ acikligMm: n("acikligMm"), egimYuzde: n("egimYuzde") }} />;
     default:
       return null;
   }

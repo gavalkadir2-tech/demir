@@ -93,6 +93,22 @@ const wallSchema = z.object({
   bosluklar: bosluklarSchema.optional(),
 });
 
+const trussSchema = z.object({
+  acikligMm: z.number(),
+  egimYuzde: z.number(),
+  catiUzunluguMm: z.number(),
+  kafesAraligiHedefMm: z.number(),
+  ustBaslikProfilId: z.number().int(),
+  altBaslikProfilId: z.number().int(),
+  kralKirisiProfilId: z.number().int().optional(),
+  diyagonalProfilId: z.number().int().optional(),
+  diyagonalSayisi: z.number().int().optional(),
+  plakaEnMm: z.number().optional(),
+  plakaBoyMm: z.number().optional(),
+  plakaKalinlikMm: z.number().optional(),
+  ankrajSayisiPerPlaka: z.number().int().optional(),
+});
+
 const customSchema = z.object({
   parcalar: z.array(
     z.object({
@@ -125,6 +141,7 @@ export const TEMPLATE_SCHEMAS: Record<string, z.ZodTypeAny> = {
   canopy: canopySchema,
   door: doorSchema,
   wall: wallSchema,
+  truss: trussSchema,
 };
 
 export const CUSTOM_SCHEMA = customSchema;
