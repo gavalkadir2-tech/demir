@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { Customer, Material, ProductTemplate, ProjectCategory, KATEGORI_ETIKET, UrunHesapSonucu } from "../api/types";
-import { Spinner, HataKutusu, UyariKutusu } from "../components/ui";
+import { Spinner, HataKutusu, UyariKutusu, Badge } from "../components/ui";
 import MaterialSelect from "../components/MaterialSelect";
 import HesapSonucuGorunum from "../components/HesapSonucuGorunum";
 import SemaGorunum from "../components/SemaGorunum";
@@ -29,6 +29,24 @@ export const URUN_EMOJI: Record<string, string> = {
 const EMOJI = URUN_EMOJI;
 
 const KATEGORILER = Object.keys(KATEGORI_ETIKET) as ProjectCategory[];
+
+interface AiDanismanSonucu {
+  degerlendirme: string;
+  malzemeUygunlugu: "yeterli" | "sinirda" | "yetersiz";
+  onerilenAlternatif?: string | null;
+  tahminiTasimaKapasitesiKg?: number | null;
+  tasimaKapasitesiAciklamasi: string;
+  oneriler: string[];
+  hesaplananAgirlikKg: number;
+  agirlikNotu?: string | null;
+}
+
+const UYGUNLUK_ETIKET: Record<string, string> = { yeterli: "✅ Yeterli", sinirda: "⚠️ Sınırda", yetersiz: "❌ Yetersiz" };
+const UYGUNLUK_RENK: Record<string, string> = {
+  yeterli: "bg-green-100 text-green-700",
+  sinirda: "bg-amber-100 text-amber-700",
+  yetersiz: "bg-red-100 text-red-700",
+};
 
 interface AiIsYorumu {
   templateKey: string;
@@ -315,11 +333,16 @@ export function UrunFormu({
   const [kaydediliyor, setKaydediliyor] = useState(false);
   const [params, setParams] = useState<Record<string, unknown>>({});
   const [name, setName] = useState("");
+  const [aiDanisman, setAiDanisman] = useState<AiDanismanSonucu | null>(null);
+  const [aiDanismanYukleniyor, setAiDanismanYukleniyor] = useState(false);
+  const [aiDanismanHata, setAiDanismanHata] = useState<string | null>(null);
 
   const hesapla = async () => {
     setHesaplaniyor(true);
     setHata(null);
     setOnizleme(null);
+    setAiDanisman(null);
+    setAiDanismanHata(null);
     try {
       const r = await api.post<{ sonuc: UrunHesapSonucu; malzemeler: Record<string, Material> }>(`/calc/${templateKey}`, params);
       setOnizleme(r);
@@ -327,6 +350,19 @@ export function UrunFormu({
       setHata(e.message);
     } finally {
       setHesaplaniyor(false);
+    }
+  };
+
+  const aiDegerlendir = async () => {
+    setAiDanismanYukleniyor(true);
+    setAiDanismanHata(null);
+    try {
+      const r = await api.post<AiDanismanSonucu>("/ai/malzeme-danismani", { templateKey, params });
+      setAiDanisman(r);
+    } catch (e: any) {
+      setAiDanismanHata(e.message);
+    } finally {
+      setAiDanismanYukleniyor(false);
     }
   };
 
@@ -371,6 +407,49 @@ export function UrunFormu({
           <h2 className="font-bold text-lg">Hesap Sonucu</h2>
           <SemaGorunum templateKey={templateKey} params={params} ozetDegerler={onizleme.sonuc.ozetDegerler} />
           <HesapSonucuGorunum sonuc={onizleme.sonuc} malzemeler={onizleme.malzemeler} />
+
+          <div className="rounded-xl border border-neutral-200 p-4 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <span className="font-semibold">🤖 AI Malzeme Danışmanı (opsiyonel)</span>
+              <button className="btn-secondary btn-sm" onClick={aiDegerlendir} disabled={aiDanismanYukleniyor}>
+                {aiDanismanYukleniyor ? "Değerlendiriliyor..." : aiDanisman ? "Yeniden Değerlendir" : "Değerlendirme Al"}
+              </button>
+            </div>
+            <HataKutusu mesaj={aiDanismanHata} />
+            {aiDanisman && (
+              <div className="space-y-3 text-sm">
+                <div className="flex flex-wrap items-center gap-3">
+                  <Badge className={UYGUNLUK_RENK[aiDanisman.malzemeUygunlugu]}>
+                    {UYGUNLUK_ETIKET[aiDanisman.malzemeUygunlugu] ?? aiDanisman.malzemeUygunlugu}
+                  </Badge>
+                  <span className="text-neutral-600">
+                    Tahmini toplam ağırlık: <b>{aiDanisman.hesaplananAgirlikKg} kg</b>
+                  </span>
+                </div>
+                <p>{aiDanisman.degerlendirme}</p>
+                {aiDanisman.onerilenAlternatif && (
+                  <p className="font-medium">Önerilen alternatif: {aiDanisman.onerilenAlternatif}</p>
+                )}
+                {aiDanisman.agirlikNotu && <p className="text-xs text-neutral-500">{aiDanisman.agirlikNotu}</p>}
+                {aiDanisman.oneriler.length > 0 && (
+                  <ul className="list-disc list-inside space-y-1">
+                    {aiDanisman.oneriler.map((o, i) => (
+                      <li key={i}>{o}</li>
+                    ))}
+                  </ul>
+                )}
+                {aiDanisman.tahminiTasimaKapasitesiKg != null && (
+                  <div className="rounded-lg bg-amber-50 border border-amber-300 text-amber-900 px-3 py-2">
+                    <div className="font-semibold">
+                      ⚠️ Kaba taşıma kapasitesi tahmini: ~{aiDanisman.tahminiTasimaKapasitesiKg} kg
+                    </div>
+                    <div className="text-xs mt-1">{aiDanisman.tasimaKapasitesiAciklamasi}</div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           <button className="btn-primary w-full" onClick={kaydet} disabled={kaydediliyor}>
             {kaydediliyor ? "Kaydediliyor..." : "✅ Kaydet ve İşe Git"}
           </button>

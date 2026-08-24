@@ -2,8 +2,67 @@ import { Router } from "express";
 import { z } from "zod";
 import { GoogleGenAI } from "@google/genai";
 import { asyncHandler, ApiHatasi } from "../lib/errors";
+import { prisma } from "../lib/prisma";
+import { calculateByTemplateKey } from "../calc";
+import { TEMPLATE_SCHEMAS, idToKey, malzemeSozlugu } from "./calc";
 
 const router = Router();
+
+const GEMINI_MODEL = "gemini-3.6-flash";
+
+/** Gemini'den yapılandırılmış JSON yanıt alır ve verilen zod şemasıyla doğrular. Anahtar yoksa/istek başarısızsa ApiHatasi fırlatır. */
+async function geminiJsonIste<T>(opts: {
+  contents: string;
+  systemInstruction: string;
+  responseJsonSchema: unknown;
+  zodSchema: z.ZodType<T>;
+  hataBaglami: string;
+}): Promise<T> {
+  if (!process.env.GEMINI_API_KEY) {
+    throw new ApiHatasi(
+      503,
+      "AI özelliği şu anda kullanılamıyor: sunucuda GEMINI_API_KEY tanımlı değil. Lütfen yönetici ile iletişime geçin."
+    );
+  }
+
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+  let metinYaniti: string | undefined;
+  try {
+    const response = await ai.models.generateContent({
+      model: GEMINI_MODEL,
+      contents: opts.contents,
+      config: {
+        systemInstruction: opts.systemInstruction,
+        responseMimeType: "application/json",
+        responseJsonSchema: opts.responseJsonSchema,
+      },
+    });
+    metinYaniti = response.text;
+  } catch (e) {
+    console.error(`${opts.hataBaglami} hatası:`, e);
+    throw new ApiHatasi(502, "Yapay zeka isteği başarısız oldu. Lütfen tekrar deneyin.");
+  }
+
+  if (!metinYaniti) {
+    throw new ApiHatasi(502, "Yapay zeka yanıtı boş döndü. Lütfen tekrar deneyin.");
+  }
+
+  let ham: unknown;
+  try {
+    ham = JSON.parse(metinYaniti);
+  } catch {
+    throw new ApiHatasi(502, "Yapay zeka yanıtı anlaşılamadı. Lütfen tekrar deneyin.");
+  }
+
+  const sonuc = opts.zodSchema.safeParse(ham);
+  if (!sonuc.success) {
+    console.error(`${opts.hataBaglami}: AI çıktısı beklenen şemaya uymuyor:`, sonuc.error.issues);
+    throw new ApiHatasi(502, "Yapay zeka yanıtı beklenen formatta değil. Lütfen tekrar deneyin.");
+  }
+
+  return sonuc.data;
+}
 
 const istekSchema = z.object({
   metin: z.string().min(3, "Metin çok kısa.").max(2000, "Metin çok uzun (maks. 2000 karakter)."),
@@ -175,51 +234,134 @@ router.post(
   asyncHandler(async (req, res) => {
     const { metin } = istekSchema.parse(req.body);
 
-    if (!process.env.GEMINI_API_KEY) {
-      throw new ApiHatasi(
-        503,
-        "AI özelliği şu anda kullanılamıyor: sunucuda GEMINI_API_KEY tanımlı değil. Lütfen yönetici ile iletişime geçin."
+    const sonuc = await geminiJsonIste({
+      contents: metin,
+      systemInstruction: SISTEM_PROMPTU,
+      responseJsonSchema: RESPONSE_JSON_SCHEMA,
+      zodSchema: aiCiktiSchema,
+      hataBaglami: "AI is-yorumla",
+    });
+
+    const { alanlar, ...geri } = sonuc;
+    res.json({ ...geri, alanlar: alanlar[sonuc.templateKey] });
+  })
+);
+
+const danismanIstekSchema = z.object({
+  templateKey: z.enum(["railing", "stairs", "canopy", "door", "wall", "truss"]),
+  params: z.record(z.string(), z.unknown()),
+});
+
+const danismanCiktiSchema = z.object({
+  degerlendirme: z.string(),
+  malzemeUygunlugu: z.enum(["yeterli", "sinirda", "yetersiz"]),
+  onerilenAlternatif: z.string().nullish(),
+  tahminiTasimaKapasitesiKg: z.number().nullish(),
+  tasimaKapasitesiAciklamasi: z.string(),
+  oneriler: z.array(z.string()),
+});
+
+const DANISMAN_RESPONSE_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    degerlendirme: { type: "string" },
+    malzemeUygunlugu: { type: "string", enum: ["yeterli", "sinirda", "yetersiz"] },
+    onerilenAlternatif: { type: "string" },
+    tahminiTasimaKapasitesiKg: { type: "number" },
+    tasimaKapasitesiAciklamasi: { type: "string" },
+    oneriler: { type: "array", items: { type: "string" } },
+  },
+  required: ["degerlendirme", "malzemeUygunlugu", "tasimaKapasitesiAciklamasi", "oneriler"],
+};
+
+const DANISMAN_SISTEM_PROMPTU = `Sen bir çelik konstrüksiyon/demirci atölyesi için deneyimli bir teknik danışmansın. Sana bir ürünün hesaplanmış ölçüleri, kullanılan profil/malzeme bilgileri ve toplam ağırlığı verilecek. Görevin, bu seçimleri teknik açıdan kısaca değerlendirmek ve kullanıcıya (genellikle teknik olmayan bir usta) anlaşılır, pratik bir görüş sunmak.
+
+ÇOK ÖNEMLİ - SORUMLULUK REDDİ: Verdiğin taşıma kapasitesi tahmini KESİN BİR MÜHENDİSLİK HESABI DEĞİLDİR, sadece kabaca fikir vermek içindir. Merdiven, çatı, korkuluk gibi can güvenliği içeren yapılarda gerçek yük hesabı; kesit modülü, malzeme akma dayanımı, burkulma, emniyet katsayısı gibi faktörleri içeren resmi bir statik hesap gerektirir. "tasimaKapasitesiAciklamasi" alanında bunu HER ZAMAN açıkça belirt ve kritik/ağır yük durumlarında bir statik mühendisinden onay alınmasını öner.
+
+Değerlendirirken dikkat et:
+- malzemeUygunlugu: verilen ölçüler/açıklık için seçilen profil kesiti ve kalınlığı genel tecrübeye göre "yeterli" mi, "sinirda" mı (biraz büyütülmesi önerilir), yoksa "yetersiz" mi (mutlaka değiştirilmeli)?
+- onerilenAlternatif: malzemeUygunlugu "sinirda" veya "yetersiz" ise hangi profil kesiti/kalınlığının daha uygun olacağını öner (örn. "120x120x4 Kutu Profil"). "yeterli" ise bu alanı hiç ekleme.
+- tahminiTasimaKapasitesiKg: ürün tipine uygun tipik bir kullanım senaryosu için (korkulukta yatay itme yükü, merdivende yayılı yaşam yükü, çatıda kar+rüzgar yükü vb.) kabaca bir sayısal tahmin ver.
+- oneriler: montaj, korozyon koruması (galvaniz/boya), bakım gibi pratik ek öneriler, en fazla 4 madde.
+
+Kısa, anlaşılır, teknik jargonu gerekirse kısaca açıklayarak yaz. Türkçe yanıt ver, yalnızca geçerli JSON döndür.`;
+
+const SABLON_TURKCE: Record<string, string> = {
+  railing: "Korkuluk",
+  stairs: "Merdiven",
+  canopy: "Sundurma/Kanopi",
+  door: "Kapı",
+  wall: "Çelik Duvar Paneli",
+  truss: "Çatı Kafesi",
+};
+
+const CELIK_YOGUNLUK_KG_M3 = 7850;
+const POLIKARBON_YOGUNLUK_KG_M3 = 1200;
+
+router.post(
+  "/malzeme-danismani",
+  asyncHandler(async (req, res) => {
+    const { templateKey, params } = danismanIstekSchema.parse(req.body);
+
+    const schema = TEMPLATE_SCHEMAS[templateKey];
+    const parsed = schema.parse(params);
+    const girdi = idToKey(parsed as Record<string, unknown>);
+    const sonuc = calculateByTemplateKey(templateKey, girdi);
+    const malzemeler = await malzemeSozlugu(sonuc);
+
+    let profilAgirlikKg = 0;
+    let eksikAgirlikVerisi = false;
+    const malzemeSatirlari: string[] = [];
+    for (const ozet of sonuc.profilOzet) {
+      const malzeme = malzemeler[ozet.profilKey];
+      if (!malzeme) continue;
+      if (malzeme.unitWeightKgPerM) {
+        profilAgirlikKg += ozet.toplamMetre * malzeme.unitWeightKgPerM;
+      } else {
+        eksikAgirlikVerisi = true;
+      }
+      malzemeSatirlari.push(
+        `- ${malzeme.name}${malzeme.section ? ` (${malzeme.section})` : ""}: ${ozet.toplamMetre} m kullanılıyor, ${
+          malzeme.unitWeightKgPerM ? `${malzeme.unitWeightKgPerM} kg/m` : "ağırlık bilgisi girilmemiş"
+        }`
       );
     }
 
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
-    let metinYaniti: string | undefined;
-    try {
-      const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
-        contents: metin,
-        config: {
-          systemInstruction: SISTEM_PROMPTU,
-          responseMimeType: "application/json",
-          responseJsonSchema: RESPONSE_JSON_SCHEMA,
-        },
-      });
-      metinYaniti = response.text;
-    } catch (e) {
-      console.error("AI is-yorumla hatası:", e);
-      throw new ApiHatasi(502, "Yapay zeka isteği başarısız oldu. Lütfen tekrar deneyin.");
+    let sacAgirlikKg = 0;
+    for (const sac of sonuc.sacKalemleri) {
+      const alanM2 = (sac.enMm / 1000) * (sac.boyMm / 1000) * sac.adet;
+      const yogunluk = sac.label.toLowerCase().includes("polikarbon") ? POLIKARBON_YOGUNLUK_KG_M3 : CELIK_YOGUNLUK_KG_M3;
+      sacAgirlikKg += alanM2 * ((sac.kalinlikMm ?? 1) / 1000) * yogunluk;
     }
 
-    if (!metinYaniti) {
-      throw new ApiHatasi(502, "Yapay zeka yanıtı boş döndü. Lütfen tekrar deneyin.");
-    }
+    const toplamAgirlikKg = Math.round((profilAgirlikKg + sacAgirlikKg) * 10) / 10;
 
-    let ham: unknown;
-    try {
-      ham = JSON.parse(metinYaniti);
-    } catch {
-      throw new ApiHatasi(502, "Yapay zeka yanıtı anlaşılamadı. Lütfen metni farklı şekilde ifade edip tekrar deneyin.");
-    }
+    const olculer = Object.entries(sonuc.ozetDegerler)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(", ");
 
-    const sonuc = aiCiktiSchema.safeParse(ham);
-    if (!sonuc.success) {
-      console.error("AI çıktısı beklenen şemaya uymuyor:", sonuc.error.issues);
-      throw new ApiHatasi(502, "Yapay zeka yanıtı beklenen formatta değil. Lütfen tekrar deneyin.");
-    }
+    const girdiMetni = `Ürün tipi: ${SABLON_TURKCE[templateKey] ?? templateKey}
+Hesaplanan ara değerler: ${olculer || "yok"}
+Kullanılan malzemeler:
+${malzemeSatirlari.join("\n") || "- (malzeme bilgisi bulunamadı)"}
+Hesaplanan toplam ağırlık: ${toplamAgirlikKg} kg
+Hesaplama motorunun ürettiği uyarılar: ${sonuc.uyarilar.length > 0 ? sonuc.uyarilar.join("; ") : "yok"}`;
 
-    const { alanlar, ...geri } = sonuc.data;
-    res.json({ ...geri, alanlar: alanlar[sonuc.data.templateKey] });
+    const aiSonuc = await geminiJsonIste({
+      contents: girdiMetni,
+      systemInstruction: DANISMAN_SISTEM_PROMPTU,
+      responseJsonSchema: DANISMAN_RESPONSE_JSON_SCHEMA,
+      zodSchema: danismanCiktiSchema,
+      hataBaglami: "AI malzeme-danismani",
+    });
+
+    res.json({
+      ...aiSonuc,
+      hesaplananAgirlikKg: toplamAgirlikKg,
+      agirlikNotu: eksikAgirlikVerisi
+        ? "Bazı malzemeler için kg/m ağırlık bilgisi girilmediğinden toplam ağırlık eksik hesaplanmış olabilir."
+        : null,
+    });
   })
 );
 
