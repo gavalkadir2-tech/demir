@@ -38,26 +38,21 @@ client/
   **Connect → ORMs → Prisma** ile hem `DATABASE_URL` (havuzlu) hem `DIRECT_URL` (doğrudan,
   migration'lar için) adreslerini alıp `.env`'e ekleyin — `server/.env.example` içinde örneği var.
 
-### Backend
+### Kurulum adımları (proje kök klasöründe, `server`/`client` içine girmeden)
 
 ```bash
-cd server
-npm install
-cp .env.example .env        # DATABASE_URL'i kendi Postgres bilgilerinize göre düzenleyin
-npx prisma migrate dev      # veritabanı şemasını oluşturur
-npx tsx prisma/seed.ts      # ürün şablonları + örnek malzeme kataloğu + ayarları ekler
-npm run dev                 # http://localhost:4000
+npm install                 # kök + server + client bağımlılıklarının hepsini kurar
+cp server/.env.example server/.env   # DATABASE_URL'i kendi Postgres/Supabase bilgilerinize göre düzenleyin
+npx prisma migrate dev --prefix server --name init   # veritabanı şemasını oluşturur
+npx tsx server/prisma/seed.ts                        # ürün şablonları + malzeme kataloğu + ayarları ekler
+npm run dev                 # backend (4000) + frontend (5173) AYNI ANDA başlar
 ```
 
-Testleri çalıştırmak için: `npm test`
+`npm run dev` tek komutla hem backend'i hem frontend'i başlatır (çıktılar `[SERVER]`/`[CLIENT]` etiketli
+görünür) — iki ayrı terminal açmaya gerek yoktur. Sadece birini çalıştırmak isterseniz: `npm run dev:server`
+veya `npm run dev:client`.
 
-### Frontend
-
-```bash
-cd client
-npm install
-npm run dev                 # http://localhost:5173 (API isteklerini /api üzerinden 4000 portuna yönlendirir)
-```
+Testleri çalıştırmak için (kökten): `npm test`
 
 ## MVP Kapsamı
 
@@ -65,7 +60,7 @@ Uygulanan (uçtan uca çalışır durumda):
 
 1. Müşteri yönetimi ve iş geçmişi
 2. Yeni iş sihirbazı (Müşteri → Ürün → Ölçüler/Malzeme → Hesapla → Kaydet)
-3. Ürün şablonları: **Korkuluk, Merdiven, Sundurma, Kapı** (parametrik hesaplama) + **Manuel/Çelik Konstrüksiyon** (elle parça girişi)
+3. Ürün şablonları: **Korkuluk, Merdiven, Sundurma, Kapı, Çelik Duvar Paneli (prefabrik, kapı/pencere boşluklu), Çatı Kafesi (kral kirişi + aşık)** (parametrik hesaplama) + **Manuel/Çelik Konstrüksiyon** (elle parça girişi)
 4. Malzeme kütüphanesi (profil/sac/sarf/bağlantı elemanı), fiyat geçmişi, stok takibi
 5. Sac hesaplama aracı (m², ağırlık, maliyet)
 6. Profil kesim optimizasyonu (First Fit Decreasing bin-packing, kesim payı dahil) + görsel kesim şeması
@@ -77,7 +72,7 @@ Uygulanan (uçtan uca çalışır durumda):
 ### Sonraki Aşamalar (İlk sürüm kapsamı dışında bırakıldı)
 
 - Kullanıcı/yetkilendirme sistemi (çoklu kullanıcı, roller)
-- Tamamen dinamik/kullanıcı tanımlı ürün şablonu oluşturucu (şu an 5 şablon kod düzeyinde tanımlı;
+- Tamamen dinamik/kullanıcı tanımlı ürün şablonu oluşturucu (şu an 7 şablon kod düzeyinde tanımlı;
   yeni şablon eklemek `server/src/calc` içine yeni bir hesaplama fonksiyonu eklemeyi gerektiriyor)
 - Daha gelişmiş kesim optimizasyonu algoritmaları (ör. karışık uzunluklu stok, 2D nesting)
 
