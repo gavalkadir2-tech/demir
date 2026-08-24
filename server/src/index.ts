@@ -17,7 +17,8 @@ import aiRouter from "./routes/ai";
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+// AI plan fotoğrafı yüklemeleri base64 olarak JSON gövdesinde gelir; varsayılan 100kb limiti yetersiz.
+app.use(express.json({ limit: "12mb" }));
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 

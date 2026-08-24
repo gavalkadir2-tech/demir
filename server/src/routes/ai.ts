@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ContentListUnion, ApiError as GeminiApiError } from "@google/genai";
 import { asyncHandler, ApiHatasi } from "../lib/errors";
 import { prisma } from "../lib/prisma";
 import { calculateByTemplateKey } from "../calc";
@@ -12,7 +12,7 @@ const GEMINI_MODEL = "gemini-3.6-flash";
 
 /** Gemini'den yapılandırılmış JSON yanıt alır ve verilen zod şemasıyla doğrular. Anahtar yoksa/istek başarısızsa ApiHatasi fırlatır. */
 async function geminiJsonIste<T>(opts: {
-  contents: string;
+  contents: ContentListUnion;
   systemInstruction: string;
   responseJsonSchema: unknown;
   zodSchema: z.ZodType<T>;
@@ -41,6 +41,12 @@ async function geminiJsonIste<T>(opts: {
     metinYaniti = response.text;
   } catch (e) {
     console.error(`${opts.hataBaglami} hatası:`, e);
+    if (e instanceof GeminiApiError && e.status === 429) {
+      throw new ApiHatasi(
+        429,
+        "Günlük ücretsiz AI kullanım kotanız doldu. Yarın tekrar deneyebilir, veya Google AI Studio'da projenize faturalandırma ekleyerek kotayı yükseltebilirsiniz."
+      );
+    }
     throw new ApiHatasi(502, "Yapay zeka isteği başarısız oldu. Lütfen tekrar deneyin.");
   }
 
@@ -205,9 +211,7 @@ const RESPONSE_JSON_SCHEMA = {
   required: ["templateKey", "baslik", "guven", "belirsizlikler", "alanlar"],
 };
 
-const SISTEM_PROMPTU = `Sen bir demirci/çelik konstrüksiyon atölyesi için sipariş metni okuyup yapılandırılmış veri çıkaran bir asistansın. Kullanıcı (genellikle teknik olmayan bir usta) yapılacak işi serbest, günlük dille anlatır. Görevin: bu 6 ürün şablonundan hangisine uyduğunu belirlemek ve şablonun ilgili alanlarını doldurmak.
-
-ŞABLONLAR:
+const SABLON_ACIKLAMALARI = `ŞABLONLAR:
 1. railing (Korkuluk): Düz, bağımsız bir korkuluk/parmaklık. Alanlar: toplamUzunlukMm, yukseklikMm, dikmeAraligiHedefMm (dikmeler arası hedef mesafe), araKayitSayisi (üst-alt profil arasına eklenen yatay ara çıta sayısı).
 2. stairs (Merdiven): Kat yüksekliği boyunca basamaklı merdiven, opsiyonel kendi korkuluğuyla. Alanlar: katYuksekligiMm, genislikMm (merdiven genişliği), basamakYuksekligiHedefMm, basamakDerinligiMm, korkulukYuksekligiMm (merdivenin kendi korkuluğu isteniyorsa).
 3. canopy (Sundurma/Kanopi): Bir duvara/yapıya dayalı eğimli çatılı sundurma, örn. araba sundurması, giriş sundurması. Alanlar: genislikMm (en), boyMm (duvardan dışa çıkma/derinlik), yukseklikMm (ön dikme yüksekliği), egimYuzde, dikmeSayisi.
@@ -216,18 +220,34 @@ const SISTEM_PROMPTU = `Sen bir demirci/çelik konstrüksiyon atölyesi için si
 6. truss (Çatı Kafesi): Bir çatının taşıyıcı üçgen kafes sistemi (kral kirişi tipi), genellikle aşıklarla birlikte. Alanlar: acikligMm, egimYuzde, catiUzunluguMm, kafesAraligiHedefMm, asikAraligiHedefMm, diyagonalSayisi.
 
 BOŞLUKLAR (sadece wall şablonu seçildiğinde doldurulur):
-Duvardaki her kapı/pencere açıklığı için bir eleman: etiket ("Kapı" veya "Pencere" gibi), konumMm (duvarın SOL kenarından açıklığın sol kenarına mesafe — metinde belirtilmemişse mantıklı bir yerleşim tahmin et), tabanYuksekligiMm (kapı için 0, pencere için metinde başka bir değer yoksa 900mm tipik eşik yüksekliği), genislikMm, yukseklikMm.
+Duvardaki her kapı/pencere açıklığı için bir eleman: etiket ("Kapı" veya "Pencere" gibi), konumMm (duvarın SOL kenarından açıklığın sol kenarına mesafe — belirtilmemişse mantıklı bir yerleşim tahmin et), tabanYuksekligiMm (kapı için 0, pencere için başka bir değer yoksa 900mm tipik eşik yüksekliği), genislikMm, yukseklikMm.
 
-"alanlar" nesnesinin yapısı: her şablon için ayrı bir alt nesne var (alanlar.railing, alanlar.stairs, alanlar.canopy, alanlar.door, alanlar.wall, alanlar.truss). templateKey olarak SEÇTİĞİN şablona karşılık gelen TEK bir alt nesneyi doldur (örn. templateKey="wall" ise sadece alanlar.wall'u doldur), DİĞER 5 alt nesneyi tamamen boş {} bırak. Bir alt nesnenin alanlarını başka bir alt nesneye YAZMA — örneğin wall'un yükseklik değerini asla alanlar.truss.catiUzunluguMm gibi başka bir şablonun alanına yazma, sadece alanlar.wall.yukseklikMm'e yaz.
+"alanlar" nesnesinin yapısı: her şablon için ayrı bir alt nesne var (alanlar.railing, alanlar.stairs, alanlar.canopy, alanlar.door, alanlar.wall, alanlar.truss). templateKey olarak SEÇTİĞİN şablona karşılık gelen TEK bir alt nesneyi doldur (örn. templateKey="wall" ise sadece alanlar.wall'u doldur), DİĞER 5 alt nesneyi tamamen boş {} bırak. Bir alt nesnenin alanlarını başka bir alt nesneye YAZMA — örneğin wall'un yükseklik değerini asla alanlar.truss.catiUzunluguMm gibi başka bir şablonun alanına yazma, sadece alanlar.wall.yukseklikMm'e yaz.`;
 
-KURALLAR:
-- Metinde açıkça belirtilmeyen veya güçlü şekilde ima edilmeyen sayısal alanları hiç ekleme (anahtarı tamamen atla) — uygulama zaten mantıklı varsayılan değerler kullanacak. Var olmayan bilgiyi uydurma.
+const ORTAK_KURALLAR = `- Açıkça belirtilmeyen veya güçlü şekilde ima edilmeyen sayısal alanları hiç ekleme (anahtarı tamamen atla) — uygulama zaten mantıklı varsayılan değerler kullanacak. Var olmayan bilgiyi uydurma.
 - Ölçü birimi belirtilmemişse metre (m) varsayılır; ondalıklı/tam sayılar metre kabul edilir (örn. "3 metre" veya "3" → 3000 mm); "cm" belirtilmişse ×10 yap; "mm" olduğu gibi kullan.
 - baslik: kısa, açıklayıcı bir ürün/iş adı üret (örn. "Bahçe Korkuluğu", "Ön Cephe Duvar Paneli").
-- musteriAdiTahmini: metinde bir müşteri/kişi/firma adı geçiyorsa döndür, yoksa bu alanı hiç ekleme.
-- guven: metnin şablonu ve ana ölçüleri ne kadar net belirttiğine göre "yuksek" | "orta" | "dusuk".
-- belirsizlikler: kullanıcının kontrol etmesi gereken varsayımların/eksik bilgilerin kısa Türkçe listesi (örn. "Dikme aralığı belirtilmediği için varsayılan kullanılacak."). Hiç belirsizlik yoksa boş dizi döndür.
+- musteriAdiTahmini: bir müşteri/kişi/firma adı geçiyorsa döndür, yoksa bu alanı hiç ekleme.
+- guven: şablonun ve ana ölçülerin ne kadar net belirlendiğine göre "yuksek" | "orta" | "dusuk".
+- belirsizlikler: kullanıcının kontrol etmesi gereken varsayımların/eksik bilgilerin kısa Türkçe listesi. Hiç belirsizlik yoksa boş dizi döndür.
 - Yalnızca geçerli JSON döndür, verilen şemaya uy.`;
+
+const SISTEM_PROMPTU = `Sen bir demirci/çelik konstrüksiyon atölyesi için sipariş metni okuyup yapılandırılmış veri çıkaran bir asistansın. Kullanıcı (genellikle teknik olmayan bir usta) yapılacak işi serbest, günlük dille anlatır. Görevin: bu 6 ürün şablonundan hangisine uyduğunu belirlemek ve şablonun ilgili alanlarını doldurmak.
+
+${SABLON_ACIKLAMALARI}
+
+KURALLAR:
+${ORTAK_KURALLAR}`;
+
+const FOTO_SISTEM_PROMPTU = `Sen bir demirci/çelik konstrüksiyon atölyesi için, kullanıcının yüklediği bir fotoğrafı (elle çizilmiş bir kroki/plan, ölçüleri not edilmiş bir kağıt, veya var olan bir yapının fotoğrafı olabilir) okuyup yapılandırılmış veri çıkaran bir asistansın. Görevin: fotoğraftaki elemanları ve varsa üzerine yazılmış ölçüleri okuyarak, bu 6 ürün şablonundan hangisine uyduğunu belirlemek ve şablonun ilgili alanlarını doldurmak.
+
+${SABLON_ACIKLAMALARI}
+
+KURALLAR:
+${ORTAK_KURALLAR}
+- Fotoğraftaki el yazısı rakamları dikkatlice oku; okuyamadığın veya emin olamadığın bir ölçüyü uydurmak yerine boş bırak ve bunu belirsizlikler listesine ekle.
+- Fotoğraf net değilse, ölçüler eksikse veya birden fazla şablona uyabilecek belirsiz bir çizimse guven="dusuk" döndür ve neden emin olamadığını belirsizlikler listesinde açıkla.
+- Bu gerçek bir fotogrametri/lazer ölçüm değildir — sadece görsel bir yorumlama ve okumadır; kullanıcı sonuçları mutlaka kontrol etmelidir (bu zaten uygulama tarafında ayrıca vurgulanacak).`;
 
 router.post(
   "/is-yorumla",
@@ -240,6 +260,46 @@ router.post(
       responseJsonSchema: RESPONSE_JSON_SCHEMA,
       zodSchema: aiCiktiSchema,
       hataBaglami: "AI is-yorumla",
+    });
+
+    const { alanlar, ...geri } = sonuc;
+    res.json({ ...geri, alanlar: alanlar[sonuc.templateKey] });
+  })
+);
+
+const IZIN_VERILEN_RESIM_TURLERI = new Set(["image/png", "image/jpeg", "image/webp", "image/heic", "image/heif"]);
+const MAKS_BASE64_UZUNLUK = 12_000_000; // ~9 MB ham veri
+
+const planIstekSchema = z.object({
+  imageBase64: z.string().min(1, "Fotoğraf verisi eksik."),
+  mimeType: z.string(),
+  not: z.string().max(500).optional(),
+});
+
+router.post(
+  "/plan-yorumla",
+  asyncHandler(async (req, res) => {
+    const { imageBase64, mimeType, not } = planIstekSchema.parse(req.body);
+
+    if (!IZIN_VERILEN_RESIM_TURLERI.has(mimeType)) {
+      throw new ApiHatasi(400, "Desteklenmeyen dosya türü. Lütfen bir fotoğraf (JPEG/PNG/WEBP) yükleyin.");
+    }
+    const ham = imageBase64.includes(",") ? imageBase64.slice(imageBase64.indexOf(",") + 1) : imageBase64;
+    if (ham.length > MAKS_BASE64_UZUNLUK) {
+      throw new ApiHatasi(413, "Fotoğraf çok büyük. Lütfen daha küçük boyutlu bir fotoğraf yükleyin (maks. ~9 MB).");
+    }
+
+    const contents: ContentListUnion = [
+      { text: not?.trim() ? `Kullanıcının notu: ${not.trim()}` : "Bu fotoğraftaki planı/krokiyi yorumla." },
+      { inlineData: { mimeType, data: ham } },
+    ];
+
+    const sonuc = await geminiJsonIste({
+      contents,
+      systemInstruction: FOTO_SISTEM_PROMPTU,
+      responseJsonSchema: RESPONSE_JSON_SCHEMA,
+      zodSchema: aiCiktiSchema,
+      hataBaglami: "AI plan-yorumla",
     });
 
     const { alanlar, ...geri } = sonuc;

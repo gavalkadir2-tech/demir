@@ -172,9 +172,25 @@ function IsBilgisiAdimi({
   const [aiCalisiyor, setAiCalisiyor] = useState(false);
   const [aiSonuc, setAiSonuc] = useState<AiIsYorumu | null>(null);
 
+  const [fotoOnizlemeUrl, setFotoOnizlemeUrl] = useState<string | null>(null);
+  const [fotoBase64, setFotoBase64] = useState<string | null>(null);
+  const [fotoMimeType, setFotoMimeType] = useState<string | null>(null);
+  const [fotoCalisiyor, setFotoCalisiyor] = useState(false);
+
   useEffect(() => {
     api.get<Customer[]>("/customers").then(setMusteriler);
   }, []);
+
+  const aiSonucuUygula = (yorum: AiIsYorumu) => {
+    setTitle(yorum.baslik);
+    setCategory(TEMPLATE_KATEGORI[yorum.templateKey] ?? "OTHER");
+    if (yorum.musteriAdiTahmini) {
+      setMod("yeni");
+      setYeniAd(yorum.musteriAdiTahmini);
+    }
+    setAiSonuc(yorum);
+    onAiYorumu(yorum);
+  };
 
   const aiIleDoldur = async () => {
     if (!aiMetin.trim()) return setHata("Önce yapılacak işi anlatın.");
@@ -183,18 +199,41 @@ function IsBilgisiAdimi({
     setAiSonuc(null);
     try {
       const yorum = await api.post<AiIsYorumu>("/ai/is-yorumla", { metin: aiMetin });
-      setTitle(yorum.baslik);
-      setCategory(TEMPLATE_KATEGORI[yorum.templateKey] ?? "OTHER");
-      if (yorum.musteriAdiTahmini) {
-        setMod("yeni");
-        setYeniAd(yorum.musteriAdiTahmini);
-      }
-      setAiSonuc(yorum);
-      onAiYorumu(yorum);
+      aiSonucuUygula(yorum);
     } catch (e: any) {
       setHata(e.message);
     } finally {
       setAiCalisiyor(false);
+    }
+  };
+
+  const fotoSec = (dosya: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result);
+      setFotoOnizlemeUrl(dataUrl);
+      setFotoBase64(dataUrl.slice(dataUrl.indexOf(",") + 1));
+      setFotoMimeType(dosya.type);
+    };
+    reader.readAsDataURL(dosya);
+  };
+
+  const fotoIleDoldur = async () => {
+    if (!fotoBase64 || !fotoMimeType) return setHata("Önce bir fotoğraf seçin.");
+    setFotoCalisiyor(true);
+    setHata(null);
+    setAiSonuc(null);
+    try {
+      const yorum = await api.post<AiIsYorumu>("/ai/plan-yorumla", {
+        imageBase64: fotoBase64,
+        mimeType: fotoMimeType,
+        not: aiMetin.trim() || undefined,
+      });
+      aiSonucuUygula(yorum);
+    } catch (e: any) {
+      setHata(e.message);
+    } finally {
+      setFotoCalisiyor(false);
     }
   };
 
@@ -240,6 +279,33 @@ function IsBilgisiAdimi({
         <button className="btn-secondary w-full" onClick={aiIleDoldur} disabled={aiCalisiyor}>
           {aiCalisiyor ? "Analiz ediliyor..." : "🤖 AI ile Doldur"}
         </button>
+
+        <div className="border-t border-brand-200 pt-3 space-y-2">
+          <label className="field-label">📷 Ya da elle çizilmiş bir plan/kroki fotoğrafı yükleyin</label>
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="field-input"
+            onChange={(e) => {
+              const dosya = e.target.files?.[0];
+              if (dosya) fotoSec(dosya);
+            }}
+          />
+          {fotoOnizlemeUrl && (
+            <div className="flex items-center gap-3">
+              <img src={fotoOnizlemeUrl} alt="Yüklenen plan önizlemesi" className="h-20 w-20 object-cover rounded-lg border border-neutral-200" />
+              <button className="btn-secondary btn-sm flex-1" onClick={fotoIleDoldur} disabled={fotoCalisiyor}>
+                {fotoCalisiyor ? "Fotoğraf okunuyor..." : "🤖 Fotoğraftan Doldur"}
+              </button>
+            </div>
+          )}
+          <p className="text-xs text-neutral-500">
+            Bu gerçek bir lazer ölçüm değildir — sadece fotoğraftaki yazılı ölçüleri/şekli okumaya çalışır. Net olmayan
+            fotoğraflarda sonuç düşük güvenilirlikte olabilir, mutlaka kontrol edin.
+          </p>
+        </div>
+
         {aiSonuc && (
           <div className="text-sm space-y-2">
             <div className="font-semibold text-brand-700">
