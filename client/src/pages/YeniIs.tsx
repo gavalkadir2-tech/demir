@@ -24,6 +24,7 @@ const TEMPLATE_KATEGORI: Record<string, ProjectCategory> = {
   door: "DOOR",
   wall: "STEEL_STRUCTURE",
   truss: "ROOF",
+  shelf: "SHELF",
   custom: "OTHER",
 };
 
@@ -34,6 +35,7 @@ export const URUN_EMOJI: Record<string, string> = {
   door: "🚪",
   wall: "🏗️",
   truss: "🔺",
+  shelf: "🗄️",
   custom: "🔩",
 };
 const EMOJI = URUN_EMOJI;
@@ -500,6 +502,7 @@ export function UrunFormu({
         {templateKey === "door" && <KapiAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
         {templateKey === "wall" && <DuvarAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
         {templateKey === "truss" && <CatiKafesiAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
+        {templateKey === "shelf" && <RafAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
 
         <button className="btn-primary w-full" onClick={hesapla} disabled={hesaplaniyor}>
           {hesaplaniyor ? "Hesaplanıyor..." : "🧮 Hesapla"}
@@ -1144,6 +1147,84 @@ function CatiKafesiAlanlari({
               onChange={setDirekProfilId}
             />
           )}
+        </div>
+      </details>
+    </div>
+  );
+}
+
+function RafAlanlari({
+  materials,
+  onChange,
+  baslangic,
+}: {
+  materials: Material[];
+  onChange: (p: Record<string, unknown>) => void;
+  baslangic?: Record<string, unknown>;
+}) {
+  const [genislikMm, setGenislikMm] = useState<number>(() => (baslangic?.genislikMm as number) ?? 1000);
+  const [derinlikMm, setDerinlikMm] = useState<number>(() => (baslangic?.derinlikMm as number) ?? 400);
+  const [yukseklikMm, setYukseklikMm] = useState<number>(() => (baslangic?.yukseklikMm as number) ?? 1800);
+  const [rafSayisi, setRafSayisi] = useState<number>(() => (baslangic?.rafSayisi as number) ?? 4);
+  const [ayakProfilId, setAyakProfilId] = useState<number | undefined>(() => baslangic?.ayakProfilId as number | undefined);
+  const [rafCercevesiProfilId, setRafCercevesiProfilId] = useState<number | undefined>(
+    () => baslangic?.rafCercevesiProfilId as number | undefined
+  );
+  const [rafSacKullan, setRafSacKullan] = useState<boolean>(() => (baslangic?.rafSacKullan as boolean) ?? true);
+  const [sacKalinlikMm, setSacKalinlikMm] = useState<number>(() => (baslangic?.sacKalinlikMm as number) ?? 1.5);
+  const [caprazProfilId, setCaprazProfilId] = useState<number | undefined>(
+    () => baslangic?.caprazProfilId as number | undefined
+  );
+
+  useEffect(() => {
+    onChange({
+      genislikMm,
+      derinlikMm,
+      yukseklikMm,
+      rafSayisi,
+      ayakProfilId,
+      rafCercevesiProfilId,
+      rafSacKullan,
+      sacKalinlikMm: rafSacKullan ? sacKalinlikMm : undefined,
+      caprazProfilId,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [genislikMm, derinlikMm, yukseklikMm, rafSayisi, ayakProfilId, rafCercevesiProfilId, rafSacKullan, sacKalinlikMm, caprazProfilId]);
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <Sayi label="Genişlik (mm)" value={genislikMm} onChange={setGenislikMm} />
+        <Sayi label="Derinlik (mm)" value={derinlikMm} onChange={setDerinlikMm} />
+        <Sayi label="Yükseklik (mm)" value={yukseklikMm} onChange={setYukseklikMm} />
+        <Sayi label="Raf Sayısı" value={rafSayisi} onChange={setRafSayisi} />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <MaterialSelect label="Ayak Profili" materials={materials} value={ayakProfilId} onChange={setAyakProfilId} />
+        <MaterialSelect
+          label="Raf Çerçevesi Profili"
+          materials={materials}
+          value={rafCercevesiProfilId}
+          onChange={setRafCercevesiProfilId}
+        />
+      </div>
+      <div className="mt-1 space-y-3">
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input type="checkbox" checked={rafSacKullan} onChange={(e) => setRafSacKullan(e.target.checked)} />
+          Raf yüzeyine sac plaka ekle
+        </label>
+        {rafSacKullan && <Sayi label="Sac Kalınlığı (mm)" value={sacKalinlikMm} onChange={setSacKalinlikMm} />}
+      </div>
+      <details className="rounded-xl border border-neutral-200 p-3">
+        <summary className="font-semibold cursor-pointer">Gelişmiş: Stabilite Çaprazı</summary>
+        <div className="mt-3">
+          <MaterialSelect
+            label="Çapraz Profili (opsiyonel, arka yüz X-destek)"
+            materials={materials}
+            value={caprazProfilId}
+            onChange={setCaprazProfilId}
+            allowEmpty
+          />
         </div>
       </details>
     </div>

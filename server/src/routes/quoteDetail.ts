@@ -99,17 +99,28 @@ router.get(
     doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor("#ccc").stroke();
     doc.moveDown(0.3);
 
-    for (const kalem of teklif.items) {
-      const y = doc.y;
-      if (y > 720) doc.addPage();
-      doc.fontSize(9);
-      doc.text(kalem.description, kolon.aciklama, doc.y, { width: 250 });
-      const satirY = doc.y === y ? y : y;
-      doc.text(String(kalem.qty), kolon.adet, y);
-      doc.text(kalem.unit, kolon.birim, y);
-      doc.text(tl(kalem.unitPrice), kolon.birimFiyat, y);
-      doc.text(tl(kalem.lineTotal), kolon.tutar, y);
-      doc.moveDown(0.4);
+    const BOLUM_ETIKET: Record<string, string> = { MATERIAL: "MALZEME", LABOR: "İŞÇİLİK", EXPENSE: "GİDERLER", PRODUCT: "ÜRÜN" };
+    const BOLUM_SIRASI = ["MATERIAL", "LABOR", "EXPENSE", "PRODUCT"] as const;
+    for (const bolum of BOLUM_SIRASI) {
+      const kalemler = teklif.items.filter((k) => k.type === bolum);
+      if (kalemler.length === 0) continue;
+
+      if (doc.y > 700) doc.addPage();
+      doc.fontSize(8.5).font("Helvetica-Bold").fillColor("#666").text(BOLUM_ETIKET[bolum], kolon.aciklama, doc.y);
+      doc.fillColor("#000").font("Helvetica");
+      doc.moveDown(0.2);
+
+      for (const kalem of kalemler) {
+        const y = doc.y;
+        if (y > 720) doc.addPage();
+        doc.fontSize(9);
+        doc.text(kalem.description, kolon.aciklama, doc.y, { width: 250 });
+        doc.text(String(kalem.qty), kolon.adet, y);
+        doc.text(kalem.unit, kolon.birim, y);
+        doc.text(tl(kalem.unitPrice), kolon.birimFiyat, y);
+        doc.text(tl(kalem.lineTotal), kolon.tutar, y);
+        doc.moveDown(0.4);
+      }
     }
 
     doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor("#ccc").stroke();
@@ -136,8 +147,15 @@ router.get(
     doc.moveDown(0.2);
     ozetSatir("Ara toplam (KDV hariç)", teklif.subtotal, true);
     ozetSatir(`KDV (%${teklif.vatPercent})`, teklif.vatAmount);
-    doc.moveDown(0.2);
-    ozetSatir("GENEL TOPLAM", teklif.total, true);
+    doc.moveDown(0.4);
+
+    const kutuY = doc.y;
+    doc.rect(340, kutuY - 4, 215, 26).fillAndStroke("#f5f5f5", "#ccc");
+    doc.fillColor("#000").font("Helvetica-Bold").fontSize(13);
+    doc.text("GENEL TOPLAM", 350, kutuY + 3, { continued: true, width: 130 });
+    doc.text(tl(teklif.total), { align: "right" });
+    doc.font("Helvetica").fontSize(10);
+    doc.moveDown(1.2);
 
     if (teklif.notes) {
       doc.moveDown(1);

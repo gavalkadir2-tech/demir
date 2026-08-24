@@ -49,6 +49,7 @@ async function main() {
       { key: "door", name: "Kapı", description: "Demir kapı (kasa + kanat)" },
       { key: "wall", name: "Çelik Duvar Paneli", description: "Prefabrik/çelik karkas duvar paneli (dikme + ray + boşluklar)" },
       { key: "truss", name: "Çatı Kafesi", description: "Kral kirişi tipi çatı makası (üst/alt başlık + kral kirişi)" },
+      { key: "shelf", name: "Raf", description: "Depo/atölye rafı (4 ayak + çok seviyeli çerçeve, opsiyonel sac yüzey)" },
       { key: "custom", name: "Manuel / Çelik Konstrüksiyon", description: "Elle parça girişi, hazır şablona bağlı değil" },
     ],
     skipDuplicates: true,

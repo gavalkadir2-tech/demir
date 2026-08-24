@@ -740,8 +740,43 @@ function KesimTab({ proje, onChanged }: { proje: Project; onChanged: () => void 
 function MaliyetTab({ proje, onChanged }: { proje: Project; onChanged: () => void }) {
   return (
     <div className="space-y-6">
+      <SarfTahminiKarti proje={proje} />
       <IscilikBolumu proje={proje} onChanged={onChanged} />
       <GiderBolumu proje={proje} onChanged={onChanged} />
+    </div>
+  );
+}
+
+function SarfTahminiKarti({ proje }: { proje: Project }) {
+  const t = proje.sarfTahmini;
+  if (!t || (t.yuzeyAlaniM2 === 0 && t.kaynakTeliTahminiKg === 0)) return null;
+  return (
+    <div className="card space-y-2">
+      <h2 className="font-bold">🔩 Tahmini Sarf Malzeme İhtiyacı</h2>
+      <p className="text-xs text-neutral-500">
+        Toplam profil ağırlığı ve kesit yüzey alanından hesaplanan kaba bir tahmindir; atölyenize/kaynak yöntemine göre
+        gerçek tüketim farklılık gösterebilir. Aşağıdaki "Sarf Malzeme"/"Boya" gider kalemlerini eklerken referans olarak
+        kullanabilirsiniz.
+      </p>
+      <div className="grid grid-cols-3 gap-3 text-center">
+        <div className="rounded-xl bg-neutral-50 p-3">
+          <div className="text-xl font-bold">{sayi(t.kaynakTeliTahminiKg, 1)} kg</div>
+          <div className="text-xs text-neutral-500">Kaynak Teli/Elektrot</div>
+        </div>
+        <div className="rounded-xl bg-neutral-50 p-3">
+          <div className="text-xl font-bold">{sayi(t.boyaTahminiKg, 1)} kg</div>
+          <div className="text-xs text-neutral-500">Boya (astar + son kat)</div>
+        </div>
+        <div className="rounded-xl bg-neutral-50 p-3">
+          <div className="text-xl font-bold">{sayi(t.yuzeyAlaniM2, 1)} m²</div>
+          <div className="text-xs text-neutral-500">Boyanacak Yüzey Alanı</div>
+        </div>
+      </div>
+      {t.yuzeyAlaniEksikVeri && (
+        <p className="text-xs text-amber-700">
+          ⚠️ Bazı parçaların kesit tipi/boyutu tanımlı değil; yüzey alanı ve dolayısıyla boya tahmini eksik olabilir.
+        </p>
+      )}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import CanopySchematic from "./CanopySchematic";
 import DoorSchematic from "./DoorSchematic";
 import WallSchematic, { DuvarBoslukVeri } from "./WallSchematic";
 import TrussSchematic from "./TrussSchematic";
+import RafSchematic from "./RafSchematic";
 
 /** Ürün şablonuna göre uygun şematik çizimi seçip render eder (railing/stairs/canopy/door). */
 export default function SemaGorunum({
@@ -94,6 +95,20 @@ export default function SemaGorunum({
             gercekAralikMm: ozetDegerler.gercekAralikMm,
             stabiliteVar: Boolean(params.stabiliteBaglantisiVar && params.stabiliteProfilId),
             direkSayisi: Number(params.direkSayisi ?? 0),
+          }}
+        />
+      );
+    case "shelf":
+      return (
+        <RafSchematic
+          veri={{
+            genislikMm: n("genislikMm"),
+            derinlikMm: n("derinlikMm"),
+            yukseklikMm: n("yukseklikMm"),
+            rafSayisi: ozetDegerler.rafSayisi,
+            rafAraligiMm: ozetDegerler.rafAraligiMm,
+            sacVar: Boolean(params.rafSacKullan),
+            caprazVar: Boolean(params.caprazProfilId),
           }}
         />
       );

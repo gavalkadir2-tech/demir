@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { asyncHandler } from "../lib/errors";
 import { parcaAgirlikKg, sacKalemleriAgirlikKg, yuvarla1 } from "../calc/weight";
+import { sarfTahminiHesapla } from "../calc/consumables";
 import { UrunHesapSonucu } from "../calc/types";
 import { KaplamaTuru } from "../calc/kaplama";
 
@@ -109,6 +110,11 @@ router.get(
       sacAgirlikKg += sacKalemleriAgirlikKg(sonuc.sacKalemleri, kaplamaTuru);
     }
 
+    const sarfTahmini = sarfTahminiHesapla(
+      profilAgirlikKg,
+      proje.parts.map((p) => ({ lengthMm: p.lengthMm, qty: p.qty, kesit: p.material }))
+    );
+
     res.json({
       ...proje,
       agirlikOzeti: {
@@ -117,6 +123,7 @@ router.get(
         toplamAgirlikKg: yuvarla1(profilAgirlikKg + sacAgirlikKg),
         eksikAgirlikVerisi,
       },
+      sarfTahmini,
     });
   })
 );

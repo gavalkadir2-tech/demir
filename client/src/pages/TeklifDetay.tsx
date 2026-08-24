@@ -1,9 +1,17 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import { Quote, QuoteStatus, TEKLIF_DURUM_ETIKET } from "../api/types";
 import { Spinner, Badge } from "../components/ui";
 import { tl, tarih } from "../lib/format";
+
+const KALEM_BOLUM_SIRASI: Array<"MATERIAL" | "LABOR" | "EXPENSE" | "PRODUCT"> = ["MATERIAL", "LABOR", "EXPENSE", "PRODUCT"];
+const KALEM_BOLUM_ETIKET: Record<string, string> = {
+  MATERIAL: "Malzeme",
+  LABOR: "İşçilik",
+  EXPENSE: "Giderler",
+  PRODUCT: "Ürün",
+};
 
 export default function TeklifDetay() {
   const { id } = useParams();
@@ -81,14 +89,25 @@ export default function TeklifDetay() {
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
-            {teklif.items?.map((i) => (
-              <tr key={i.id}>
-                <td className="px-3 py-2">{i.description}</td>
-                <td className="px-3 py-2">{i.qty}</td>
-                <td className="px-3 py-2">{i.unit}</td>
-                <td className="px-3 py-2">{tl(i.unitPrice)}</td>
-                <td className="px-3 py-2 font-semibold">{tl(i.lineTotal)}</td>
-              </tr>
+            {KALEM_BOLUM_SIRASI.filter((bolum) => teklif.items?.some((i) => i.type === bolum)).map((bolum) => (
+              <Fragment key={bolum}>
+                <tr className="bg-neutral-50">
+                  <td colSpan={5} className="px-3 py-1.5 text-xs font-bold text-neutral-500 uppercase tracking-wide">
+                    {KALEM_BOLUM_ETIKET[bolum]}
+                  </td>
+                </tr>
+                {teklif.items!
+                  .filter((i) => i.type === bolum)
+                  .map((i) => (
+                    <tr key={i.id}>
+                      <td className="px-3 py-2">{i.description}</td>
+                      <td className="px-3 py-2">{i.qty}</td>
+                      <td className="px-3 py-2">{i.unit}</td>
+                      <td className="px-3 py-2">{tl(i.unitPrice)}</td>
+                      <td className="px-3 py-2 font-semibold">{tl(i.lineTotal)}</td>
+                    </tr>
+                  ))}
+              </Fragment>
             ))}
           </tbody>
         </table>

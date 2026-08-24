@@ -198,6 +198,7 @@ export interface Project {
   cuttingLists?: CuttingList[];
   quotes?: Quote[];
   agirlikOzeti?: { profilAgirlikKg: number; sacAgirlikKg: number; toplamAgirlikKg: number; eksikAgirlikVerisi: boolean };
+  sarfTahmini?: { yuzeyAlaniM2: number; yuzeyAlaniEksikVeri: boolean; kaynakTeliTahminiKg: number; boyaTahminiKg: number };
 }
 
 export type LaborType = "WELDING" | "CUTTING" | "ASSEMBLY" | "PAINTING" | "OTHER";
