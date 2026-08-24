@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { Customer, Material, ProductTemplate, ProjectCategory, KATEGORI_ETIKET, UrunHesapSonucu } from "../api/types";
-import { Spinner, HataKutusu } from "../components/ui";
+import { Spinner, HataKutusu, UyariKutusu } from "../components/ui";
 import MaterialSelect from "../components/MaterialSelect";
 import HesapSonucuGorunum from "../components/HesapSonucuGorunum";
 import SemaGorunum from "../components/SemaGorunum";
@@ -30,6 +30,16 @@ const EMOJI = URUN_EMOJI;
 
 const KATEGORILER = Object.keys(KATEGORI_ETIKET) as ProjectCategory[];
 
+interface AiIsYorumu {
+  templateKey: string;
+  baslik: string;
+  musteriAdiTahmini: string | null;
+  guven: "yuksek" | "orta" | "dusuk";
+  belirsizlikler: string[];
+  alanlar: Record<string, number | string | null>;
+  bosluklar: DuvarBoslukTaslak[] | null;
+}
+
 export default function YeniIs() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -37,6 +47,7 @@ export default function YeniIs() {
   const [adim, setAdim] = useState<1 | 2 | 3>(1);
   const [projectId, setProjectId] = useState<number | null>(null);
   const [templateKey, setTemplateKey] = useState<string | null>(params.get("template"));
+  const [aiAlanlar, setAiAlanlar] = useState<Record<string, unknown> | null>(null);
 
   const [sablonlar, setSablonlar] = useState<ProductTemplate[] | null>(null);
   const [materials, setMaterials] = useState<Material[] | null>(null);
@@ -68,6 +79,10 @@ export default function YeniIs() {
           }
         }}
         templateKey={templateKey}
+        onAiYorumu={(yorum) => {
+          setTemplateKey(yorum.templateKey);
+          setAiAlanlar({ ...yorum.alanlar, bosluklar: yorum.bosluklar ?? undefined });
+        }}
       />
     );
   }
@@ -101,7 +116,7 @@ export default function YeniIs() {
   return (
     <div className="space-y-6">
       <StepHeader adim={3} baslik="Ölçüler ve Malzeme" />
-      <UrunFormu templateKey={templateKey} projectId={projectId} materials={materials} />
+      <UrunFormu templateKey={templateKey} projectId={projectId} materials={materials} baslangic={aiAlanlar ?? undefined} />
     </div>
   );
 }
@@ -115,7 +130,15 @@ function StepHeader({ adim, baslik }: { adim: number; baslik: string }) {
   );
 }
 
-function IsBilgisiAdimi({ onDevam, templateKey }: { onDevam: (projectId: number) => void; templateKey: string | null }) {
+function IsBilgisiAdimi({
+  onDevam,
+  templateKey,
+  onAiYorumu,
+}: {
+  onDevam: (projectId: number) => void;
+  templateKey: string | null;
+  onAiYorumu: (yorum: AiIsYorumu) => void;
+}) {
   const [musteriler, setMusteriler] = useState<Customer[] | null>(null);
   const [mod, setMod] = useState<"mevcut" | "yeni">("mevcut");
   const [customerId, setCustomerId] = useState<number | undefined>(undefined);
@@ -127,9 +150,35 @@ function IsBilgisiAdimi({ onDevam, templateKey }: { onDevam: (projectId: number)
   const [hata, setHata] = useState<string | null>(null);
   const [kaydediliyor, setKaydediliyor] = useState(false);
 
+  const [aiMetin, setAiMetin] = useState("");
+  const [aiCalisiyor, setAiCalisiyor] = useState(false);
+  const [aiSonuc, setAiSonuc] = useState<AiIsYorumu | null>(null);
+
   useEffect(() => {
     api.get<Customer[]>("/customers").then(setMusteriler);
   }, []);
+
+  const aiIleDoldur = async () => {
+    if (!aiMetin.trim()) return setHata("Önce yapılacak işi anlatın.");
+    setAiCalisiyor(true);
+    setHata(null);
+    setAiSonuc(null);
+    try {
+      const yorum = await api.post<AiIsYorumu>("/ai/is-yorumla", { metin: aiMetin });
+      setTitle(yorum.baslik);
+      setCategory(TEMPLATE_KATEGORI[yorum.templateKey] ?? "OTHER");
+      if (yorum.musteriAdiTahmini) {
+        setMod("yeni");
+        setYeniAd(yorum.musteriAdiTahmini);
+      }
+      setAiSonuc(yorum);
+      onAiYorumu(yorum);
+    } catch (e: any) {
+      setHata(e.message);
+    } finally {
+      setAiCalisiyor(false);
+    }
+  };
 
   const devam = async () => {
     if (!title.trim()) return setHata("İş adı zorunlu.");
@@ -156,6 +205,34 @@ function IsBilgisiAdimi({ onDevam, templateKey }: { onDevam: (projectId: number)
   return (
     <div className="space-y-6 max-w-lg">
       <StepHeader adim={1} baslik="İş Bilgisi" />
+
+      <div className="card space-y-3 border-2 border-brand-200 bg-brand-50/40">
+        <label className="field-label">🤖 Yapay Zeka ile Hızlı Doldur (opsiyonel)</label>
+        <p className="text-xs text-neutral-500">
+          Yapılacak işi kendi cümlelerinizle anlatın, ürün tipini ve ölçüleri sizin için tahmin edip formu doldursun. Sonuçları
+          mutlaka kontrol edin.
+        </p>
+        <textarea
+          className="field-input"
+          rows={2}
+          placeholder="örn. Ahmet Bey için 3 metre uzunluğunda, 1 metre yüksekliğinde bahçe korkuluğu, ortasında bir ara kayıt olsun"
+          value={aiMetin}
+          onChange={(e) => setAiMetin(e.target.value)}
+        />
+        <button className="btn-secondary w-full" onClick={aiIleDoldur} disabled={aiCalisiyor}>
+          {aiCalisiyor ? "Analiz ediliyor..." : "🤖 AI ile Doldur"}
+        </button>
+        {aiSonuc && (
+          <div className="text-sm space-y-2">
+            <div className="font-semibold text-brand-700">
+              ✅ "{EMOJI[aiSonuc.templateKey] ?? "🛠️"} {aiSonuc.baslik}" olarak dolduruldu (güven: {aiSonuc.guven}). Aşağıdaki
+              bilgileri ve bir sonraki adımdaki ölçüleri kontrol edin.
+            </div>
+            <UyariKutusu mesajlar={aiSonuc.belirsizlikler} />
+          </div>
+        )}
+      </div>
+
       <div className="card space-y-4">
         <HataKutusu mesaj={hata} />
         <div>
@@ -223,11 +300,13 @@ export function UrunFormu({
   projectId,
   materials,
   onSaved,
+  baslangic,
 }: {
   templateKey: string;
   projectId: number;
   materials: Material[];
   onSaved?: () => void;
+  baslangic?: Record<string, unknown>;
 }) {
   const navigate = useNavigate();
   const [onizleme, setOnizleme] = useState<{ sonuc: UrunHesapSonucu; malzemeler: Record<string, Material> } | null>(null);
@@ -275,12 +354,12 @@ export function UrunFormu({
           <input className="field-input" placeholder="örn. Bahçe Korkuluğu" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
 
-        {templateKey === "railing" && <KorkulukAlanlari materials={materials} onChange={setParams} />}
-        {templateKey === "stairs" && <MerdivenAlanlari materials={materials} onChange={setParams} />}
-        {templateKey === "canopy" && <SundurmaAlanlari materials={materials} onChange={setParams} />}
-        {templateKey === "door" && <KapiAlanlari materials={materials} onChange={setParams} />}
-        {templateKey === "wall" && <DuvarAlanlari materials={materials} onChange={setParams} />}
-        {templateKey === "truss" && <CatiKafesiAlanlari materials={materials} onChange={setParams} />}
+        {templateKey === "railing" && <KorkulukAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
+        {templateKey === "stairs" && <MerdivenAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
+        {templateKey === "canopy" && <SundurmaAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
+        {templateKey === "door" && <KapiAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
+        {templateKey === "wall" && <DuvarAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
+        {templateKey === "truss" && <CatiKafesiAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
 
         <button className="btn-primary w-full" onClick={hesapla} disabled={hesaplaniyor}>
           {hesaplaniyor ? "Hesaplanıyor..." : "🧮 Hesapla"}
@@ -310,14 +389,22 @@ function Sayi({ label, value, onChange }: { label: string; value: number | undef
   );
 }
 
-function KorkulukAlanlari({ materials, onChange }: { materials: Material[]; onChange: (p: Record<string, unknown>) => void }) {
-  const [toplamUzunlukMm, setToplamUzunlukMm] = useState(12000);
-  const [yukseklikMm, setYukseklikMm] = useState(1200);
-  const [dikmeAraligiHedefMm, setDikmeAraligiHedefMm] = useState(1500);
+function KorkulukAlanlari({
+  materials,
+  onChange,
+  baslangic,
+}: {
+  materials: Material[];
+  onChange: (p: Record<string, unknown>) => void;
+  baslangic?: Record<string, unknown>;
+}) {
+  const [toplamUzunlukMm, setToplamUzunlukMm] = useState<number>(() => (baslangic?.toplamUzunlukMm as number) ?? 12000);
+  const [yukseklikMm, setYukseklikMm] = useState<number>(() => (baslangic?.yukseklikMm as number) ?? 1200);
+  const [dikmeAraligiHedefMm, setDikmeAraligiHedefMm] = useState<number>(() => (baslangic?.dikmeAraligiHedefMm as number) ?? 1500);
   const [ustProfilId, setUstProfilId] = useState<number>();
   const [altProfilId, setAltProfilId] = useState<number>();
   const [dikmeProfilId, setDikmeProfilId] = useState<number>();
-  const [araKayitSayisi, setAraKayitSayisi] = useState(0);
+  const [araKayitSayisi, setAraKayitSayisi] = useState<number>(() => (baslangic?.araKayitSayisi as number) ?? 0);
   const [araKayitProfilId, setAraKayitProfilId] = useState<number>();
 
   useEffect(() => {
@@ -348,13 +435,25 @@ function KorkulukAlanlari({ materials, onChange }: { materials: Material[]; onCh
   );
 }
 
-function MerdivenAlanlari({ materials, onChange }: { materials: Material[]; onChange: (p: Record<string, unknown>) => void }) {
-  const [katYuksekligiMm, setKatYuksekligiMm] = useState(3000);
-  const [genislikMm, setGenislikMm] = useState(900);
-  const [basamakYuksekligiHedefMm, setBasamakYuksekligiHedefMm] = useState(180);
-  const [basamakDerinligiMm, setBasamakDerinligiMm] = useState(270);
+function MerdivenAlanlari({
+  materials,
+  onChange,
+  baslangic,
+}: {
+  materials: Material[];
+  onChange: (p: Record<string, unknown>) => void;
+  baslangic?: Record<string, unknown>;
+}) {
+  const [katYuksekligiMm, setKatYuksekligiMm] = useState<number>(() => (baslangic?.katYuksekligiMm as number) ?? 3000);
+  const [genislikMm, setGenislikMm] = useState<number>(() => (baslangic?.genislikMm as number) ?? 900);
+  const [basamakYuksekligiHedefMm, setBasamakYuksekligiHedefMm] = useState<number>(
+    () => (baslangic?.basamakYuksekligiHedefMm as number) ?? 180
+  );
+  const [basamakDerinligiMm, setBasamakDerinligiMm] = useState<number>(() => (baslangic?.basamakDerinligiMm as number) ?? 270);
   const [tasiyiciProfilId, setTasiyiciProfilId] = useState<number>();
-  const [korkulukYuksekligiMm, setKorkulukYuksekligiMm] = useState<number>();
+  const [korkulukYuksekligiMm, setKorkulukYuksekligiMm] = useState<number | undefined>(
+    () => (baslangic?.korkulukYuksekligiMm as number | undefined) ?? undefined
+  );
   const [korkulukDikmeProfilId, setKorkulukDikmeProfilId] = useState<number>();
   const [korkulukUstProfilId, setKorkulukUstProfilId] = useState<number>();
 
@@ -393,12 +492,20 @@ function MerdivenAlanlari({ materials, onChange }: { materials: Material[]; onCh
   );
 }
 
-function SundurmaAlanlari({ materials, onChange }: { materials: Material[]; onChange: (p: Record<string, unknown>) => void }) {
-  const [genislikMm, setGenislikMm] = useState(4000);
-  const [boyMm, setBoyMm] = useState(3000);
-  const [yukseklikMm, setYukseklikMm] = useState(2200);
-  const [egimYuzde, setEgimYuzde] = useState(10);
-  const [dikmeSayisi, setDikmeSayisi] = useState(3);
+function SundurmaAlanlari({
+  materials,
+  onChange,
+  baslangic,
+}: {
+  materials: Material[];
+  onChange: (p: Record<string, unknown>) => void;
+  baslangic?: Record<string, unknown>;
+}) {
+  const [genislikMm, setGenislikMm] = useState<number>(() => (baslangic?.genislikMm as number) ?? 4000);
+  const [boyMm, setBoyMm] = useState<number>(() => (baslangic?.boyMm as number) ?? 3000);
+  const [yukseklikMm, setYukseklikMm] = useState<number>(() => (baslangic?.yukseklikMm as number) ?? 2200);
+  const [egimYuzde, setEgimYuzde] = useState<number>(() => (baslangic?.egimYuzde as number) ?? 10);
+  const [dikmeSayisi, setDikmeSayisi] = useState<number>(() => (baslangic?.dikmeSayisi as number) ?? 3);
   const [anaTasiyiciProfilId, setAnaTasiyiciProfilId] = useState<number>();
   const [araTasiyiciProfilId, setAraTasiyiciProfilId] = useState<number>();
   const [dikmeProfilId, setDikmeProfilId] = useState<number>();
@@ -428,15 +535,23 @@ function SundurmaAlanlari({ materials, onChange }: { materials: Material[]; onCh
   );
 }
 
-function KapiAlanlari({ materials, onChange }: { materials: Material[]; onChange: (p: Record<string, unknown>) => void }) {
-  const [genislikMm, setGenislikMm] = useState(1000);
-  const [yukseklikMm, setYukseklikMm] = useState(2200);
+function KapiAlanlari({
+  materials,
+  onChange,
+  baslangic,
+}: {
+  materials: Material[];
+  onChange: (p: Record<string, unknown>) => void;
+  baslangic?: Record<string, unknown>;
+}) {
+  const [genislikMm, setGenislikMm] = useState<number>(() => (baslangic?.genislikMm as number) ?? 1000);
+  const [yukseklikMm, setYukseklikMm] = useState<number>(() => (baslangic?.yukseklikMm as number) ?? 2200);
   const [kasaProfilId, setKasaProfilId] = useState<number>();
   const [kanatProfilId, setKanatProfilId] = useState<number>();
-  const [sacKalinlikMm, setSacKalinlikMm] = useState<number>(1.5);
-  const [menteseAdet, setMenteseAdet] = useState(3);
-  const [kilitAdet, setKilitAdet] = useState(1);
-  const [kolAdet, setKolAdet] = useState(1);
+  const [sacKalinlikMm, setSacKalinlikMm] = useState<number>(() => (baslangic?.sacKalinlikMm as number) ?? 1.5);
+  const [menteseAdet, setMenteseAdet] = useState<number>(() => (baslangic?.menteseAdet as number) ?? 3);
+  const [kilitAdet, setKilitAdet] = useState<number>(() => (baslangic?.kilitAdet as number) ?? 1);
+  const [kolAdet, setKolAdet] = useState<number>(() => (baslangic?.kolAdet as number) ?? 1);
 
   useEffect(() => {
     onChange({ genislikMm, yukseklikMm, kasaProfilId, kanatProfilId, sacKalinlikMm, menteseAdet, kilitAdet, kolAdet });
@@ -474,14 +589,24 @@ interface DuvarBoslukTaslak {
   yukseklikMm: number;
 }
 
-function DuvarAlanlari({ materials, onChange }: { materials: Material[]; onChange: (p: Record<string, unknown>) => void }) {
-  const [genislikMm, setGenislikMm] = useState(4000);
-  const [yukseklikMm, setYukseklikMm] = useState(2500);
-  const [dikmeAraligiHedefMm, setDikmeAraligiHedefMm] = useState(600);
+function DuvarAlanlari({
+  materials,
+  onChange,
+  baslangic,
+}: {
+  materials: Material[];
+  onChange: (p: Record<string, unknown>) => void;
+  baslangic?: Record<string, unknown>;
+}) {
+  const [genislikMm, setGenislikMm] = useState<number>(() => (baslangic?.genislikMm as number) ?? 4000);
+  const [yukseklikMm, setYukseklikMm] = useState<number>(() => (baslangic?.yukseklikMm as number) ?? 2500);
+  const [dikmeAraligiHedefMm, setDikmeAraligiHedefMm] = useState<number>(() => (baslangic?.dikmeAraligiHedefMm as number) ?? 600);
   const [ustProfilId, setUstProfilId] = useState<number>();
   const [altProfilId, setAltProfilId] = useState<number>();
   const [dikmeProfilId, setDikmeProfilId] = useState<number>();
-  const [bosluklar, setBosluklar] = useState<DuvarBoslukTaslak[]>([]);
+  const [bosluklar, setBosluklar] = useState<DuvarBoslukTaslak[]>(
+    () => (baslangic?.bosluklar as DuvarBoslukTaslak[] | undefined) ?? []
+  );
 
   useEffect(() => {
     onChange({ genislikMm, yukseklikMm, dikmeAraligiHedefMm, ustProfilId, altProfilId, dikmeProfilId, bosluklar });
@@ -567,18 +692,28 @@ function DuvarAlanlari({ materials, onChange }: { materials: Material[]; onChang
   );
 }
 
-function CatiKafesiAlanlari({ materials, onChange }: { materials: Material[]; onChange: (p: Record<string, unknown>) => void }) {
-  const [acikligMm, setAcikligMm] = useState(6000);
-  const [egimYuzde, setEgimYuzde] = useState(30);
-  const [catiUzunluguMm, setCatiUzunluguMm] = useState(9000);
-  const [kafesAraligiHedefMm, setKafesAraligiHedefMm] = useState(900);
+function CatiKafesiAlanlari({
+  materials,
+  onChange,
+  baslangic,
+}: {
+  materials: Material[];
+  onChange: (p: Record<string, unknown>) => void;
+  baslangic?: Record<string, unknown>;
+}) {
+  const [acikligMm, setAcikligMm] = useState<number>(() => (baslangic?.acikligMm as number) ?? 6000);
+  const [egimYuzde, setEgimYuzde] = useState<number>(() => (baslangic?.egimYuzde as number) ?? 30);
+  const [catiUzunluguMm, setCatiUzunluguMm] = useState<number>(() => (baslangic?.catiUzunluguMm as number) ?? 9000);
+  const [kafesAraligiHedefMm, setKafesAraligiHedefMm] = useState<number>(
+    () => (baslangic?.kafesAraligiHedefMm as number) ?? 900
+  );
   const [ustBaslikProfilId, setUstBaslikProfilId] = useState<number>();
   const [altBaslikProfilId, setAltBaslikProfilId] = useState<number>();
   const [kralKirisiProfilId, setKralKirisiProfilId] = useState<number>();
   const [diyagonalProfilId, setDiyagonalProfilId] = useState<number>();
-  const [diyagonalSayisi, setDiyagonalSayisi] = useState(0);
+  const [diyagonalSayisi, setDiyagonalSayisi] = useState<number>(() => (baslangic?.diyagonalSayisi as number) ?? 0);
   const [asikProfilId, setAsikProfilId] = useState<number>();
-  const [asikAraligiHedefMm, setAsikAraligiHedefMm] = useState(1000);
+  const [asikAraligiHedefMm, setAsikAraligiHedefMm] = useState<number>(() => (baslangic?.asikAraligiHedefMm as number) ?? 1000);
 
   useEffect(() => {
     onChange({

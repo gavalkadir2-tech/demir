@@ -13,6 +13,7 @@ import quoteDetailRouter from "./routes/quoteDetail";
 import dashboardRouter from "./routes/dashboard";
 import reportsRouter from "./routes/reports";
 import settingsRouter from "./routes/settings";
+import aiRouter from "./routes/ai";
 
 const app = express();
 app.use(cors());
@@ -29,6 +30,7 @@ app.use("/api/quotes", quoteDetailRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/reports", reportsRouter);
 app.use("/api/settings", settingsRouter);
+app.use("/api/ai", aiRouter);
 
 // Üretimde (Render vb.) client build'i backend'in kendisinden sun (tek servis, tek URL).
 // Yerel geliştirmede client/dist yoktur (Vite ayrı çalışır), bu blok o zaman devre dışı kalır.
