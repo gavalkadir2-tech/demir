@@ -115,10 +115,12 @@ export default function YeniIs() {
 
   const [sablonlar, setSablonlar] = useState<ProductTemplate[] | null>(null);
   const [materials, setMaterials] = useState<Material[] | null>(null);
+  const [sacMalzemeler, setSacMalzemeler] = useState<Material[]>([]);
 
   useEffect(() => {
     api.get<ProductTemplate[]>("/product-templates").then(setSablonlar);
     api.get<Material[]>("/materials?category=PROFILE").then(setMaterials);
+    api.get<Material[]>("/materials?category=SHEET").then(setSacMalzemeler);
   }, []);
 
   const templateSecildi = (key: string) => {
@@ -180,7 +182,13 @@ export default function YeniIs() {
   return (
     <div className="space-y-6">
       <StepHeader adim={3} baslik="Ölçüler ve Malzeme" />
-      <UrunFormu templateKey={templateKey} projectId={projectId} materials={materials} baslangic={aiAlanlar ?? undefined} />
+      <UrunFormu
+        templateKey={templateKey}
+        projectId={projectId}
+        materials={materials}
+        sacMalzemeler={sacMalzemeler}
+        baslangic={aiAlanlar ?? undefined}
+      />
     </div>
   );
 }
@@ -455,6 +463,7 @@ export function UrunFormu({
   templateKey,
   projectId,
   materials,
+  sacMalzemeler,
   onSaved,
   baslangic,
   duzenlemeItemId,
@@ -463,6 +472,9 @@ export function UrunFormu({
   templateKey: string;
   projectId: number;
   materials: Material[];
+  /** Sac (levha) kategorisindeki malzemeler - taban plakası/basamak plakası/raf plakası vb. için
+   * opsiyonel malzeme bağlama alanlarında kullanılır. Verilmezse (eski çağrılarla uyum için) boş liste. */
+  sacMalzemeler?: Material[];
   onSaved?: () => void;
   baslangic?: Record<string, unknown>;
   /** Verilirse form düzenleme modunda çalışır: kaydet POST yerine bu id'ye PUT yapar. */
@@ -546,17 +558,35 @@ export function UrunFormu({
           <input className="field-input" placeholder="örn. Bahçe Korkuluğu" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
 
-        {templateKey === "railing" && <KorkulukAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
-        {templateKey === "stairs" && <MerdivenAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
-        {templateKey === "spiral_stairs" && <DonerMerdivenAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
-        {templateKey === "canopy" && <SundurmaAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
-        {templateKey === "door" && <KapiAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
+        {templateKey === "railing" && (
+          <KorkulukAlanlari materials={materials} sacMalzemeler={sacMalzemeler ?? []} onChange={setParams} baslangic={baslangic} />
+        )}
+        {templateKey === "stairs" && (
+          <MerdivenAlanlari materials={materials} sacMalzemeler={sacMalzemeler ?? []} onChange={setParams} baslangic={baslangic} />
+        )}
+        {templateKey === "spiral_stairs" && (
+          <DonerMerdivenAlanlari materials={materials} sacMalzemeler={sacMalzemeler ?? []} onChange={setParams} baslangic={baslangic} />
+        )}
+        {templateKey === "canopy" && (
+          <SundurmaAlanlari materials={materials} sacMalzemeler={sacMalzemeler ?? []} onChange={setParams} baslangic={baslangic} />
+        )}
+        {templateKey === "door" && (
+          <KapiAlanlari materials={materials} sacMalzemeler={sacMalzemeler ?? []} onChange={setParams} baslangic={baslangic} />
+        )}
         {templateKey === "wall" && <DuvarAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
-        {templateKey === "truss" && <CatiKafesiAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
-        {templateKey === "shelf" && <RafAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
-        {templateKey === "pergola" && <PergolaAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
+        {templateKey === "truss" && (
+          <CatiKafesiAlanlari materials={materials} sacMalzemeler={sacMalzemeler ?? []} onChange={setParams} baslangic={baslangic} />
+        )}
+        {templateKey === "shelf" && (
+          <RafAlanlari materials={materials} sacMalzemeler={sacMalzemeler ?? []} onChange={setParams} baslangic={baslangic} />
+        )}
+        {templateKey === "pergola" && (
+          <PergolaAlanlari materials={materials} sacMalzemeler={sacMalzemeler ?? []} onChange={setParams} baslangic={baslangic} />
+        )}
         {templateKey === "ferforje_panel" && <FerforjePanelAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
-        {templateKey === "steel_frame" && <KolonKirisAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
+        {templateKey === "steel_frame" && (
+          <KolonKirisAlanlari materials={materials} sacMalzemeler={sacMalzemeler ?? []} onChange={setParams} baslangic={baslangic} />
+        )}
 
         <button className="btn-primary w-full" onClick={hesapla} disabled={hesaplaniyor}>
           {hesaplaniyor ? "Hesaplanıyor..." : "🧮 Hesapla"}
@@ -669,10 +699,12 @@ function Sayi({ label, value, onChange }: { label: string; value: number | undef
 
 function KorkulukAlanlari({
   materials,
+  sacMalzemeler,
   onChange,
   baslangic,
 }: {
   materials: Material[];
+  sacMalzemeler: Material[];
   onChange: (p: Record<string, unknown>) => void;
   baslangic?: Record<string, unknown>;
 }) {
@@ -686,11 +718,32 @@ function KorkulukAlanlari({
   const [araKayitProfilId, setAraKayitProfilId] = useState<number | undefined>(
     () => baslangic?.araKayitProfilId as number | undefined
   );
+  const [plakaMalzemeId, setPlakaMalzemeId] = useState<number | undefined>(() => baslangic?.plakaMalzemeId as number | undefined);
 
   useEffect(() => {
-    onChange({ toplamUzunlukMm, yukseklikMm, dikmeAraligiHedefMm, ustProfilId, altProfilId, dikmeProfilId, araKayitSayisi, araKayitProfilId });
+    onChange({
+      toplamUzunlukMm,
+      yukseklikMm,
+      dikmeAraligiHedefMm,
+      ustProfilId,
+      altProfilId,
+      dikmeProfilId,
+      araKayitSayisi,
+      araKayitProfilId,
+      plakaMalzemeId,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toplamUzunlukMm, yukseklikMm, dikmeAraligiHedefMm, ustProfilId, altProfilId, dikmeProfilId, araKayitSayisi, araKayitProfilId]);
+  }, [
+    toplamUzunlukMm,
+    yukseklikMm,
+    dikmeAraligiHedefMm,
+    ustProfilId,
+    altProfilId,
+    dikmeProfilId,
+    araKayitSayisi,
+    araKayitProfilId,
+    plakaMalzemeId,
+  ]);
 
   return (
     <div className="space-y-3">
@@ -705,10 +758,17 @@ function KorkulukAlanlari({
         <MaterialSelect label="Dikme Profili" materials={materials} value={dikmeProfilId} onChange={setDikmeProfilId} />
       </div>
       <details className="rounded-xl border border-neutral-200 p-3">
-        <summary className="font-semibold cursor-pointer">Gelişmiş: Ara Kayıt</summary>
+        <summary className="font-semibold cursor-pointer">Gelişmiş: Ara Kayıt ve Taban Plakası</summary>
         <div className="grid grid-cols-2 gap-3 mt-3">
           <Sayi label="Ara Kayıt Sayısı" value={araKayitSayisi} onChange={setAraKayitSayisi} />
           <MaterialSelect label="Ara Kayıt Profili" materials={materials} value={araKayitProfilId} onChange={setAraKayitProfilId} allowEmpty />
+          <MaterialSelect
+            label="Taban Plakası Sac Malzemesi (opsiyonel, stok/maliyet için)"
+            materials={sacMalzemeler}
+            value={plakaMalzemeId}
+            onChange={setPlakaMalzemeId}
+            allowEmpty
+          />
         </div>
       </details>
     </div>
@@ -717,10 +777,12 @@ function KorkulukAlanlari({
 
 function MerdivenAlanlari({
   materials,
+  sacMalzemeler,
   onChange,
   baslangic,
 }: {
   materials: Material[];
+  sacMalzemeler: Material[];
   onChange: (p: Record<string, unknown>) => void;
   baslangic?: Record<string, unknown>;
 }) {
@@ -742,6 +804,9 @@ function MerdivenAlanlari({
   const [korkulukUstProfilId, setKorkulukUstProfilId] = useState<number | undefined>(
     () => baslangic?.korkulukUstProfilId as number | undefined
   );
+  const [basamakSacMalzemeId, setBasamakSacMalzemeId] = useState<number | undefined>(
+    () => baslangic?.basamakSacMalzemeId as number | undefined
+  );
 
   useEffect(() => {
     onChange({
@@ -753,9 +818,20 @@ function MerdivenAlanlari({
       korkulukYuksekligiMm: korkulukYuksekligiMm || undefined,
       korkulukDikmeProfilId,
       korkulukUstProfilId,
+      basamakSacMalzemeId,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [katYuksekligiMm, genislikMm, basamakYuksekligiHedefMm, toplamDerinlikMm, tasiyiciProfilId, korkulukYuksekligiMm, korkulukDikmeProfilId, korkulukUstProfilId]);
+  }, [
+    katYuksekligiMm,
+    genislikMm,
+    basamakYuksekligiHedefMm,
+    toplamDerinlikMm,
+    tasiyiciProfilId,
+    korkulukYuksekligiMm,
+    korkulukDikmeProfilId,
+    korkulukUstProfilId,
+    basamakSacMalzemeId,
+  ]);
 
   return (
     <div className="space-y-3">
@@ -769,6 +845,13 @@ function MerdivenAlanlari({
         Basamak derinliği, kiriş (hipotenüs) uzunluğu ve eğim açısı bu iki ölçüden otomatik hesaplanır.
       </p>
       <MaterialSelect label="Taşıyıcı (Kiriş) Profili" materials={materials} value={tasiyiciProfilId} onChange={setTasiyiciProfilId} />
+      <MaterialSelect
+        label="Basamak Plakası Sac Malzemesi (opsiyonel, stok/maliyet için)"
+        materials={sacMalzemeler}
+        value={basamakSacMalzemeId}
+        onChange={setBasamakSacMalzemeId}
+        allowEmpty
+      />
       <details className="rounded-xl border border-neutral-200 p-3">
         <summary className="font-semibold cursor-pointer">Gelişmiş: Merdiven Korkuluğu</summary>
         <div className="grid grid-cols-3 gap-3 mt-3">
@@ -783,10 +866,12 @@ function MerdivenAlanlari({
 
 function DonerMerdivenAlanlari({
   materials,
+  sacMalzemeler,
   onChange,
   baslangic,
 }: {
   materials: Material[];
+  sacMalzemeler: Material[];
   onChange: (p: Record<string, unknown>) => void;
   baslangic?: Record<string, unknown>;
 }) {
@@ -816,6 +901,9 @@ function DonerMerdivenAlanlari({
   const [korkulukUstProfilId, setKorkulukUstProfilId] = useState<number | undefined>(
     () => baslangic?.korkulukUstProfilId as number | undefined
   );
+  const [basamakSacMalzemeId, setBasamakSacMalzemeId] = useState<number | undefined>(
+    () => baslangic?.basamakSacMalzemeId as number | undefined
+  );
 
   useEffect(() => {
     onChange({
@@ -827,6 +915,7 @@ function DonerMerdivenAlanlari({
       merkezKolonProfilId,
       basamakDestekProfilId,
       basamakKalinlikMm,
+      basamakSacMalzemeId,
       korkulukVar,
       korkulukYuksekligiMm: korkulukVar ? korkulukYuksekligiMm : undefined,
       korkulukDikmeProfilId: korkulukVar ? korkulukDikmeProfilId : undefined,
@@ -842,6 +931,7 @@ function DonerMerdivenAlanlari({
     merkezKolonProfilId,
     basamakDestekProfilId,
     basamakKalinlikMm,
+    basamakSacMalzemeId,
     korkulukVar,
     korkulukYuksekligiMm,
     korkulukDikmeProfilId,
@@ -874,6 +964,13 @@ function DonerMerdivenAlanlari({
           materials={materials}
           value={basamakDestekProfilId}
           onChange={setBasamakDestekProfilId}
+        />
+        <MaterialSelect
+          label="Basamak Plakası Sac Malzemesi (opsiyonel, stok/maliyet için)"
+          materials={sacMalzemeler}
+          value={basamakSacMalzemeId}
+          onChange={setBasamakSacMalzemeId}
+          allowEmpty
         />
       </div>
       <div className="mt-1 space-y-3">
@@ -910,10 +1007,12 @@ function DonerMerdivenAlanlari({
 
 function SundurmaAlanlari({
   materials,
+  sacMalzemeler,
   onChange,
   baslangic,
 }: {
   materials: Material[];
+  sacMalzemeler: Material[];
   onChange: (p: Record<string, unknown>) => void;
   baslangic?: Record<string, unknown>;
 }) {
@@ -933,6 +1032,7 @@ function SundurmaAlanlari({
     () => baslangic?.caprazProfilId as number | undefined
   );
   const [kaplamaTuru, setKaplamaTuru] = useState<string>(() => (baslangic?.kaplamaTuru as string) ?? "trapez_sac");
+  const [plakaMalzemeId, setPlakaMalzemeId] = useState<number | undefined>(() => baslangic?.plakaMalzemeId as number | undefined);
 
   useEffect(() => {
     onChange({
@@ -946,6 +1046,7 @@ function SundurmaAlanlari({
       dikmeProfilId,
       caprazProfilId,
       kaplamaTuru,
+      plakaMalzemeId,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -959,6 +1060,7 @@ function SundurmaAlanlari({
     dikmeProfilId,
     caprazProfilId,
     kaplamaTuru,
+    plakaMalzemeId,
   ]);
 
   return (
@@ -986,16 +1088,25 @@ function SundurmaAlanlari({
           ))}
         </select>
       </div>
+      <MaterialSelect
+        label="Taban Plakası Sac Malzemesi (opsiyonel, stok/maliyet için)"
+        materials={sacMalzemeler}
+        value={plakaMalzemeId}
+        onChange={setPlakaMalzemeId}
+        allowEmpty
+      />
     </div>
   );
 }
 
 function KapiAlanlari({
   materials,
+  sacMalzemeler,
   onChange,
   baslangic,
 }: {
   materials: Material[];
+  sacMalzemeler: Material[];
   onChange: (p: Record<string, unknown>) => void;
   baslangic?: Record<string, unknown>;
 }) {
@@ -1004,14 +1115,15 @@ function KapiAlanlari({
   const [kasaProfilId, setKasaProfilId] = useState<number | undefined>(() => baslangic?.kasaProfilId as number | undefined);
   const [kanatProfilId, setKanatProfilId] = useState<number | undefined>(() => baslangic?.kanatProfilId as number | undefined);
   const [sacKalinlikMm, setSacKalinlikMm] = useState<number>(() => (baslangic?.sacKalinlikMm as number) ?? 1.5);
+  const [sacMalzemeId, setSacMalzemeId] = useState<number | undefined>(() => baslangic?.sacMalzemeId as number | undefined);
   const [menteseAdet, setMenteseAdet] = useState<number>(() => (baslangic?.menteseAdet as number) ?? 3);
   const [kilitAdet, setKilitAdet] = useState<number>(() => (baslangic?.kilitAdet as number) ?? 1);
   const [kolAdet, setKolAdet] = useState<number>(() => (baslangic?.kolAdet as number) ?? 1);
 
   useEffect(() => {
-    onChange({ genislikMm, yukseklikMm, kasaProfilId, kanatProfilId, sacKalinlikMm, menteseAdet, kilitAdet, kolAdet });
+    onChange({ genislikMm, yukseklikMm, kasaProfilId, kanatProfilId, sacKalinlikMm, sacMalzemeId, menteseAdet, kilitAdet, kolAdet });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [genislikMm, yukseklikMm, kasaProfilId, kanatProfilId, sacKalinlikMm, menteseAdet, kilitAdet, kolAdet]);
+  }, [genislikMm, yukseklikMm, kasaProfilId, kanatProfilId, sacKalinlikMm, sacMalzemeId, menteseAdet, kilitAdet, kolAdet]);
 
   return (
     <div className="space-y-3">
@@ -1027,6 +1139,13 @@ function KapiAlanlari({
         <summary className="font-semibold cursor-pointer">Gelişmiş: Sac ve Aksesuar</summary>
         <div className="grid grid-cols-2 gap-3 mt-3">
           <Sayi label="Sac Kalınlığı (mm)" value={sacKalinlikMm} onChange={setSacKalinlikMm} />
+          <MaterialSelect
+            label="Kaplama Sac Malzemesi (opsiyonel, stok/maliyet için)"
+            materials={sacMalzemeler}
+            value={sacMalzemeId}
+            onChange={setSacMalzemeId}
+            allowEmpty
+          />
           <Sayi label="Menteşe Adedi" value={menteseAdet} onChange={setMenteseAdet} />
           <Sayi label="Kilit Adedi" value={kilitAdet} onChange={setKilitAdet} />
           <Sayi label="Kol Adedi" value={kolAdet} onChange={setKolAdet} />
@@ -1188,10 +1307,12 @@ function DuvarAlanlari({
 
 function CatiKafesiAlanlari({
   materials,
+  sacMalzemeler,
   onChange,
   baslangic,
 }: {
   materials: Material[];
+  sacMalzemeler: Material[];
   onChange: (p: Record<string, unknown>) => void;
   baslangic?: Record<string, unknown>;
 }) {
@@ -1228,6 +1349,7 @@ function CatiKafesiAlanlari({
   const [cikmaPayiMm, setCikmaPayiMm] = useState<number>(() => (baslangic?.cikmaPayiMm as number) ?? 300);
   const [direkSayisi, setDirekSayisi] = useState<number>(() => (baslangic?.direkSayisi as number) ?? 0);
   const [direkProfilId, setDirekProfilId] = useState<number | undefined>(() => baslangic?.direkProfilId as number | undefined);
+  const [plakaMalzemeId, setPlakaMalzemeId] = useState<number | undefined>(() => baslangic?.plakaMalzemeId as number | undefined);
 
   useEffect(() => {
     onChange({
@@ -1250,6 +1372,7 @@ function CatiKafesiAlanlari({
       cikmaPayiMm: olukluMu ? undefined : cikmaPayiMm,
       direkSayisi,
       direkProfilId: direkSayisi > 0 ? direkProfilId : undefined,
+      plakaMalzemeId,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -1272,6 +1395,7 @@ function CatiKafesiAlanlari({
     cikmaPayiMm,
     direkSayisi,
     direkProfilId,
+    plakaMalzemeId,
   ]);
 
   return (
@@ -1300,6 +1424,13 @@ function CatiKafesiAlanlari({
           ))}
         </select>
       </div>
+      <MaterialSelect
+        label="Mesnet Plakası Sac Malzemesi (opsiyonel, stok/maliyet için)"
+        materials={sacMalzemeler}
+        value={plakaMalzemeId}
+        onChange={setPlakaMalzemeId}
+        allowEmpty
+      />
       <details className="rounded-xl border border-neutral-200 p-3">
         <summary className="font-semibold cursor-pointer">Gelişmiş: Kral Kirişi, Çapraz Destek ve Stabilite</summary>
         <div className="grid grid-cols-2 gap-3 mt-3">
@@ -1375,10 +1506,12 @@ function CatiKafesiAlanlari({
 
 function RafAlanlari({
   materials,
+  sacMalzemeler,
   onChange,
   baslangic,
 }: {
   materials: Material[];
+  sacMalzemeler: Material[];
   onChange: (p: Record<string, unknown>) => void;
   baslangic?: Record<string, unknown>;
 }) {
@@ -1392,6 +1525,9 @@ function RafAlanlari({
   );
   const [rafSacKullan, setRafSacKullan] = useState<boolean>(() => (baslangic?.rafSacKullan as boolean) ?? true);
   const [sacKalinlikMm, setSacKalinlikMm] = useState<number>(() => (baslangic?.sacKalinlikMm as number) ?? 1.5);
+  const [rafSacMalzemeId, setRafSacMalzemeId] = useState<number | undefined>(
+    () => baslangic?.rafSacMalzemeId as number | undefined
+  );
   const [caprazProfilId, setCaprazProfilId] = useState<number | undefined>(
     () => baslangic?.caprazProfilId as number | undefined
   );
@@ -1407,6 +1543,7 @@ function RafAlanlari({
       rafCercevesiProfilId,
       rafSacKullan,
       sacKalinlikMm: rafSacKullan ? sacKalinlikMm : undefined,
+      rafSacMalzemeId: rafSacKullan ? rafSacMalzemeId : undefined,
       caprazProfilId,
       tasarimYukuKgM2,
     });
@@ -1420,6 +1557,7 @@ function RafAlanlari({
     rafCercevesiProfilId,
     rafSacKullan,
     sacKalinlikMm,
+    rafSacMalzemeId,
     caprazProfilId,
     tasarimYukuKgM2,
   ]);
@@ -1446,7 +1584,18 @@ function RafAlanlari({
           <input type="checkbox" checked={rafSacKullan} onChange={(e) => setRafSacKullan(e.target.checked)} />
           Raf yüzeyine sac plaka ekle
         </label>
-        {rafSacKullan && <Sayi label="Sac Kalınlığı (mm)" value={sacKalinlikMm} onChange={setSacKalinlikMm} />}
+        {rafSacKullan && (
+          <div className="grid grid-cols-2 gap-3">
+            <Sayi label="Sac Kalınlığı (mm)" value={sacKalinlikMm} onChange={setSacKalinlikMm} />
+            <MaterialSelect
+              label="Raf Plakası Sac Malzemesi (opsiyonel, stok/maliyet için)"
+              materials={sacMalzemeler}
+              value={rafSacMalzemeId}
+              onChange={setRafSacMalzemeId}
+              allowEmpty
+            />
+          </div>
+        )}
       </div>
       <details className="rounded-xl border border-neutral-200 p-3">
         <summary className="font-semibold cursor-pointer">Gelişmiş: Stabilite Çaprazı ve Yapısal Kontrol</summary>
@@ -1470,10 +1619,12 @@ function RafAlanlari({
 
 function PergolaAlanlari({
   materials,
+  sacMalzemeler,
   onChange,
   baslangic,
 }: {
   materials: Material[];
+  sacMalzemeler: Material[];
   onChange: (p: Record<string, unknown>) => void;
   baslangic?: Record<string, unknown>;
 }) {
@@ -1486,6 +1637,7 @@ function PergolaAlanlari({
   const [lataProfilId, setLataProfilId] = useState<number | undefined>(() => baslangic?.lataProfilId as number | undefined);
   const [lataYonu, setLataYonu] = useState<string>(() => (baslangic?.lataYonu as string) ?? "genislik");
   const [lataAraligiHedefMm, setLataAraligiHedefMm] = useState<number>(() => (baslangic?.lataAraligiHedefMm as number) ?? 200);
+  const [plakaMalzemeId, setPlakaMalzemeId] = useState<number | undefined>(() => baslangic?.plakaMalzemeId as number | undefined);
 
   useEffect(() => {
     onChange({
@@ -1498,9 +1650,21 @@ function PergolaAlanlari({
       lataProfilId,
       lataYonu,
       lataAraligiHedefMm,
+      plakaMalzemeId,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [genislikMm, boyMm, yukseklikMm, kolonSayisi, kolonProfilId, kirisProfilId, lataProfilId, lataYonu, lataAraligiHedefMm]);
+  }, [
+    genislikMm,
+    boyMm,
+    yukseklikMm,
+    kolonSayisi,
+    kolonProfilId,
+    kirisProfilId,
+    lataProfilId,
+    lataYonu,
+    lataAraligiHedefMm,
+    plakaMalzemeId,
+  ]);
 
   return (
     <div className="space-y-3">
@@ -1529,6 +1693,13 @@ function PergolaAlanlari({
         4 kolonlu basit pergolada kolon sayısı 4; geniş açıklıklarda 6/8 gibi çift sayı seçilirse ara kolonlar eşit
         dağıtılır.
       </p>
+      <MaterialSelect
+        label="Taban Plakası Sac Malzemesi (opsiyonel, stok/maliyet için)"
+        materials={sacMalzemeler}
+        value={plakaMalzemeId}
+        onChange={setPlakaMalzemeId}
+        allowEmpty
+      />
     </div>
   );
 }
@@ -1648,10 +1819,12 @@ function FerforjePanelAlanlari({
 
 function KolonKirisAlanlari({
   materials,
+  sacMalzemeler,
   onChange,
   baslangic,
 }: {
   materials: Material[];
+  sacMalzemeler: Material[];
   onChange: (p: Record<string, unknown>) => void;
   baslangic?: Record<string, unknown>;
 }) {
@@ -1673,6 +1846,7 @@ function KolonKirisAlanlari({
   const [stabiliteProfilId, setStabiliteProfilId] = useState<number | undefined>(
     () => baslangic?.stabiliteProfilId as number | undefined
   );
+  const [plakaMalzemeId, setPlakaMalzemeId] = useState<number | undefined>(() => baslangic?.plakaMalzemeId as number | undefined);
 
   useEffect(() => {
     onChange({
@@ -1686,6 +1860,7 @@ function KolonKirisAlanlari({
       baglantiKirisiProfilId,
       stabiliteBaglantisiVar,
       stabiliteProfilId: stabiliteBaglantisiVar ? stabiliteProfilId : undefined,
+      plakaMalzemeId,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -1699,6 +1874,7 @@ function KolonKirisAlanlari({
     baglantiKirisiProfilId,
     stabiliteBaglantisiVar,
     stabiliteProfilId,
+    plakaMalzemeId,
   ]);
 
   return (
@@ -1718,6 +1894,13 @@ function KolonKirisAlanlari({
         <MaterialSelect label="Kiriş Profili" materials={materials} value={kirisProfilId} onChange={setKirisProfilId} />
       </div>
       <Sayi label="Çerçeve Aralığı (mm)" value={cerceveAraligiHedefMm} onChange={setCerceveAraligiHedefMm} />
+      <MaterialSelect
+        label="Taban Plakası Sac Malzemesi (opsiyonel, stok/maliyet için)"
+        materials={sacMalzemeler}
+        value={plakaMalzemeId}
+        onChange={setPlakaMalzemeId}
+        allowEmpty
+      />
       <details className="rounded-xl border border-neutral-200 p-3">
         <summary className="font-semibold cursor-pointer">Gelişmiş: Bağlantı Kirişi ve Stabilite</summary>
         <div className="mt-3 space-y-3">

@@ -22,6 +22,9 @@ export interface DonerMerdivenGirdi {
   basamakDestekProfilKey: string;
   /** Basamak plaka kalınlığı (mm) */
   basamakKalinlikMm?: number;
+  /** Basamak plakasının alınacağı sac Material id'si (opsiyonel) - verilirse teklif maliyetine ve
+   * iş onayında stok düşümüne dahil edilir. */
+  basamakSacMalzemeKey?: string;
 
   korkulukVar?: boolean;
   korkulukYuksekligiMm?: number;
@@ -101,6 +104,7 @@ export function calculateSpiralStairs(girdi: DonerMerdivenGirdi): UrunHesapSonuc
     enMm: Math.ceil(radyalUzunlukMm),
     boyMm: Math.ceil(basamakGenislikMm),
     kalinlikMm: basamakKalinlikMm,
+    materialKey: girdi.basamakSacMalzemeKey,
     adet: basamakSayisi,
     not: "Gerçek şekil pasta dilimidir; burada ortalama genişlikte dikdörtgen olarak yaklaşıklanmıştır - sac kesimi şablonla yapılmalıdır.",
   });

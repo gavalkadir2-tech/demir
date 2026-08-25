@@ -21,6 +21,9 @@ export interface RafGirdi {
   /** Raf yüzeyi için sac plaka kullanılsın mı (varsayılan true) */
   rafSacKullan?: boolean;
   sacKalinlikMm?: number;
+  /** Raf plakasının alınacağı sac Material id'si (opsiyonel) - verilirse teklif maliyetine ve
+   * iş onayında stok düşümüne dahil edilir. */
+  rafSacMalzemeKey?: string;
   /** Arka yüzde stabilite çaprazı (X) profil kesiti - opsiyonel */
   caprazProfilKey?: string;
   /** Bir raf seviyesi için tasarım yükü (kg/m²) - malzeme listesini etkilemez, sadece yapısal
@@ -99,6 +102,7 @@ export function calculateShelf(girdi: RafGirdi): UrunHesapSonucu {
       boyMm: Math.round(derinlikMm),
       kalinlikMm: sacKalinlikMm,
       adet: rafSayisi,
+      materialKey: girdi.rafSacMalzemeKey,
     });
   }
 

@@ -8,6 +8,7 @@ import { calculateWallPanel } from "../../calc/wall";
 import { calculateShelf } from "../../calc/shelf";
 import { calculatePergola } from "../../calc/pergola";
 import { calculateSteelFrame } from "../../calc/steelFrame";
+import { calculateCanopy } from "../../calc/canopy";
 
 function mockMaterial(overrides: Partial<Material>): Material {
   return {
@@ -345,4 +346,146 @@ test("kolon-kiriş kontrolü: güçlü kiriş dar açıklıkta uygun/sınırda �
   const kontrol = yapiselKontrolCalistir("steel_frame", girdi, sonuc, { kolon: GUCLU_BOX, kiris: GUCLU_BOX });
   assert.ok(kontrol);
   assert.notEqual(kontrol!.genelDurum, "yetersiz");
+});
+
+test("raf kontrolü: ayak burkulma kalemi de eklenir ve zayıf ayak yetersiz çıkar", () => {
+  const sonuc = calculateShelf({
+    genislikMm: 1200,
+    derinlikMm: 500,
+    yukseklikMm: 3000,
+    rafSayisi: 6,
+    ayakProfilKey: "ayak",
+    rafCercevesiProfilKey: "cerceve",
+  });
+  const girdi = {
+    genislikMm: 1200,
+    derinlikMm: 500,
+    yukseklikMm: 3000,
+    rafSayisi: 6,
+    ayakProfilKey: "ayak",
+    rafCercevesiProfilKey: "cerceve",
+    tasarimYukuKgM2: 300,
+  };
+  const kontrol = yapiselKontrolCalistir("shelf", girdi, sonuc, { ayak: ZAYIF_BOX, cerceve: GUCLU_BOX });
+  assert.ok(kontrol);
+  assert.equal(kontrol!.kalemler.length, 2);
+  const ayakKalemi = kontrol!.kalemler.find((k) => k.eleman.includes("Ayak"))!;
+  assert.ok(ayakKalemi);
+  assert.equal(ayakKalemi.tur, "kolon");
+  assert.equal(kontrol!.genelDurum, "yetersiz");
+});
+
+test("pergola kontrolü: kolon burkulma kalemi de eklenir", () => {
+  const sonuc = calculatePergola({
+    genislikMm: 4000,
+    boyMm: 3000,
+    yukseklikMm: 2400,
+    kolonSayisi: 4,
+    kolonProfilKey: "kolon",
+    kirisProfilKey: "kiris",
+    lataProfilKey: "lata",
+  });
+  const girdi = {
+    genislikMm: 4000,
+    boyMm: 3000,
+    yukseklikMm: 2400,
+    kolonSayisi: 4,
+    kolonProfilKey: "kolon",
+    kirisProfilKey: "kiris",
+    lataProfilKey: "lata",
+  };
+  const kontrol = yapiselKontrolCalistir("pergola", girdi, sonuc, { kolon: GUCLU_BOX, kiris: GUCLU_BOX, lata: GUCLU_BOX });
+  assert.ok(kontrol);
+  assert.equal(kontrol!.kalemler.length, 2);
+  assert.ok(kontrol!.kalemler.some((k) => k.tur === "kolon" && k.eleman.includes("Kolon")));
+});
+
+test("kolon-kiriş kontrolü: kolon burkulma kalemi de eklenir", () => {
+  const sonuc = calculateSteelFrame({
+    acikligMm: 6000,
+    uzunlukMm: 9000,
+    yukseklikMm: 3000,
+    kolonProfilKey: "kolon",
+    kirisProfilKey: "kiris",
+  });
+  const girdi = {
+    acikligMm: 6000,
+    uzunlukMm: 9000,
+    yukseklikMm: 3000,
+    kolonProfilKey: "kolon",
+    kirisProfilKey: "kiris",
+  };
+  const kontrol = yapiselKontrolCalistir("steel_frame", girdi, sonuc, { kolon: GUCLU_BOX, kiris: GUCLU_BOX });
+  assert.ok(kontrol);
+  assert.equal(kontrol!.kalemler.length, 2);
+  assert.ok(kontrol!.kalemler.some((k) => k.tur === "kolon"));
+});
+
+test("sundurma kontrolü: zayıf dikme yüksek çıkmada yetersiz çıkar", () => {
+  const sonuc = calculateCanopy({
+    genislikMm: 6000,
+    boyMm: 4000,
+    yukseklikMm: 2200,
+    egimYuzde: 10,
+    dikmeSayisi: 3,
+    anaTasiyiciProfilKey: "ana",
+    araTasiyiciProfilKey: "ara",
+    dikmeProfilKey: "dikme",
+  });
+  const girdi = {
+    genislikMm: 6000,
+    boyMm: 4000,
+    yukseklikMm: 2200,
+    egimYuzde: 10,
+    dikmeSayisi: 3,
+    anaTasiyiciProfilKey: "ana",
+    araTasiyiciProfilKey: "ara",
+    dikmeProfilKey: "dikme",
+  };
+  const kontrol = yapiselKontrolCalistir("canopy", girdi, sonuc, { ana: GUCLU_BOX, ara: GUCLU_BOX, dikme: ZAYIF_BOX });
+  assert.ok(kontrol);
+  assert.equal(kontrol!.genelDurum, "yetersiz");
+  assert.equal(kontrol!.kalemler[0].tur, "kolon");
+  assert.equal(kontrol!.kalemler[0].eleman, "Dikme (eksenel burkulma)");
+});
+
+test("sundurma kontrolü: güçlü dikme kısa çıkmada uygun/sınırda çıkar", () => {
+  const sonuc = calculateCanopy({
+    genislikMm: 4000,
+    boyMm: 2000,
+    yukseklikMm: 2200,
+    egimYuzde: 10,
+    dikmeSayisi: 3,
+    anaTasiyiciProfilKey: "ana",
+    araTasiyiciProfilKey: "ara",
+    dikmeProfilKey: "dikme",
+  });
+  const girdi = {
+    genislikMm: 4000,
+    boyMm: 2000,
+    yukseklikMm: 2200,
+    egimYuzde: 10,
+    dikmeSayisi: 3,
+    anaTasiyiciProfilKey: "ana",
+    araTasiyiciProfilKey: "ara",
+    dikmeProfilKey: "dikme",
+  };
+  const kontrol = yapiselKontrolCalistir("canopy", girdi, sonuc, { ana: GUCLU_BOX, ara: GUCLU_BOX, dikme: GUCLU_BOX });
+  assert.ok(kontrol);
+  assert.notEqual(kontrol!.genelDurum, "yetersiz");
+});
+
+test("sundurma kontrolü: dikme malzemesi bulunamazsa undefined döner", () => {
+  const sonuc = calculateCanopy({
+    genislikMm: 4000,
+    boyMm: 2000,
+    yukseklikMm: 2200,
+    egimYuzde: 10,
+    dikmeSayisi: 3,
+    anaTasiyiciProfilKey: "ana",
+    araTasiyiciProfilKey: "ara",
+    dikmeProfilKey: "dikme",
+  });
+  const kontrol = yapiselKontrolCalistir("canopy", { dikmeProfilKey: "dikme" }, sonuc, {});
+  assert.equal(kontrol, undefined);
 });

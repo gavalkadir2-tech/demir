@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { kesitOzellikleriHesapla, kirisKontrolEt } from "../engineering";
+import { kesitOzellikleriHesapla, kirisKontrolEt, kolonBurkulmaKontrolEt } from "../engineering";
 import { HesaplamaHatasi } from "../units";
 
 test("kesit: kare kutu profil (40x40x2) atalet momenti doğru hesaplanır", () => {
@@ -104,4 +104,37 @@ test("kiriş kontrolü: daha yüksek emniyet katsayısı izin verilen gerilmeyi 
     guvenlikKatsayisi: 3,
   });
   assert.ok(yuksekEmniyet.izinVerilenGerilmeMPa < dusukEmniyet.izinVerilenGerilmeMPa);
+});
+
+test("kolon burkulma: Euler kritik yükü doğru hesaplanır (40x40x2 kutu, 2000mm, K=1)", () => {
+  const kesit = kesitOzellikleriHesapla({ profilSekli: "BOX", widthMm: 40, heightMm: 40, thicknessMm: 2 })!;
+  const sonuc = kolonBurkulmaKontrolEt({ boyMm: 2000, eksenelYukN: 100, kesit });
+  // Pcr = pi^2 * E * I / (K*L)^2 = pi^2 * 210000 * 73365.33 / 2000^2 ≈ 38015 N
+  assert.ok(Math.abs(sonuc.burkulmaYukuKrN - 38015) < 50);
+});
+
+test("kolon burkulma: yüksek eksenel yük + narin (uzun/zayıf) kolon yetersiz çıkar", () => {
+  const kesit = kesitOzellikleriHesapla({ profilSekli: "BOX", widthMm: 20, heightMm: 20, thicknessMm: 2 })!;
+  const sonuc = kolonBurkulmaKontrolEt({ boyMm: 4000, eksenelYukN: 20000, kesit });
+  assert.equal(sonuc.durum, "yetersiz");
+});
+
+test("kolon burkulma: düşük eksenel yük + kısa/güçlü kolon uygun çıkar", () => {
+  const kesit = kesitOzellikleriHesapla({ profilSekli: "BOX", widthMm: 100, heightMm: 100, thicknessMm: 6 })!;
+  const sonuc = kolonBurkulmaKontrolEt({ boyMm: 2000, eksenelYukN: 5000, kesit });
+  assert.notEqual(sonuc.durum, "yetersiz");
+});
+
+test("kolon burkulma: etkin boy faktörü K arttıkça kritik yük düşer (K=2 konsol, K=1 mafsallı)", () => {
+  const kesit = kesitOzellikleriHesapla({ profilSekli: "BOX", widthMm: 40, heightMm: 40, thicknessMm: 3 })!;
+  const pinli = kolonBurkulmaKontrolEt({ boyMm: 2000, eksenelYukN: 100, kesit, etkinBoyFaktoru: 1 });
+  const konsol = kolonBurkulmaKontrolEt({ boyMm: 2000, eksenelYukN: 100, kesit, etkinBoyFaktoru: 2 });
+  // (K*L)^2 paydada olduğu için K=2, Pcr'yi K=1'e göre 4'e böler.
+  assert.ok(Math.abs(konsol.burkulmaYukuKrN - pinli.burkulmaYukuKrN / 4) < 5);
+});
+
+test("kolon burkulma: geçersiz girdilerde hata fırlatır", () => {
+  const kesit = kesitOzellikleriHesapla({ profilSekli: "BOX", widthMm: 40, heightMm: 40, thicknessMm: 3 })!;
+  assert.throws(() => kolonBurkulmaKontrolEt({ boyMm: 0, eksenelYukN: 100, kesit }), HesaplamaHatasi);
+  assert.throws(() => kolonBurkulmaKontrolEt({ boyMm: 2000, eksenelYukN: -1, kesit }), HesaplamaHatasi);
 });

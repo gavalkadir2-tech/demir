@@ -27,6 +27,9 @@ export interface PergolaGirdi {
   plakaEnMm?: number;
   plakaBoyMm?: number;
   plakaKalinlikMm?: number;
+  /** Taban plakasının alınacağı sac Material id'si (opsiyonel) - verilirse teklif maliyetine ve
+   * iş onayında stok düşümüne dahil edilir. */
+  plakaMalzemeKey?: string;
   ankrajSayisiPerPlaka?: number;
 }
 
@@ -111,6 +114,7 @@ export function calculatePergola(girdi: PergolaGirdi): UrunHesapSonucu {
     enMm: plakaEnMm,
     boyMm: plakaBoyMm,
     kalinlikMm: plakaKalinlikMm,
+    materialKey: girdi.plakaMalzemeKey,
     adet: kolonSayisi,
   });
 

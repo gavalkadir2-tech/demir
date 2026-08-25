@@ -20,6 +20,9 @@ export interface KapiGirdi {
   /** Kanat kaplama sacı kalınlığı (mm); verilmezse sac kaplama hesaplanmaz */
   sacKalinlikMm?: number;
   sacIkiYuzlu?: boolean;
+  /** Kaplama sacının alınacağı sac Material id'si (opsiyonel) - verilirse teklif maliyetine ve
+   * iş onayında stok düşümüne dahil edilir. */
+  sacMalzemeKey?: string;
   menteseAdet?: number;
   kilitAdet?: number;
   kolAdet?: number;
@@ -83,6 +86,7 @@ export function calculateDoor(girdi: KapiGirdi): UrunHesapSonucu {
       enMm: Math.round(kanatGenislikMm),
       boyMm: Math.round(kanatYukseklikMm),
       kalinlikMm: girdi.sacKalinlikMm,
+      materialKey: girdi.sacMalzemeKey,
       adet: sacIkiYuzlu ? 2 : 1,
     });
   }

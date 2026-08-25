@@ -26,6 +26,9 @@ export interface KorkulukGirdi {
   plakaEnMm?: number;
   plakaBoyMm?: number;
   plakaKalinlikMm?: number;
+  /** Taban plakasının alınacağı sac Material id'si (opsiyonel) - verilirse teklif maliyetine ve
+   * iş onayında stok düşümüne dahil edilir. */
+  plakaMalzemeKey?: string;
   /** Plaka başına ankraj sayısı */
   ankrajSayisiPerPlaka?: number;
 }
@@ -121,6 +124,7 @@ export function calculateRailing(girdi: KorkulukGirdi): UrunHesapSonucu {
       enMm: plakaEnMm,
       boyMm: plakaBoyMm,
       kalinlikMm: plakaKalinlikMm,
+      materialKey: girdi.plakaMalzemeKey,
       adet: dikmeSayisi,
     });
     sonuc.baglantiKalemleri.push({

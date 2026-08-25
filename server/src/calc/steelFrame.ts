@@ -26,6 +26,9 @@ export interface KolonKirisGirdi {
   plakaEnMm?: number;
   plakaBoyMm?: number;
   plakaKalinlikMm?: number;
+  /** Taban plakasının alınacağı sac Material id'si (opsiyonel) - verilirse teklif maliyetine ve
+   * iş onayında stok düşümüne dahil edilir. */
+  plakaMalzemeKey?: string;
   ankrajSayisiPerPlaka?: number;
 }
 
@@ -113,6 +116,7 @@ export function calculateSteelFrame(girdi: KolonKirisGirdi): UrunHesapSonucu {
     enMm: plakaEnMm,
     boyMm: plakaBoyMm,
     kalinlikMm: plakaKalinlikMm,
+    materialKey: girdi.plakaMalzemeKey,
     adet: kolonToplamAdet,
   });
 

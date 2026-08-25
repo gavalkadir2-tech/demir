@@ -23,6 +23,10 @@ export interface SacKalemi {
   adet: number;
   /** Ağırlık tahmini için efektif yoğunluk (kg/m3). Verilmezse çelik yoğunluğu varsayılır. */
   yogunlukKgM3?: number;
+  /** Bağlı olduğu Material id'si (string) - verilirse teklif maliyetine ve iş onayında stok
+   * düşümüne dahil edilir (bkz. lib/sheetCostAndStock.ts). Verilmezse (varsayılan) profil
+   * parçalardan farklı olarak bu kalem maliyet/stok hesabına hiç dahil edilmez. */
+  materialKey?: string;
   not?: string;
 }
 

@@ -224,29 +224,58 @@ export interface HesaplananParca {
   not?: string;
 }
 
+export interface SacKalemi {
+  label: string;
+  enMm: number;
+  boyMm: number;
+  kalinlikMm?: number;
+  adet: number;
+  yogunlukKgM3?: number;
+  materialKey?: string;
+  not?: string;
+}
+
 export interface UrunHesapSonucu {
   parcalar: HesaplananParca[];
   profilOzet: { profilKey: string; toplamMetre: number; toplamAdetParca: number }[];
-  sacKalemleri: { label: string; enMm: number; boyMm: number; kalinlikMm?: number; adet: number; not?: string }[];
+  sacKalemleri: SacKalemi[];
   baglantiKalemleri: { label: string; birim: string; adet: number }[];
   uyarilar: string[];
   ozetDegerler: Record<string, number>;
 }
 
-export interface YapiselKontrolKalemi {
+interface YapiselKontrolKalemiOrtak {
   eleman: string;
   profilAdi: string;
   yukAciklamasi: string;
+  guvenlikOrani: number;
+  durum: "uygun" | "sinirda" | "yetersiz";
+  aciklama: string;
+}
+
+export interface YapiselKontrolKalemiKiris extends YapiselKontrolKalemiOrtak {
+  tur: "kiris";
   maxSehimMm: number;
   izinVerilenSehimMm: number;
   sehimUygun: boolean;
   maxGerilmeMPa: number;
   izinVerilenGerilmeMPa: number;
   gerilmeUygun: boolean;
-  guvenlikOrani: number;
-  durum: "uygun" | "sinirda" | "yetersiz";
-  aciklama: string;
 }
+
+export interface YapiselKontrolKalemiKolon extends YapiselKontrolKalemiOrtak {
+  tur: "kolon";
+  eksenelYukN: number;
+  burkulmaYukuKrN: number;
+  izinVerilenBurkulmaYukuN: number;
+  burkulmaUygun: boolean;
+  akmaYukuN: number;
+  izinVerilenAkmaYukuN: number;
+  akmaUygun: boolean;
+  narinlikOrani: number;
+}
+
+export type YapiselKontrolKalemi = YapiselKontrolKalemiKiris | YapiselKontrolKalemiKolon;
 
 export interface YapiselKontrolSonucu {
   kalemler: YapiselKontrolKalemi[];
@@ -348,6 +377,8 @@ export interface SacYerlesenParca {
   xMm: number;
   yMm: number;
   label?: string;
+  /** Parça, orijinal en/boy yönüne göre 90° döndürülerek mi yerleştirildi. */
+  donduruldu?: boolean;
 }
 
 export interface SacLevhasi {

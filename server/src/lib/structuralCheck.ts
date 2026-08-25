@@ -5,7 +5,14 @@
 // döner (hata fırlatmaz) - yapısal kontrol her zaman opsiyonel bir ek bilgidir.
 
 import { Material } from "@prisma/client";
-import { kesitOzellikleriHesapla, kirisKontrolEt, kgToN, KirisKontrolSonucu } from "../calc/engineering";
+import {
+  kesitOzellikleriHesapla,
+  kirisKontrolEt,
+  kolonBurkulmaKontrolEt,
+  kgToN,
+  KirisKontrolSonucu,
+  KolonBurkulmaSonucu,
+} from "../calc/engineering";
 import { KAPLAMA_BILGI, KaplamaTuru } from "../calc/kaplama";
 import { UrunHesapSonucu } from "../calc/types";
 
@@ -21,11 +28,21 @@ const PERGOLA_YUK_N_M2 = 400; // Açık latalı, kaplamasız pergola için tipik
 const YAPISAL_KONTROL_UYARISI =
   "Bu, basitleştirilmiş bir mukavemet/sehim kontrolüdür - tam bir statik projelendirme değildir. Kritik/kamusal yapılarda mutlaka bir inşaat mühendisinden onay alın.";
 
-export interface YapiselKontrolKalemi extends KirisKontrolSonucu {
+export interface YapiselKontrolKalemiKiris extends KirisKontrolSonucu {
+  tur: "kiris";
   eleman: string;
   profilAdi: string;
   yukAciklamasi: string;
 }
+
+export interface YapiselKontrolKalemiKolon extends KolonBurkulmaSonucu {
+  tur: "kolon";
+  eleman: string;
+  profilAdi: string;
+  yukAciklamasi: string;
+}
+
+export type YapiselKontrolKalemi = YapiselKontrolKalemiKiris | YapiselKontrolKalemiKolon;
 
 export interface YapiselKontrolSonucu {
   kalemler: YapiselKontrolKalemi[];
@@ -62,6 +79,7 @@ function korkulukKontrolu(
     const s = kirisKontrolEt({ acikligMm: gercekAralikMm, mesnetTuru: "basit", yukTuru: "yayili", toplamYukN, kesit: ustKesit });
     kalemler.push({
       ...s,
+      tur: "kiris" as const,
       eleman: "Üst profil (dikmeler arası açıklık)",
       profilAdi: ustMalzeme.name,
       yukAciklamasi: `Yatay çizgisel yük ${KORKULUK_YATAY_YUK_N_M / 1000} kN/m × ${(gercekAralikMm / 1000).toFixed(2)} m açıklık`,
@@ -84,6 +102,7 @@ function korkulukKontrolu(
     });
     kalemler.push({
       ...s,
+      tur: "kiris" as const,
       eleman: "Dikme (konsol, tepe noktasında yatay itme)",
       profilAdi: dikmeMalzeme.name,
       yukAciklamasi: `Yatay itme ${(toplamYukN / 1000).toFixed(2)} kN, ${(yukseklikMm / 1000).toFixed(2)} m yükseklikte`,
@@ -124,6 +143,7 @@ function catiKafesiKontrolu(
   return ozetOlustur([
     {
       ...s,
+      tur: "kiris" as const,
       eleman: "Aşık (kafesler arası açıklık)",
       profilAdi: asikMalzeme.name,
       yukAciklamasi: `Kar yükü ${(KAR_YUKU_N_M2 / 1000).toFixed(2)} kN/m² + kaplama ağırlığı ${(kaplamaYukNM2 / 1000).toFixed(
@@ -156,6 +176,7 @@ function merdivenKontrolu(
   return ozetOlustur([
     {
       ...s,
+      tur: "kiris" as const,
       eleman: `Taşıyıcı (kiriş, ${tasiyiciAdet} adet arasında paylaşılan yük)`,
       profilAdi: tasiyiciMalzeme.name,
       yukAciklamasi: `Basamak canlı yükü ${(BASAMAK_CANLI_YUK_N_M2 / 1000).toFixed(2)} kN/m² × ${(genislikMm / 1000).toFixed(
@@ -188,6 +209,7 @@ function donerMerdivenKontrolu(
   const kalemler: YapiselKontrolKalemi[] = [
     {
       ...s,
+      tur: "kiris" as const,
       eleman: "Basamak desteği (konsol)",
       profilAdi: destekMalzeme.name,
       yukAciklamasi: `Basamak canlı yükü ${(BASAMAK_CANLI_YUK_N_M2 / 1000).toFixed(2)} kN/m² × ${(
@@ -214,6 +236,7 @@ function donerMerdivenKontrolu(
         });
         kalemler.push({
           ...s2,
+          tur: "kiris" as const,
           eleman: "Korkuluk dikmesi (konsol, tepe noktasında yatay itme)",
           profilAdi: dikmeMalzeme.name,
           yukAciklamasi: `Yatay itme ${(KORKULUK_YATAY_YUK_N_M / 1000).toFixed(2)} kN/m × ${(basamakGenislikMm / 1000).toFixed(
@@ -249,6 +272,7 @@ function duvarKontrolu(
   return ozetOlustur([
     {
       ...s,
+      tur: "kiris" as const,
       eleman: "Dikme (üst/alt ray arası, düzleme dik rüzgar yükü)",
       profilAdi: dikmeMalzeme.name,
       yukAciklamasi: `Rüzgar yükü ${(RUZGAR_YUKU_N_M2 / 1000).toFixed(2)} kN/m² × ${(gercekAralikMm / 1000).toFixed(
@@ -278,16 +302,41 @@ function rafKontrolu(
 
   const s = kirisKontrolEt({ acikligMm: genislikMm, mesnetTuru: "basit", yukTuru: "yayili", toplamYukN, kesit: cerceveKesit });
 
-  return ozetOlustur([
+  const kalemler: YapiselKontrolKalemi[] = [
     {
       ...s,
+      tur: "kiris" as const,
       eleman: "Raf çerçevesi (genişlik yönü, ayaklar arası açıklık)",
       profilAdi: cerceveMalzeme.name,
       yukAciklamasi: `Tasarım yükü ${tasarimYukuKgM2} kg/m² × ${(genislikMm / 1000).toFixed(2)}×${(derinlikMm / 1000).toFixed(
         2
       )} m raf alanı, ön/arka çerçeve arasında paylaşılmış (belirtilmezse ${RAF_VARSAYILAN_TASARIM_YUKU_KG_M2} kg/m² varsayılır)`,
     },
-  ]);
+  ];
+
+  const ayakMalzeme = malzemeler[String(girdi.ayakProfilKey)];
+  const yukseklikMm = Number(girdi.yukseklikMm);
+  const rafSayisi = Number(girdi.rafSayisi) || sonuc.ozetDegerler.rafSayisi;
+  if (ayakMalzeme && yukseklikMm) {
+    const ayakKesit = kesitOzellikleriHesapla(ayakMalzeme);
+    if (ayakKesit) {
+      // Tüm raf seviyelerinin toplam yükü, 4 ayak arasında eşit paylaşılır.
+      const tumSeviyelerYukN = kgToN(tasarimYukuKgM2 * (genislikMm / 1000) * (derinlikMm / 1000) * rafSayisi);
+      const eksenelYukN = tumSeviyelerYukN / 4;
+      const sKolon = kolonBurkulmaKontrolEt({ boyMm: yukseklikMm, eksenelYukN, kesit: ayakKesit });
+      kalemler.push({
+        ...sKolon,
+        tur: "kolon" as const,
+        eleman: "Ayak (eksenel burkulma, 4 ayak arası paylaşılmış toplam raf yükü)",
+        profilAdi: ayakMalzeme.name,
+        yukAciklamasi: `Tasarım yükü ${tasarimYukuKgM2} kg/m² × ${rafSayisi} seviye × raf alanı, 4 ayak arasında paylaşılmış, ${(
+          yukseklikMm / 1000
+        ).toFixed(2)} m ayak boyu`,
+      });
+    }
+  }
+
+  return ozetOlustur(kalemler);
 }
 
 function pergolaKontrolu(
@@ -312,16 +361,36 @@ function pergolaKontrolu(
 
   const s = kirisKontrolEt({ acikligMm: spanMm, mesnetTuru: "basit", yukTuru: "yayili", toplamYukN, kesit: kirisKesit });
 
-  return ozetOlustur([
+  const kalemler: YapiselKontrolKalemi[] = [
     {
       ...s,
+      tur: "kiris" as const,
       eleman: "Kenar kirişi (bitişik kolonlar arası açıklık)",
       profilAdi: kirisMalzeme.name,
       yukAciklamasi: `Kendi ağırlık + rüzgar yükü ${(PERGOLA_YUK_N_M2 / 1000).toFixed(2)} kN/m² × ${(boyMm / 2000).toFixed(
         2
       )} m yayılma genişliği (yapı derinliğinin yarısı), ${(spanMm / 1000).toFixed(2)} m kolon açıklığı`,
     },
-  ]);
+  ];
+
+  const yukseklikMm = Number(girdi.yukseklikMm);
+  const kolonMalzeme = malzemeler[String(girdi.kolonProfilKey)];
+  if (yukseklikMm && kolonMalzeme) {
+    const kolonKesit = kesitOzellikleriHesapla(kolonMalzeme);
+    if (kolonKesit) {
+      // İç kolon, iki bitişik açıklığın mesnet tepkisini birden taşır (muhafazakâr, en yüklü kolon).
+      const sKolon = kolonBurkulmaKontrolEt({ boyMm: yukseklikMm, eksenelYukN: toplamYukN, kesit: kolonKesit });
+      kalemler.push({
+        ...sKolon,
+        tur: "kolon" as const,
+        eleman: "Kolon (eksenel burkulma, en yüklü iç kolon)",
+        profilAdi: kolonMalzeme.name,
+        yukAciklamasi: `Bitişik kenar kirişi açıklıklarından gelen mesnet yükü, ${(yukseklikMm / 1000).toFixed(2)} m kolon boyu`,
+      });
+    }
+  }
+
+  return ozetOlustur(kalemler);
 }
 
 function kolonKirisKontrolu(
@@ -344,14 +413,77 @@ function kolonKirisKontrolu(
 
   const s = kirisKontrolEt({ acikligMm, mesnetTuru: "basit", yukTuru: "yayili", toplamYukN, kesit: kirisKesit });
 
-  return ozetOlustur([
+  const kalemler: YapiselKontrolKalemi[] = [
     {
       ...s,
+      tur: "kiris" as const,
       eleman: "Kiriş (açıklık)",
       profilAdi: kirisMalzeme.name,
       yukAciklamasi: `Üzerine eklenecek çatı/kaplama için tipik kar yükü varsayımı ${(KAR_YUKU_N_M2 / 1000).toFixed(
         2
       )} kN/m² × ${(gercekAralikMm / 1000).toFixed(2)} m çerçeve aralığı, ${(acikligMm / 1000).toFixed(2)} m açıklık`,
+    },
+  ];
+
+  const yukseklikMm = Number(girdi.yukseklikMm);
+  const kolonMalzeme = malzemeler[String(girdi.kolonProfilKey)];
+  if (yukseklikMm && kolonMalzeme) {
+    const kolonKesit = kesitOzellikleriHesapla(kolonMalzeme);
+    if (kolonKesit) {
+      // İç kolon (birden fazla açıklık varsa), iki bitişik açıklığın mesnet tepkisini birden taşır.
+      const sKolon = kolonBurkulmaKontrolEt({ boyMm: yukseklikMm, eksenelYukN: toplamYukN, kesit: kolonKesit });
+      kalemler.push({
+        ...sKolon,
+        tur: "kolon" as const,
+        eleman: "Kolon (eksenel burkulma, en yüklü iç kolon)",
+        profilAdi: kolonMalzeme.name,
+        yukAciklamasi: `Bitişik kiriş açıklıklarından gelen mesnet yükü, ${(yukseklikMm / 1000).toFixed(2)} m kolon boyu`,
+      });
+    }
+  }
+
+  return ozetOlustur(kalemler);
+}
+
+function sundurmaKontrolu(
+  girdi: Record<string, unknown>,
+  sonuc: UrunHesapSonucu,
+  malzemeler: Record<string, Material>
+): YapiselKontrolSonucu | undefined {
+  const dikmeSayisi = Number(girdi.dikmeSayisi);
+  const genislikMm = Number(girdi.genislikMm);
+  const yukseklikMm = Number(girdi.yukseklikMm);
+  const kirisUzunlukMm = sonuc.ozetDegerler.kirisUzunlukMm;
+  const dikmeMalzeme = malzemeler[String(girdi.dikmeProfilKey)];
+  if (!dikmeSayisi || !genislikMm || !yukseklikMm || !kirisUzunlukMm || !dikmeMalzeme) return undefined;
+
+  const dikmeKesit = kesitOzellikleriHesapla(dikmeMalzeme);
+  if (!dikmeKesit) return undefined;
+
+  const kaplamaTuru = girdi.kaplamaTuru as KaplamaTuru | undefined;
+  let kaplamaYukNM2 = 0;
+  if (kaplamaTuru && kaplamaTuru !== "yok") {
+    const bilgi = KAPLAMA_BILGI[kaplamaTuru];
+    const kalinlikMm = Number(girdi.kaplamaKalinlikMm) || bilgi.varsayilanKalinlikMm;
+    kaplamaYukNM2 = kgToN((kalinlikMm / 1000) * bilgi.efektifYogunlukKgM3);
+  }
+  const toplamAlanYukNM2 = KAR_YUKU_N_M2 + kaplamaYukNM2;
+  const tributaryGenislikMm = genislikMm / dikmeSayisi;
+  const eksenelYukN = toplamAlanYukNM2 * (tributaryGenislikMm / 1000) * (kirisUzunlukMm / 1000);
+
+  const s = kolonBurkulmaKontrolEt({ boyMm: yukseklikMm, eksenelYukN, kesit: dikmeKesit });
+
+  return ozetOlustur([
+    {
+      ...s,
+      tur: "kolon" as const,
+      eleman: "Dikme (eksenel burkulma)",
+      profilAdi: dikmeMalzeme.name,
+      yukAciklamasi: `Kar yükü ${(KAR_YUKU_N_M2 / 1000).toFixed(2)} kN/m² + kaplama ağırlığı ${(kaplamaYukNM2 / 1000).toFixed(
+        3
+      )} kN/m², ${(tributaryGenislikMm / 1000).toFixed(2)} m yayılma genişliği × ${(kirisUzunlukMm / 1000).toFixed(
+        2
+      )} m çıkma, ${(yukseklikMm / 1000).toFixed(2)} m dikme boyu`,
     },
   ]);
 }
@@ -372,6 +504,7 @@ export function yapiselKontrolCalistir(
     if (templateKey === "shelf") return rafKontrolu(girdi, sonuc, malzemeler);
     if (templateKey === "pergola") return pergolaKontrolu(girdi, sonuc, malzemeler);
     if (templateKey === "steel_frame") return kolonKirisKontrolu(girdi, sonuc, malzemeler);
+    if (templateKey === "canopy") return sundurmaKontrolu(girdi, sonuc, malzemeler);
     return undefined;
   } catch {
     // Yapısal kontrol her zaman opsiyoneldir - beklenmeyen bir hata ana hesaplamayı bozmamalı.

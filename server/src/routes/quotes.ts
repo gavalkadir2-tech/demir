@@ -4,6 +4,7 @@ import { asyncHandler, ApiHatasi } from "../lib/errors";
 import { generateCuttingListsForProject } from "../lib/cuttingService";
 import { calculateCost } from "../calc/costing";
 import { calculateMaterialLineCost, costPerMm } from "../lib/pricing";
+import { sacMalzemeGruplariHesapla, sacGrubuMaliyetHesapla } from "../lib/sheetMaterialAggregation";
 
 const router = Router({ mergeParams: true });
 
@@ -93,6 +94,20 @@ router.post(
           lineTotal: netCost,
         });
       }
+    }
+
+    const { gruplar: sacGruplari, uyarilar: sacUyarilari } = await sacMalzemeGruplariHesapla(projectId);
+    uyarilar.push(...sacUyarilari);
+    for (const grup of sacGruplari) {
+      const sacMaliyet = Math.round(sacGrubuMaliyetHesapla(grup) * 100) / 100;
+      materialCost += sacMaliyet;
+      materialItems.push({
+        description: `${grup.material.name} (levha)`,
+        qty: grup.nesting.toplamLevha,
+        unit: `adet x ${grup.nesting.sheetWidthMm / 1000}x${grup.nesting.sheetHeightMm / 1000}m levha`,
+        unitPrice: grup.nesting.toplamLevha > 0 ? Math.round((sacMaliyet / grup.nesting.toplamLevha) * 100) / 100 : 0,
+        lineTotal: sacMaliyet,
+      });
     }
 
     const consumableCost = expenses.filter((e) => e.type === "CONSUMABLE").reduce((s, e) => s + e.amount, 0);

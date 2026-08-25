@@ -18,6 +18,9 @@ export interface MerdivenGirdi {
   tasiyiciAdet?: number;
   /** Basamak plaka kalınlığı (mm), sac ihtiyacı için */
   basamakKalinlikMm?: number;
+  /** Basamak plakasının alınacağı sac Material id'si (opsiyonel) - verilirse teklif maliyetine ve
+   * iş onayında stok düşümüne dahil edilir. */
+  basamakSacMalzemeKey?: string;
 
   /** Korkuluk yüksekliği (mm) - verilirse merdiven korkuluğu da hesaplanır */
   korkulukYuksekligiMm?: number;
@@ -88,6 +91,7 @@ export function calculateStairs(girdi: MerdivenGirdi): UrunHesapSonucu {
     enMm: genislikMm,
     boyMm: basamakDerinligiMm,
     kalinlikMm: basamakKalinlikMm,
+    materialKey: girdi.basamakSacMalzemeKey,
     adet: basamakSayisi,
   });
 

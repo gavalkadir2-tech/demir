@@ -47,9 +47,11 @@ export default function SacLevhaGorunumu({
               fillOpacity={0.75}
               stroke="#ffffff"
               strokeWidth={1}
+              strokeDasharray={p.donduruldu ? "4 2" : undefined}
             >
               <title>
                 {p.label ?? "Parça"}: {sayi(p.enMm)}×{sayi(p.boyMm)} mm
+                {p.donduruldu ? " (90° döndürülmüş)" : ""}
               </title>
             </rect>
             {p.enMm * scale > 30 && p.boyMm * scale > 14 && (
@@ -62,6 +64,7 @@ export default function SacLevhaGorunumu({
                 fill="#ffffff"
                 fontWeight={600}
               >
+                {p.donduruldu ? "↻ " : ""}
                 {sayi(p.enMm)}×{sayi(p.boyMm)}
               </text>
             )}

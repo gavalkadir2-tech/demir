@@ -242,3 +242,93 @@ const G = 9.81; // yerçekimi ivmesi, kg -> N çevrimi için
 export function kgToN(kg: number): number {
   return kg * G;
 }
+
+export interface KolonBurkulmaGirdi {
+  /** Kolon/eleman boyu (mm). */
+  boyMm: number;
+  /** Eksenel basınç yükü (N). */
+  eksenelYukN: number;
+  kesit: KesitOzellikleri;
+  celikSinifi?: CelikSinifi;
+  guvenlikKatsayisi?: number;
+  /** Etkin boy faktörü K (mesnet koşuluna göre). Varsayılan 1 (iki ucu mafsallı) - basit çelik
+   * yapılarda (basit bağlantılı taban plakası + kirişe mafsallı bağlantı) tipik bir varsayımdır.
+   * Ankastre-serbest (konsol) için 2, ankastre-mafsallı için 0.7, ankastre-ankastre için 0.5. */
+  etkinBoyFaktoru?: number;
+}
+
+export interface KolonBurkulmaSonucu {
+  eksenelYukN: number;
+  /** Euler kritik burkulma yükü (N). */
+  burkulmaYukuKrN: number;
+  izinVerilenBurkulmaYukuN: number;
+  burkulmaUygun: boolean;
+  /** Kesitin salt akma (ezilme) yükü, A×Fy (N). */
+  akmaYukuN: number;
+  izinVerilenAkmaYukuN: number;
+  akmaUygun: boolean;
+  /** min(izinVerilenBurkulma, izinVerilenAkma) / eksenelYük; 1'in altındaysa yetersiz demektir. */
+  guvenlikOrani: number;
+  /** Narinlik oranı KL/r - bilgi amaçlı; genelde 200'ü aşan değerler aşırı narin kabul edilir. */
+  narinlikOrani: number;
+  durum: "uygun" | "sinirda" | "yetersiz";
+  aciklama: string;
+}
+
+/** Eksenel basınç altındaki bir kolon/elemanın burkulma (Euler) ve akma (ezilme) kontrolünü yapar.
+ * Gerçek kapasite, iki modun (burkulma/akma) daha düşük olanıyla sınırlıdır. */
+export function kolonBurkulmaKontrolEt(girdi: KolonBurkulmaGirdi): KolonBurkulmaSonucu {
+  const { boyMm, eksenelYukN, kesit } = girdi;
+  if (boyMm <= 0) throw new HesaplamaHatasi("Kolon burkulma kontrolü için boy 0'dan büyük olmalı.");
+  if (eksenelYukN < 0) throw new HesaplamaHatasi("Eksenel yük negatif olamaz.");
+  if (kesit.ixMm4 <= 0 || kesit.alanMm2 <= 0) throw new HesaplamaHatasi("Geçersiz kesit özellikleri.");
+
+  const celikSinifi = girdi.celikSinifi ?? "S235";
+  const fy = CELIK_AKMA_DAYANIMI_MPA[celikSinifi];
+  const guvenlikKatsayisi = girdi.guvenlikKatsayisi ?? VARSAYILAN_GUVENLIK_KATSAYISI;
+  const K = girdi.etkinBoyFaktoru ?? 1;
+
+  const E = CELIK_E_MPA;
+  const I = kesit.ixMm4;
+  const A = kesit.alanMm2;
+  const etkinBoyMm = K * boyMm;
+
+  const burkulmaYukuKrN = (Math.PI ** 2 * E * I) / etkinBoyMm ** 2;
+  const izinVerilenBurkulmaYukuN = burkulmaYukuKrN / guvenlikKatsayisi;
+  const akmaYukuN = A * fy;
+  const izinVerilenAkmaYukuN = akmaYukuN / guvenlikKatsayisi;
+
+  const izinVerilenN = Math.min(izinVerilenBurkulmaYukuN, izinVerilenAkmaYukuN);
+  const burkulmaUygun = eksenelYukN <= izinVerilenBurkulmaYukuN;
+  const akmaUygun = eksenelYukN <= izinVerilenAkmaYukuN;
+  const guvenlikOrani = eksenelYukN > 0 ? izinVerilenN / eksenelYukN : Infinity;
+  const narinlikOrani = etkinBoyMm / Math.sqrt(I / A);
+
+  let durum: KolonBurkulmaSonucu["durum"];
+  if (!burkulmaUygun || !akmaUygun) durum = "yetersiz";
+  else if (eksenelYukN > 0.85 * izinVerilenN) durum = "sinirda";
+  else durum = "uygun";
+
+  const aciklama =
+    durum === "yetersiz"
+      ? !burkulmaUygun
+        ? "Burkulma (elastik stabilite) sınırı aşılıyor - daha güçlü/kalın kesit seçin veya boyu (mesnet aralığını) azaltın."
+        : "Akma (ezilme) sınırı aşılıyor - daha güçlü bir profil seçin."
+      : durum === "sinirda"
+      ? "Sınırların içinde ama payı az; ek güvenlik için daha güçlü profil düşünülebilir."
+      : "Hesaplanan eksenel yük altında profil yeterli.";
+
+  return {
+    eksenelYukN: Math.round(eksenelYukN),
+    burkulmaYukuKrN: Math.round(burkulmaYukuKrN),
+    izinVerilenBurkulmaYukuN: Math.round(izinVerilenBurkulmaYukuN),
+    burkulmaUygun,
+    akmaYukuN: Math.round(akmaYukuN),
+    izinVerilenAkmaYukuN: Math.round(izinVerilenAkmaYukuN),
+    akmaUygun,
+    guvenlikOrani: Math.round(guvenlikOrani * 100) / 100,
+    narinlikOrani: Math.round(narinlikOrani * 10) / 10,
+    durum,
+    aciklama,
+  };
+}

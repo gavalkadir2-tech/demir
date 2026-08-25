@@ -27,28 +27,53 @@ export default function YapiselKontrolGorunum({ kontrol }: { kontrol: YapiselKon
               <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-white/60">{DURUM_ETIKET[k.durum]}</span>
             </div>
             <div className="text-xs opacity-80 mt-0.5">{k.yukAciklamasi}</div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 text-xs">
-              <div>
-                <div className="opacity-70">Sehim</div>
-                <div className="font-bold">
-                  {k.maxSehimMm} / {k.izinVerilenSehimMm} mm
+            {k.tur === "kolon" ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 text-xs">
+                <div>
+                  <div className="opacity-70">Burkulma Yükü</div>
+                  <div className="font-bold">
+                    {k.eksenelYukN} / {k.izinVerilenBurkulmaYukuN} N
+                  </div>
+                </div>
+                <div>
+                  <div className="opacity-70">Akma (Ezilme) Yükü</div>
+                  <div className="font-bold">
+                    {k.eksenelYukN} / {k.izinVerilenAkmaYukuN} N
+                  </div>
+                </div>
+                <div>
+                  <div className="opacity-70">Güvenlik oranı</div>
+                  <div className="font-bold">{k.guvenlikOrani}×</div>
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <div className="opacity-70">Sonuç</div>
+                  <div className="font-medium">{k.aciklama}</div>
                 </div>
               </div>
-              <div>
-                <div className="opacity-70">Gerilme</div>
-                <div className="font-bold">
-                  {k.maxGerilmeMPa} / {k.izinVerilenGerilmeMPa} MPa
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 text-xs">
+                <div>
+                  <div className="opacity-70">Sehim</div>
+                  <div className="font-bold">
+                    {k.maxSehimMm} / {k.izinVerilenSehimMm} mm
+                  </div>
+                </div>
+                <div>
+                  <div className="opacity-70">Gerilme</div>
+                  <div className="font-bold">
+                    {k.maxGerilmeMPa} / {k.izinVerilenGerilmeMPa} MPa
+                  </div>
+                </div>
+                <div>
+                  <div className="opacity-70">Güvenlik oranı</div>
+                  <div className="font-bold">{k.guvenlikOrani}×</div>
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <div className="opacity-70">Sonuç</div>
+                  <div className="font-medium">{k.aciklama}</div>
                 </div>
               </div>
-              <div>
-                <div className="opacity-70">Güvenlik oranı</div>
-                <div className="font-bold">{k.guvenlikOrani}×</div>
-              </div>
-              <div className="col-span-2 sm:col-span-1">
-                <div className="opacity-70">Sonuç</div>
-                <div className="font-medium">{k.aciklama}</div>
-              </div>
-            </div>
+            )}
           </div>
         ))}
       </div>

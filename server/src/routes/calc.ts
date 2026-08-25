@@ -26,6 +26,7 @@ const railingSchema = z.object({
   plakaEnMm: z.number().optional(),
   plakaBoyMm: z.number().optional(),
   plakaKalinlikMm: z.number().optional(),
+  plakaMalzemeId: z.number().int().optional(),
   ankrajSayisiPerPlaka: z.number().int().optional(),
 });
 
@@ -37,6 +38,7 @@ const stairsSchema = z.object({
   tasiyiciProfilId: z.number().int(),
   tasiyiciAdet: z.number().int().optional(),
   basamakKalinlikMm: z.number().optional(),
+  basamakSacMalzemeId: z.number().int().optional(),
   korkulukYuksekligiMm: z.number().optional(),
   korkulukDikmeProfilId: z.number().int().optional(),
   korkulukUstProfilId: z.number().int().optional(),
@@ -52,6 +54,7 @@ const spiralStairsSchema = z.object({
   merkezKolonProfilId: z.number().int(),
   basamakDestekProfilId: z.number().int(),
   basamakKalinlikMm: z.number().optional(),
+  basamakSacMalzemeId: z.number().int().optional(),
   korkulukVar: z.boolean().optional(),
   korkulukYuksekligiMm: z.number().optional(),
   korkulukDikmeProfilId: z.number().int().optional(),
@@ -74,6 +77,7 @@ const canopySchema = z.object({
   plakaEnMm: z.number().optional(),
   plakaBoyMm: z.number().optional(),
   plakaKalinlikMm: z.number().optional(),
+  plakaMalzemeId: z.number().int().optional(),
   ankrajSayisiPerPlaka: z.number().int().optional(),
 });
 
@@ -87,6 +91,7 @@ const doorSchema = z.object({
   araKayitSayisi: z.number().int().optional(),
   sacKalinlikMm: z.number().optional(),
   sacIkiYuzlu: z.boolean().optional(),
+  sacMalzemeId: z.number().int().optional(),
   menteseAdet: z.number().int().optional(),
   kilitAdet: z.number().int().optional(),
   kolAdet: z.number().int().optional(),
@@ -135,6 +140,7 @@ const trussSchema = z.object({
   plakaEnMm: z.number().optional(),
   plakaBoyMm: z.number().optional(),
   plakaKalinlikMm: z.number().optional(),
+  plakaMalzemeId: z.number().int().optional(),
   ankrajSayisiPerPlaka: z.number().int().optional(),
   stabiliteBaglantisiVar: z.boolean().optional(),
   stabiliteProfilId: z.number().int().optional(),
@@ -154,6 +160,7 @@ const shelfSchema = z.object({
   rafCercevesiProfilId: z.number().int(),
   rafSacKullan: z.boolean().optional(),
   sacKalinlikMm: z.number().optional(),
+  rafSacMalzemeId: z.number().int().optional(),
   caprazProfilId: z.number().int().optional(),
   tasarimYukuKgM2: z.number().optional(),
 });
@@ -171,6 +178,7 @@ const pergolaSchema = z.object({
   plakaEnMm: z.number().optional(),
   plakaBoyMm: z.number().optional(),
   plakaKalinlikMm: z.number().optional(),
+  plakaMalzemeId: z.number().int().optional(),
   ankrajSayisiPerPlaka: z.number().int().optional(),
 });
 
@@ -202,6 +210,7 @@ const steelFrameSchema = z.object({
   plakaEnMm: z.number().optional(),
   plakaBoyMm: z.number().optional(),
   plakaKalinlikMm: z.number().optional(),
+  plakaMalzemeId: z.number().int().optional(),
   ankrajSayisiPerPlaka: z.number().int().optional(),
 });
 
