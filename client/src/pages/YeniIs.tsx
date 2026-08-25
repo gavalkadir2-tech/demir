@@ -17,7 +17,6 @@ import MaterialSelect from "../components/MaterialSelect";
 import HesapSonucuGorunum from "../components/HesapSonucuGorunum";
 import YapiselKontrolGorunum from "../components/YapiselKontrolGorunum";
 import SemaGorunum from "../components/SemaGorunum";
-import TrussIsometricView from "../components/TrussIsometricView";
 
 const TEMPLATE_KATEGORI: Record<string, ProjectCategory> = {
   railing: "RAILING",
@@ -495,7 +494,6 @@ export function UrunFormu({
   const [aiDanisman, setAiDanisman] = useState<AiDanismanSonucu | null>(null);
   const [aiDanismanYukleniyor, setAiDanismanYukleniyor] = useState(false);
   const [aiDanismanHata, setAiDanismanHata] = useState<string | null>(null);
-  const [goster3D, setGoster3D] = useState(false);
 
   const hesapla = async () => {
     setHesaplaniyor(true);
@@ -503,7 +501,6 @@ export function UrunFormu({
     setOnizleme(null);
     setAiDanisman(null);
     setAiDanismanHata(null);
-    setGoster3D(false);
     try {
       const r = await api.post<{ sonuc: UrunHesapSonucu; malzemeler: Record<string, Material>; yapiselKontrol?: YapiselKontrolSonucu }>(
         `/calc/${templateKey}`,
@@ -596,32 +593,12 @@ export function UrunFormu({
       {onizleme && (
         <div className="card space-y-4">
           <h2 className="font-bold text-lg">Hesap Sonucu</h2>
-          <SemaGorunum templateKey={templateKey} params={params} ozetDegerler={onizleme.sonuc.ozetDegerler} />
-
-          {templateKey === "truss" && (
-            <div>
-              <button className="btn-secondary btn-sm" onClick={() => setGoster3D((v) => !v)}>
-                {goster3D ? "▼ 3D Görünümü Gizle" : "🧊 3D Görünümü Göster"}
-              </button>
-              {goster3D && (
-                <div className="mt-3">
-                  <TrussIsometricView
-                    veri={{
-                      acikligMm: Number(params.acikligMm ?? 0),
-                      egimYuzde: Number(params.egimYuzde ?? 0),
-                      catiUzunluguMm: Number(params.catiUzunluguMm ?? 0),
-                      kafesSayisi: onizleme.sonuc.ozetDegerler.kafesSayisi ?? 2,
-                      gercekAralikMm: onizleme.sonuc.ozetDegerler.gercekAralikMm ?? Number(params.catiUzunluguMm ?? 0),
-                      asikVar: Boolean(params.asikProfilId),
-                      asikAraligiHedefMm: Number(params.asikAraligiHedefMm ?? 1000),
-                      stabiliteVar: Boolean(params.stabiliteBaglantisiVar && params.stabiliteProfilId),
-                      kaplamaGoster: params.kaplamaTuru !== "yok",
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-          )}
+          <SemaGorunum
+            templateKey={templateKey}
+            params={params}
+            ozetDegerler={onizleme.sonuc.ozetDegerler}
+            malzemeler={onizleme.malzemeler}
+          />
 
           <HesapSonucuGorunum sonuc={onizleme.sonuc} malzemeler={onizleme.malzemeler} />
 

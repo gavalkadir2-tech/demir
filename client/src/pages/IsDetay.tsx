@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import {
@@ -583,6 +583,12 @@ function ParcalarTab({ proje, onChanged }: { proje: Project; onChanged: () => vo
 
   const manuelParcalar = (proje.parts ?? []).filter((p) => !p.projectItemId);
 
+  const malzemeSozlugu = useMemo(() => {
+    const d: Record<string, Material> = {};
+    for (const p of proje.parts ?? []) d[String(p.materialId)] = p.material;
+    return d;
+  }, [proje.parts]);
+
   return (
     <div className="space-y-6">
       {proje.agirlikOzeti && (
@@ -626,7 +632,12 @@ function ParcalarTab({ proje, onChanged }: { proje: Project; onChanged: () => vo
             </div>
           </div>
           <div className="mb-3">
-            <SemaGorunum templateKey={item.template.key} params={item.paramsJson} ozetDegerler={item.resultJson.ozetDegerler} />
+            <SemaGorunum
+              templateKey={item.template.key}
+              params={item.paramsJson}
+              ozetDegerler={item.resultJson.ozetDegerler}
+              malzemeler={malzemeSozlugu}
+            />
           </div>
           <PartTable
             parcalar={(proje.parts ?? []).filter((p) => p.projectItemId === item.id)}

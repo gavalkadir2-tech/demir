@@ -1,4 +1,21 @@
-import { OkTanimlari, YatayOlcu, DikeyOlcu, mmEtiket, PALET, Lejant, VIEW_W, VIEW_H, LEGEND_H } from "./schematicShared";
+import { useState } from "react";
+import {
+  OkTanimlari,
+  YatayOlcu,
+  DikeyOlcu,
+  mmEtiket,
+  PALET,
+  Lejant,
+  VIEW_W,
+  VIEW_H,
+  LEGEND_H,
+  KesitOlcusu,
+  olcekliKalinlikPx,
+  GorunumSekmeleri,
+  SemaGorunumTipi,
+  Izometrik3DSahne,
+  Kiris3D,
+} from "./schematicShared";
 
 export interface DuvarBoslukVeri {
   etiket: string;
@@ -16,21 +33,18 @@ export interface DuvarPaneliSemaVeri {
   bosluklar?: DuvarBoslukVeri[];
   disKaplamaVar?: boolean;
   icKaplamaVar?: boolean;
+  dikmeKesit?: KesitOlcusu;
+  rayKesit?: KesitOlcusu;
 }
 
 const MARGIN_LEFT = 70;
 const MARGIN_RIGHT = 20;
 const MARGIN_TOP = 20;
 const MARGIN_BOTTOM = 70;
-const RAY_KALINLIK = 5;
-const DIKME_GENISLIK = 6;
 const EPSILON = 1;
 
-/** Duvar panelinin önden görünüşünü (dikme/ray/boşluk) ölçekli, ölçüleri etiketli SVG olarak gösterir. */
-export default function WallSchematic({ veri }: { veri: DuvarPaneliSemaVeri }) {
-  const { genislikMm, yukseklikMm, dikmeAraligiHedefMm, bosluklar = [], disKaplamaVar = false, icKaplamaVar = false } = veri;
-  if (!genislikMm || !yukseklikMm || !dikmeAraligiHedefMm) return null;
-
+function dikmePozisyonHesapla(veri: DuvarPaneliSemaVeri) {
+  const { genislikMm, yukseklikMm, dikmeAraligiHedefMm, bosluklar = [] } = veri;
   const gecerliBosluklar = bosluklar
     .map((b) => ({ ...b, tabanYuksekligiMm: Math.max(0, b.tabanYuksekligiMm ?? 0) }))
     .filter(
@@ -56,6 +70,12 @@ export default function WallSchematic({ veri }: { veri: DuvarPaneliSemaVeri }) {
     }
   }
   dikmePozisyonlari.sort((a, b) => a - b);
+  return { gecerliBosluklar, dikmePozisyonlari };
+}
+
+function OndenGorunum({ veri }: { veri: DuvarPaneliSemaVeri }) {
+  const { genislikMm, yukseklikMm, disKaplamaVar = false, icKaplamaVar = false, dikmeKesit, rayKesit } = veri;
+  const { gecerliBosluklar, dikmePozisyonlari } = dikmePozisyonHesapla(veri);
 
   const drawW = VIEW_W - MARGIN_LEFT - MARGIN_RIGHT;
   const drawH = VIEW_H - MARGIN_TOP - MARGIN_BOTTOM;
@@ -67,7 +87,9 @@ export default function WallSchematic({ veri }: { veri: DuvarPaneliSemaVeri }) {
   const topY = MARGIN_TOP + (drawH - scaledH);
   const groundY = topY + scaledH;
 
-  // Alt ray segmentleri: sadece tabana inen (kapı gibi) boşluklar keser.
+  const dikmeGenislik = olcekliKalinlikPx(dikmeKesit?.enMm ?? 40, scale, 2);
+  const rayKalinlik = olcekliKalinlikPx(rayKesit?.kalinlikMm ?? 40, scale, 2);
+
   const tabanaInenler = gecerliBosluklar.filter((b) => b.tabanYuksekligiMm <= EPSILON);
   const altRaySegmentleri: { x1: number; x2: number }[] = [];
   let imlec = 0;
@@ -89,12 +111,7 @@ export default function WallSchematic({ veri }: { veri: DuvarPaneliSemaVeri }) {
   ];
 
   return (
-    <svg
-      viewBox={`0 0 ${VIEW_W} ${VIEW_H + LEGEND_H}`}
-      className="w-full h-auto"
-      role="img"
-      aria-label="Duvar paneli şematik çizimi"
-    >
+    <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H + LEGEND_H}`} className="w-full h-auto" role="img" aria-label="Duvar paneli önden görünüş şematik çizimi">
       <OkTanimlari />
 
       <line x1={x0 - 15} y1={groundY} x2={x0 + scaledW + 15} y2={groundY} stroke="#a3a3a3" strokeWidth={2} />
@@ -104,57 +121,30 @@ export default function WallSchematic({ veri }: { veri: DuvarPaneliSemaVeri }) {
       )}
       {icKaplamaVar && <rect x={x0} y={topY} width={scaledW} height={scaledH} fill={PALET.ikincil} opacity={0.12} />}
 
-      {/* Boşluk kesim alanları */}
-      {gecerliBosluklar.map((b, i) => {
-        const bosAltY = groundY - b.tabanYuksekligiMm * scale;
-        const bosUstY = bosAltY - b.yukseklikMm * scale;
+      {gecerliBosluklar.map((bb, i) => {
+        const bosAltY = groundY - bb.tabanYuksekligiMm * scale;
+        const bosUstY = bosAltY - bb.yukseklikMm * scale;
         return (
           <g key={i}>
-            <rect
-              x={x0 + b.konumMm * scale}
-              y={bosUstY}
-              width={b.genislikMm * scale}
-              height={b.yukseklikMm * scale}
-              fill="#ffffff"
-              stroke="#d4d4d4"
-              strokeDasharray="3 2"
-            />
-            {/* Lento (üst) */}
-            <rect
-              x={x0 + b.konumMm * scale}
-              y={bosUstY - RAY_KALINLIK}
-              width={b.genislikMm * scale}
-              height={RAY_KALINLIK}
-              fill={PALET.vurgu}
-            />
-            {/* Eşik (alt) - tabana inmeyen boşluklarda */}
-            {b.tabanYuksekligiMm > EPSILON && (
-              <rect x={x0 + b.konumMm * scale} y={bosAltY} width={b.genislikMm * scale} height={RAY_KALINLIK} fill={PALET.vurgu} />
+            <rect x={x0 + bb.konumMm * scale} y={bosUstY} width={bb.genislikMm * scale} height={bb.yukseklikMm * scale} fill="#ffffff" stroke="#d4d4d4" strokeDasharray="3 2" />
+            <rect x={x0 + bb.konumMm * scale} y={bosUstY - rayKalinlik} width={bb.genislikMm * scale} height={rayKalinlik} fill={PALET.vurgu} />
+            {bb.tabanYuksekligiMm > EPSILON && (
+              <rect x={x0 + bb.konumMm * scale} y={bosAltY} width={bb.genislikMm * scale} height={rayKalinlik} fill={PALET.vurgu} />
             )}
-            <text x={x0 + (b.konumMm + b.genislikMm / 2) * scale} y={bosUstY + 14} textAnchor="middle" fontSize={10} fill="#a3a3a3">
-              {b.etiket} ({mmEtiket(b.genislikMm)})
+            <text x={x0 + (bb.konumMm + bb.genislikMm / 2) * scale} y={bosUstY + 14} textAnchor="middle" fontSize={10} fill="#a3a3a3">
+              {bb.etiket} ({mmEtiket(bb.genislikMm)})
             </text>
           </g>
         );
       })}
 
-      {/* Dikmeler */}
       {dikmePozisyonlari.map((px, i) => (
-        <rect key={i} x={x0 + px * scale - DIKME_GENISLIK / 2} y={topY} width={DIKME_GENISLIK} height={scaledH} fill={PALET.ana} />
+        <rect key={i} x={x0 + px * scale - dikmeGenislik / 2} y={topY} width={dikmeGenislik} height={scaledH} fill={PALET.ana} />
       ))}
 
-      {/* Üst ray (kesintisiz) */}
-      <rect x={x0} y={topY} width={scaledW} height={RAY_KALINLIK} fill={PALET.yatay} />
-      {/* Alt ray segmentleri */}
+      <rect x={x0} y={topY} width={scaledW} height={rayKalinlik} fill={PALET.yatay} />
       {altRaySegmentleri.map((s, i) => (
-        <rect
-          key={i}
-          x={x0 + s.x1 * scale}
-          y={groundY - RAY_KALINLIK}
-          width={(s.x2 - s.x1) * scale}
-          height={RAY_KALINLIK}
-          fill={PALET.yatay}
-        />
+        <rect key={i} x={x0 + s.x1 * scale} y={groundY - rayKalinlik} width={(s.x2 - s.x1) * scale} height={rayKalinlik} fill={PALET.yatay} />
       ))}
 
       <YatayOlcu x1={x0} x2={x0 + scaledW} y={dimGenislikY} etiket={mmEtiket(genislikMm)} />
@@ -162,5 +152,75 @@ export default function WallSchematic({ veri }: { veri: DuvarPaneliSemaVeri }) {
 
       <Lejant kalemler={lejant} y={VIEW_H + 6} />
     </svg>
+  );
+}
+
+function UstenGorunum({ veri }: { veri: DuvarPaneliSemaVeri }) {
+  const { genislikMm, dikmeKesit } = veri;
+  const { dikmePozisyonlari } = dikmePozisyonHesapla(veri);
+  const derinlikMm = dikmeKesit?.kalinlikMm ?? 40;
+  const en = dikmeKesit?.enMm ?? 40;
+
+  const drawW = VIEW_W - MARGIN_LEFT - MARGIN_RIGHT;
+  const scale = drawW / genislikMm;
+  const cy = VIEW_H / 2 - 10;
+  const x0 = MARGIN_LEFT;
+  const scaledW = genislikMm * scale;
+
+  const postW = Math.max(4, en * scale);
+  const postD = Math.max(4, derinlikMm * scale);
+
+  return (
+    <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H + LEGEND_H}`} className="w-full h-auto" role="img" aria-label="Duvar paneli üstten (plan) görünüş şematik çizimi">
+      <OkTanimlari />
+      <text x={x0} y={cy - postD / 2 - 20} fontSize={11} fill="#a3a3a3">
+        Üstten görünüş (dikme yerleşim planı)
+      </text>
+      <line x1={x0} y1={cy} x2={x0 + scaledW} y2={cy} stroke="#d4d4d4" strokeDasharray="4 3" />
+      {dikmePozisyonlari.map((px, i) => (
+        <rect key={i} x={x0 + px * scale - postW / 2} y={cy - postD / 2} width={postW} height={postD} fill={PALET.ana} />
+      ))}
+      <YatayOlcu x1={x0} x2={x0 + scaledW} y={cy + postD / 2 + 30} etiket={mmEtiket(genislikMm)} />
+      <text x={x0 + scaledW / 2} y={cy + postD / 2 + 55} textAnchor="middle" fontSize={11} fill="#525252">
+        dikme kesiti: {mmEtiket(en)} × {mmEtiket(derinlikMm)}
+      </text>
+      <Lejant kalemler={[{ renk: PALET.ana, etiket: "Dikme (kesit izi)" }]} y={VIEW_H + 6} />
+    </svg>
+  );
+}
+
+function Gorunum3D({ veri }: { veri: DuvarPaneliSemaVeri }) {
+  const { genislikMm, yukseklikMm, dikmeKesit, rayKesit } = veri;
+  const { dikmePozisyonlari } = dikmePozisyonHesapla(veri);
+
+  const kirisler: Kiris3D[] = [];
+  dikmePozisyonlari.forEach((x, i) => {
+    kirisler.push({ a: [x, 0, 0], b: [x, yukseklikMm, 0], enMm: dikmeKesit?.enMm ?? 40, renk: PALET.ana, etiket: i === 0 ? mmEtiket(yukseklikMm) : undefined });
+  });
+  kirisler.push({ a: [0, yukseklikMm, 0], b: [genislikMm, yukseklikMm, 0], enMm: rayKesit?.kalinlikMm ?? 40, renk: PALET.yatay });
+  kirisler.push({ a: [0, 0, 0], b: [genislikMm, 0, 0], enMm: rayKesit?.kalinlikMm ?? 40, renk: PALET.yatay, etiket: mmEtiket(genislikMm) });
+
+  const lejant = [
+    { renk: PALET.ana, etiket: "Dikme" },
+    { renk: PALET.yatay, etiket: "Üst/Alt Ray" },
+  ];
+
+  return <Izometrik3DSahne kirisler={kirisler} lejant={lejant} ariaLabel="Duvar paneli 3D izometrik görünüm" />;
+}
+
+/** Duvar panelinin önden/üstten/3D görünüşlerini, seçilen dikme/ray profilinin gerçek
+ * ölçüsüyle tutarlı, ölçekli bir çizim olarak gösterir. */
+export default function WallSchematic({ veri }: { veri: DuvarPaneliSemaVeri }) {
+  const [gorunum, setGorunum] = useState<SemaGorunumTipi>("on");
+  const { genislikMm, yukseklikMm, dikmeAraligiHedefMm } = veri;
+  if (!genislikMm || !yukseklikMm || !dikmeAraligiHedefMm) return null;
+
+  return (
+    <div>
+      <GorunumSekmeleri aktif={gorunum} onSec={setGorunum} secenekler={["on", "ust", "3d"]} />
+      {gorunum === "on" && <OndenGorunum veri={veri} />}
+      {gorunum === "ust" && <UstenGorunum veri={veri} />}
+      {gorunum === "3d" && <Gorunum3D veri={veri} />}
+    </div>
   );
 }

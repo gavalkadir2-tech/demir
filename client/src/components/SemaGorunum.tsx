@@ -1,3 +1,5 @@
+import { Material } from "../api/types";
+import { kesitOlcusu } from "./schematicShared";
 import RailingSchematic from "./RailingSchematic";
 import StairsSchematic from "./StairsSchematic";
 import CanopySchematic from "./CanopySchematic";
@@ -10,17 +12,28 @@ import PergolaSchematic from "./PergolaSchematic";
 import FerforjePanelSchematic from "./FerforjePanelSchematic";
 import SteelFrameSchematic from "./SteelFrameSchematic";
 
-/** Ürün şablonuna göre uygun şematik çizimi seçip render eder (railing/stairs/canopy/door). */
+/** Ürün şablonuna göre uygun şematik çizimi seçip render eder. Seçilen malzemelerin gerçek
+ * kesit ölçülerini (widthMm/heightMm) çözüp her şemaya iletir; böylece çizimdeki profil
+ * kalınlıkları sabit bir varsayım değil, kullanıcının seçtiği malzemeyle tutarlı olur. */
 export default function SemaGorunum({
   templateKey,
   params,
   ozetDegerler,
+  malzemeler,
 }: {
   templateKey: string;
   params: Record<string, unknown>;
   ozetDegerler: Record<string, number>;
+  /** materialId (string) -> Material sözlüğü; hesap önizlemesinden veya kayıtlı parçalardan gelir. */
+  malzemeler: Record<string, Material>;
 }) {
   const n = (k: string): number => Number(params[k] ?? 0);
+  const b = (k: string): boolean => Boolean(params[k]);
+  const mat = (k: string): Material | undefined => {
+    const v = params[k];
+    return typeof v === "number" ? malzemeler[String(v)] : undefined;
+  };
+  const kesit = (k: string) => kesitOlcusu(mat(k));
 
   switch (templateKey) {
     case "railing":
@@ -33,6 +46,10 @@ export default function SemaGorunum({
             dikmeSayisi: ozetDegerler.dikmeSayisi,
             araliklarSayisi: ozetDegerler.araliklarSayisi,
             gercekAralikMm: ozetDegerler.gercekAralikMm,
+            dikmeKesit: kesit("dikmeProfilId"),
+            ustProfilKesit: kesit("ustProfilId"),
+            altProfilKesit: kesit("altProfilId"),
+            araKayitKesit: kesit("araKayitProfilId"),
           }}
         />
       );
@@ -41,11 +58,15 @@ export default function SemaGorunum({
         <StairsSchematic
           veri={{
             katYuksekligiMm: n("katYuksekligiMm"),
+            genislikMm: n("genislikMm"),
             basamakDerinligiMm: ozetDegerler.basamakDerinligiMm,
             basamakSayisi: ozetDegerler.basamakSayisi,
             gercekBasamakYuksekligiMm: ozetDegerler.gercekBasamakYuksekligiMm,
             kosegenMm: ozetDegerler.kosegenMm,
             egimAcisiDerece: ozetDegerler.egimAcisiDerece,
+            tasiyiciAdet: n("tasiyiciAdet") || 2,
+            basamakKalinlikMm: n("basamakKalinlikMm") || 3,
+            tasiyiciKesit: kesit("tasiyiciProfilId"),
           }}
         />
       );
@@ -55,9 +76,13 @@ export default function SemaGorunum({
           veri={{
             yukseklikMm: n("yukseklikMm"),
             boyMm: n("boyMm"),
+            genislikMm: n("genislikMm"),
             egimYuzde: n("egimYuzde"),
+            dikmeSayisi: n("dikmeSayisi") || 2,
             kirisUzunlukMm: ozetDegerler.kirisUzunlukMm,
             egimDerece: ozetDegerler.egimDerece,
+            dikmeKesit: kesit("dikmeProfilId"),
+            anaTasiyiciKesit: kesit("anaTasiyiciProfilId"),
           }}
         />
       );
@@ -70,6 +95,9 @@ export default function SemaGorunum({
             kanatGenislikMm: ozetDegerler.kanatGenislikMm,
             kanatYukseklikMm: ozetDegerler.kanatYukseklikMm,
             araKayitSayisi: n("araKayitSayisi"),
+            sacKalinlikMm: n("sacKalinlikMm") || 1.5,
+            kasaKesit: kesit("kasaProfilId"),
+            kanatKesit: kesit("kanatProfilId"),
           }}
         />
       );
@@ -83,6 +111,8 @@ export default function SemaGorunum({
             bosluklar: (params.bosluklar as DuvarBoslukVeri[] | undefined) ?? [],
             disKaplamaVar: Boolean(params.disKaplamaTuru && params.disKaplamaTuru !== "yok"),
             icKaplamaVar: Boolean(params.icKaplamaTuru && params.icKaplamaTuru !== "yok"),
+            dikmeKesit: kesit("dikmeProfilId"),
+            rayKesit: kesit("ustProfilId"),
           }}
         />
       );
@@ -93,14 +123,17 @@ export default function SemaGorunum({
             acikligMm: n("acikligMm"),
             egimYuzde: n("egimYuzde"),
             catiUzunluguMm: n("catiUzunluguMm"),
-            asikVar: Boolean(params.asikProfilId),
+            asikVar: b("asikProfilId"),
             asikAraligiHedefMm: n("asikAraligiHedefMm") || 1000,
-            diyagonalVar: Boolean(params.diyagonalProfilId),
+            diyagonalVar: b("diyagonalProfilId"),
             diyagonalPanelSayisi: ozetDegerler.diyagonalPanelSayisi,
             kafesSayisi: ozetDegerler.kafesSayisi,
             gercekAralikMm: ozetDegerler.gercekAralikMm,
             stabiliteVar: Boolean(params.stabiliteBaglantisiVar && params.stabiliteProfilId),
             direkSayisi: Number(params.direkSayisi ?? 0),
+            ustBaslikKesit: kesit("ustBaslikProfilId"),
+            kralKirisiKesit: kesit("kralKirisiProfilId"),
+            asikKesit: kesit("asikProfilId"),
           }}
         />
       );
@@ -112,7 +145,9 @@ export default function SemaGorunum({
             disCapMm: n("disCapMm"),
             basamakSayisi: ozetDegerler.basamakSayisi,
             toplamDonusDerecesi: n("toplamDonusDerecesi"),
-            korkulukVar: Boolean(params.korkulukVar),
+            korkulukVar: b("korkulukVar"),
+            katYuksekligiMm: n("katYuksekligiMm"),
+            merkezKolonKesit: kesit("merkezKolonProfilId"),
           }}
         />
       );
@@ -125,8 +160,11 @@ export default function SemaGorunum({
             yukseklikMm: n("yukseklikMm"),
             rafSayisi: ozetDegerler.rafSayisi,
             rafAraligiMm: ozetDegerler.rafAraligiMm,
-            sacVar: Boolean(params.rafSacKullan),
-            caprazVar: Boolean(params.caprazProfilId),
+            sacVar: b("rafSacKullan"),
+            caprazVar: b("caprazProfilId"),
+            ayakKesit: kesit("ayakProfilId"),
+            rafCercevesiKesit: kesit("rafCercevesiProfilId"),
+            sacKalinlikMm: n("sacKalinlikMm") || 1.5,
           }}
         />
       );
@@ -136,10 +174,13 @@ export default function SemaGorunum({
           veri={{
             genislikMm: n("genislikMm"),
             boyMm: n("boyMm"),
+            yukseklikMm: n("yukseklikMm"),
             kolonSiraAdedi: ozetDegerler.kolonSiraAdedi,
             lataYonu: (params.lataYonu as "genislik" | "boy" | undefined) ?? "genislik",
             lataSayisi: ozetDegerler.lataSayisi,
             gercekLataAralikMm: ozetDegerler.gercekLataAralikMm,
+            kolonKesit: kesit("kolonProfilId"),
+            kirisKesit: kesit("kirisProfilId"),
           }}
         />
       );
@@ -152,7 +193,9 @@ export default function SemaGorunum({
             dikeyCubukSayisi: ozetDegerler.dikeyCubukSayisi,
             gercekAralikMm: ozetDegerler.gercekAralikMm,
             yatayAraKayitSayisi: Number(params.yatayAraKayitSayisi ?? 0),
-            susVar: Boolean(params.susVar),
+            susVar: b("susVar"),
+            cerceveKesit: kesit("cerceveProfilId"),
+            cubukKesit: kesit("dikeyCubukProfilId"),
           }}
         />
       );
@@ -161,12 +204,15 @@ export default function SemaGorunum({
         <SteelFrameSchematic
           veri={{
             acikligMm: n("acikligMm"),
+            uzunlukMm: n("uzunlukMm"),
             yukseklikMm: n("yukseklikMm"),
             acikSayisi: n("acikSayisi") || 1,
             cerceveSayisi: ozetDegerler.cerceveSayisi,
             gercekAralikMm: ozetDegerler.gercekAralikMm,
-            baglantiKirisiVar: Boolean(params.baglantiKirisiProfilId),
+            baglantiKirisiVar: b("baglantiKirisiProfilId"),
             stabiliteVar: Boolean(params.stabiliteBaglantisiVar && params.stabiliteProfilId),
+            kolonKesit: kesit("kolonProfilId"),
+            kirisKesit: kesit("kirisProfilId"),
           }}
         />
       );
