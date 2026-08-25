@@ -78,6 +78,7 @@ export default function SemaGorunum({
             yukseklikMm: n("yukseklikMm"),
             dikmeAraligiHedefMm: n("dikmeAraligiHedefMm"),
             bosluklar: (params.bosluklar as DuvarBoslukVeri[] | undefined) ?? [],
+            kaplamaVar: Boolean(params.kaplamaTuru && params.kaplamaTuru !== "yok"),
           }}
         />
       );

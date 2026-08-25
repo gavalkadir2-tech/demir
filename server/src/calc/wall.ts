@@ -9,6 +9,7 @@
 
 import { HesaplamaHatasi } from "./units";
 import { HesaplananParca, UrunHesapSonucu, bosSonuc, profilOzetOlustur } from "./types";
+import { KAPLAMA_BILGI, KaplamaTuru, kaplamaHesapla } from "./kaplama";
 
 export interface DuvarBosluk {
   /** Boşluğun adı, örn. "Kapı", "Pencere" */
@@ -40,10 +41,14 @@ export interface DuvarPaneliGirdi {
   /** Lento'nun boşluk kenarlarından taşma payı (mm), oturma payı için */
   lentoTasmaMm?: number;
   bosluklar?: DuvarBosluk[];
+  /** Duvar yüzey kaplaması/yalıtımı (prefabrik ev duvarı için sandviç panel vb.). Verilmezse çıplak karkas hesaplanır. */
+  kaplamaTuru?: KaplamaTuru;
+  kaplamaKalinlikMm?: number;
 }
 
 const VARSAYILAN = {
   lentoTasmaMm: 100,
+  kaplamaTuru: "yok" as const,
 };
 
 export function calculateWallPanel(girdi: DuvarPaneliGirdi): UrunHesapSonucu {
@@ -51,6 +56,7 @@ export function calculateWallPanel(girdi: DuvarPaneliGirdi): UrunHesapSonucu {
   const lentoProfilKey = girdi.lentoProfilKey ?? dikmeProfilKey;
   const lentoTasmaMm = girdi.lentoTasmaMm ?? VARSAYILAN.lentoTasmaMm;
   const bosluklar = girdi.bosluklar ?? [];
+  const kaplamaTuru = girdi.kaplamaTuru ?? VARSAYILAN.kaplamaTuru;
 
   if (genislikMm <= 0) throw new HesaplamaHatasi("Duvar genişliği 0'dan büyük olmalı.");
   if (yukseklikMm <= 0) throw new HesaplamaHatasi("Duvar yüksekliği 0'dan büyük olmalı.");
@@ -164,12 +170,33 @@ export function calculateWallPanel(girdi: DuvarPaneliGirdi): UrunHesapSonucu {
 
   sonuc.baglantiKalemleri.push({ label: "Ray dübeli", birim: "adet", adet: dubelSayisi });
 
+  let kaplamaOzet: ReturnType<typeof kaplamaHesapla> | null = null;
+  if (kaplamaTuru !== "yok") {
+    const kaplamaBilgisi = KAPLAMA_BILGI[kaplamaTuru];
+    kaplamaOzet = kaplamaHesapla(kaplamaTuru, yukseklikMm, genislikMm);
+    sonuc.sacKalemleri.push({
+      label: kaplamaBilgisi.label.replace("Çatı kaplaması", "Duvar kaplaması"),
+      enMm: kaplamaBilgisi.faydaliGenislikMm,
+      boyMm: Math.ceil(yukseklikMm),
+      kalinlikMm: girdi.kaplamaKalinlikMm ?? kaplamaBilgisi.varsayilanKalinlikMm,
+      adet: kaplamaOzet.panelSayisi,
+      not: `${kaplamaOzet.panelSayisi} panel (${kaplamaBilgisi.faydaliGenislikMm} mm faydalı genişlik) yan yana; net alan ${kaplamaOzet.netAlaniM2} m², sipariş edilecek alan (fire dahil, ~%${kaplamaBilgisi.tipikFireYuzde} bindirme/kesim payı) ${kaplamaOzet.siparisAlaniM2} m². Kapı/pencere boşlukları panelden sahada kesilir, ayrıca düşülmemiştir.`,
+    });
+  }
+
   sonuc.ozetDegerler = {
     dikmeSayisi: dikmePozisyonlari.length,
     araliklarSayisi,
     gercekAralikMm: Math.round(gercekAralikMm * 100) / 100,
     duvarAlaniM2: Math.round(duvarAlaniM2 * 100) / 100,
     bosluklarSayisi: siraliBosluklar.length,
+    ...(kaplamaOzet
+      ? {
+          kaplamaSiparisAlaniM2: kaplamaOzet.siparisAlaniM2,
+          kaplamaFireM2: kaplamaOzet.fireM2,
+          kaplamaFireYuzde: kaplamaOzet.fireYuzde,
+        }
+      : {}),
   };
 
   return sonuc;

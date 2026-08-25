@@ -1039,11 +1039,21 @@ function DuvarAlanlari({
   const [bosluklar, setBosluklar] = useState<DuvarBoslukTaslak[]>(
     () => (baslangic?.bosluklar as DuvarBoslukTaslak[] | undefined) ?? []
   );
+  const [kaplamaTuru, setKaplamaTuru] = useState<string>(() => (baslangic?.kaplamaTuru as string) ?? "yok");
 
   useEffect(() => {
-    onChange({ genislikMm, yukseklikMm, dikmeAraligiHedefMm, ustProfilId, altProfilId, dikmeProfilId, bosluklar });
+    onChange({
+      genislikMm,
+      yukseklikMm,
+      dikmeAraligiHedefMm,
+      ustProfilId,
+      altProfilId,
+      dikmeProfilId,
+      bosluklar,
+      kaplamaTuru: kaplamaTuru === "yok" ? undefined : kaplamaTuru,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [genislikMm, yukseklikMm, dikmeAraligiHedefMm, ustProfilId, altProfilId, dikmeProfilId, bosluklar]);
+  }, [genislikMm, yukseklikMm, dikmeAraligiHedefMm, ustProfilId, altProfilId, dikmeProfilId, bosluklar, kaplamaTuru]);
 
   const bosluklariGuncelle = (i: number, alan: keyof DuvarBoslukTaslak, deger: string | number) => {
     setBosluklar((liste) => liste.map((b, idx) => (idx === i ? { ...b, [alan]: deger } : b)));
@@ -1060,6 +1070,20 @@ function DuvarAlanlari({
         <MaterialSelect label="Üst Ray" materials={materials} value={ustProfilId} onChange={setUstProfilId} />
         <MaterialSelect label="Alt Ray" materials={materials} value={altProfilId} onChange={setAltProfilId} />
         <MaterialSelect label="Dikme Profili" materials={materials} value={dikmeProfilId} onChange={setDikmeProfilId} />
+      </div>
+      <div>
+        <label className="field-label">Duvar Kaplaması / Yalıtımı (prefabrik ev vb.)</label>
+        <select className="field-select" value={kaplamaTuru} onChange={(e) => setKaplamaTuru(e.target.value)}>
+          {KAPLAMA_TURU_SECENEKLERI.map((s) => (
+            <option key={s.key} value={s.key}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-neutral-500 mt-1">
+          Seçilirse duvar yüzeyi için panel/levha miktarı, m² sipariş alanı ve fire ile birlikte hesaplanır (tek yüz; çift
+          taraflı kaplamada iki kez ekleyin). Kapı/pencere boşlukları panelden sahada kesilir, ayrıca düşülmez.
+        </p>
       </div>
 
       <div className="rounded-xl border border-neutral-200 p-3 space-y-3">

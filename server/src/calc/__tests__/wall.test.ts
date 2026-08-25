@@ -116,6 +116,38 @@ test("duvar paneli: sınırları aşan boşlukta hata verir", () => {
   );
 });
 
+test("duvar paneli: kaplama türü belirtilmezse sac kalemi eklenmez (çıplak karkas)", () => {
+  const sonuc = calculateWallPanel({
+    genislikMm: 3000,
+    yukseklikMm: 2500,
+    dikmeAraligiHedefMm: 600,
+    ustProfilKey: "ray",
+    altProfilKey: "ray",
+    dikmeProfilKey: "dikme",
+  });
+  assert.equal(sonuc.sacKalemleri.length, 0);
+  assert.equal(sonuc.ozetDegerler.kaplamaSiparisAlaniM2, undefined);
+});
+
+test("duvar paneli: sandviç panel kaplama seçilirse sac kalemi ve sipariş alanı eklenir", () => {
+  const sonuc = calculateWallPanel({
+    genislikMm: 3000,
+    yukseklikMm: 2500,
+    dikmeAraligiHedefMm: 600,
+    ustProfilKey: "ray",
+    altProfilKey: "ray",
+    dikmeProfilKey: "dikme",
+    kaplamaTuru: "sandvic_panel",
+  });
+
+  const kaplama = sonuc.sacKalemleri.find((s) => s.label.includes("Duvar kaplaması"))!;
+  assert.ok(kaplama);
+  assert.equal(kaplama.boyMm, 2500);
+  // 3000mm genişlik / 1000mm faydalı panel genişliği = 3 panel
+  assert.equal(kaplama.adet, 3);
+  assert.ok(sonuc.ozetDegerler.kaplamaSiparisAlaniM2! > 0);
+});
+
 test("duvar paneli: çakışan boşluklarda hata verir", () => {
   assert.throws(
     () =>

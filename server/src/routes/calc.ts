@@ -109,6 +109,8 @@ const wallSchema = z.object({
   lentoProfilId: z.number().int().optional(),
   lentoTasmaMm: z.number().optional(),
   bosluklar: bosluklarSchema.optional(),
+  kaplamaTuru: kaplamaTuruEnum.optional(),
+  kaplamaKalinlikMm: z.number().optional(),
 });
 
 const trussSchema = z.object({

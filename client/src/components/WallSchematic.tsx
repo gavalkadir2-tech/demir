@@ -14,6 +14,7 @@ export interface DuvarPaneliSemaVeri {
   yukseklikMm: number;
   dikmeAraligiHedefMm: number;
   bosluklar?: DuvarBoslukVeri[];
+  kaplamaVar?: boolean;
 }
 
 const MARGIN_LEFT = 70;
@@ -26,7 +27,7 @@ const EPSILON = 1;
 
 /** Duvar panelinin önden görünüşünü (dikme/ray/boşluk) ölçekli, ölçüleri etiketli SVG olarak gösterir. */
 export default function WallSchematic({ veri }: { veri: DuvarPaneliSemaVeri }) {
-  const { genislikMm, yukseklikMm, dikmeAraligiHedefMm, bosluklar = [] } = veri;
+  const { genislikMm, yukseklikMm, dikmeAraligiHedefMm, bosluklar = [], kaplamaVar = false } = veri;
   if (!genislikMm || !yukseklikMm || !dikmeAraligiHedefMm) return null;
 
   const gecerliBosluklar = bosluklar
@@ -82,6 +83,7 @@ export default function WallSchematic({ veri }: { veri: DuvarPaneliSemaVeri }) {
     { renk: PALET.ana, etiket: "Dikme" },
     { renk: PALET.yatay, etiket: "Üst/Alt Ray" },
     ...(gecerliBosluklar.length > 0 ? [{ renk: PALET.vurgu, etiket: "Lento/Eşik" }] : []),
+    ...(kaplamaVar ? [{ renk: PALET.destek, etiket: "Kaplama Paneli" }] : []),
   ];
 
   return (
@@ -94,6 +96,8 @@ export default function WallSchematic({ veri }: { veri: DuvarPaneliSemaVeri }) {
       <OkTanimlari />
 
       <line x1={x0 - 15} y1={groundY} x2={x0 + scaledW + 15} y2={groundY} stroke="#a3a3a3" strokeWidth={2} />
+
+      {kaplamaVar && <rect x={x0} y={topY} width={scaledW} height={scaledH} fill={PALET.destek} opacity={0.15} />}
 
       {/* Boşluk kesim alanları */}
       {gecerliBosluklar.map((b, i) => {
