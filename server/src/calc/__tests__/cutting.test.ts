@@ -39,3 +39,28 @@ test("kesim optimizasyonu: boş liste güvenli döner", () => {
   assert.equal(sonuc.totalBars, 0);
   assert.equal(sonuc.totalWasteMm, 0);
 });
+
+test("kesim optimizasyonu: karışık stok boyu - küçük artan parça için en kısa uygun boy seçilir", () => {
+  // Tek 6000mm stokta: 5900+1200 sığmaz (2 çubuk gerekir, 6000'lik ikinci çubukta 4797mm fire).
+  // 6000 ve 3000mm ikisi de mevcutken: küçük parça (1200mm) için 3000mm'lik kısa stok seçilmeli.
+  const sonuc = optimizeCutting([5900, 1200], [6000, 3000], 3);
+  assert.equal(sonuc.totalBars, 2);
+  const kisaCubuk = sonuc.bars.find((b) => b.cuts.includes(1200))!;
+  assert.equal(kisaCubuk.stockLengthMm, 3000);
+  assert.equal(kisaCubuk.wasteMm, 1800);
+  const uzunCubuk = sonuc.bars.find((b) => b.cuts.includes(5900))!;
+  assert.equal(uzunCubuk.stockLengthMm, 6000);
+});
+
+test("kesim optimizasyonu: karışık stok boyu - tek boy verilmesiyle aynı sonucu üretir (geriye dönük uyum)", () => {
+  const pieces = [1850, 1850, 1200, 750];
+  const tekBoy = optimizeCutting(pieces, 6000, 3);
+  const diziIleTekBoy = optimizeCutting(pieces, [6000], 3);
+  assert.deepEqual(tekBoy.bars, diziIleTekBoy.bars);
+  assert.equal(diziIleTekBoy.availableLengthsMm.length, 1);
+  assert.equal(diziIleTekBoy.availableLengthsMm[0], 6000);
+});
+
+test("kesim optimizasyonu: mevcut en uzun boydan uzun parça, diğer boylar yeterli olsa da hata verir", () => {
+  assert.throws(() => optimizeCutting([7000], [3000, 6000], 3), HesaplamaHatasi);
+});

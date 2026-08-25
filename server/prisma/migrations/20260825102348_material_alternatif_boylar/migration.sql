@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "materials" ADD COLUMN     "alternatifBoylarM" DOUBLE PRECISION[] DEFAULT ARRAY[]::DOUBLE PRECISION[];

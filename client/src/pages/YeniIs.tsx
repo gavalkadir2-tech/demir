@@ -28,6 +28,8 @@ const TEMPLATE_KATEGORI: Record<string, ProjectCategory> = {
   wall: "STEEL_STRUCTURE",
   truss: "ROOF",
   shelf: "SHELF",
+  pergola: "CANOPY",
+  ferforje_panel: "FORGE",
   custom: "OTHER",
 };
 
@@ -40,6 +42,8 @@ export const URUN_EMOJI: Record<string, string> = {
   wall: "🏗️",
   truss: "🔺",
   shelf: "🗄️",
+  pergola: "🌴",
+  ferforje_panel: "🌿",
   custom: "🔩",
 };
 const EMOJI = URUN_EMOJI;
@@ -548,6 +552,8 @@ export function UrunFormu({
         {templateKey === "wall" && <DuvarAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
         {templateKey === "truss" && <CatiKafesiAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
         {templateKey === "shelf" && <RafAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
+        {templateKey === "pergola" && <PergolaAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
+        {templateKey === "ferforje_panel" && <FerforjePanelAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
 
         <button className="btn-primary w-full" onClick={hesapla} disabled={hesaplaniyor}>
           {hesaplaniyor ? "Hesaplanıyor..." : "🧮 Hesapla"}
@@ -1386,6 +1392,7 @@ function RafAlanlari({
   const [caprazProfilId, setCaprazProfilId] = useState<number | undefined>(
     () => baslangic?.caprazProfilId as number | undefined
   );
+  const [tasarimYukuKgM2, setTasarimYukuKgM2] = useState<number>(() => (baslangic?.tasarimYukuKgM2 as number) ?? 100);
 
   useEffect(() => {
     onChange({
@@ -1398,9 +1405,21 @@ function RafAlanlari({
       rafSacKullan,
       sacKalinlikMm: rafSacKullan ? sacKalinlikMm : undefined,
       caprazProfilId,
+      tasarimYukuKgM2,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [genislikMm, derinlikMm, yukseklikMm, rafSayisi, ayakProfilId, rafCercevesiProfilId, rafSacKullan, sacKalinlikMm, caprazProfilId]);
+  }, [
+    genislikMm,
+    derinlikMm,
+    yukseklikMm,
+    rafSayisi,
+    ayakProfilId,
+    rafCercevesiProfilId,
+    rafSacKullan,
+    sacKalinlikMm,
+    caprazProfilId,
+    tasarimYukuKgM2,
+  ]);
 
   return (
     <div className="space-y-3">
@@ -1427,8 +1446,8 @@ function RafAlanlari({
         {rafSacKullan && <Sayi label="Sac Kalınlığı (mm)" value={sacKalinlikMm} onChange={setSacKalinlikMm} />}
       </div>
       <details className="rounded-xl border border-neutral-200 p-3">
-        <summary className="font-semibold cursor-pointer">Gelişmiş: Stabilite Çaprazı</summary>
-        <div className="mt-3">
+        <summary className="font-semibold cursor-pointer">Gelişmiş: Stabilite Çaprazı ve Yapısal Kontrol</summary>
+        <div className="mt-3 space-y-3">
           <MaterialSelect
             label="Çapraz Profili (opsiyonel, arka yüz X-destek)"
             materials={materials}
@@ -1436,6 +1455,188 @@ function RafAlanlari({
             onChange={setCaprazProfilId}
             allowEmpty
           />
+          <Sayi label="Tasarım Yükü (kg/m², bir raf seviyesi için)" value={tasarimYukuKgM2} onChange={setTasarimYukuKgM2} />
+          <p className="text-xs text-neutral-500">
+            Yapısal kontrolde raf çerçevesinin bu yükü taşıyıp taşımadığı kontrol edilir; belirtilmezse 100 kg/m² varsayılır.
+          </p>
+        </div>
+      </details>
+    </div>
+  );
+}
+
+function PergolaAlanlari({
+  materials,
+  onChange,
+  baslangic,
+}: {
+  materials: Material[];
+  onChange: (p: Record<string, unknown>) => void;
+  baslangic?: Record<string, unknown>;
+}) {
+  const [genislikMm, setGenislikMm] = useState<number>(() => (baslangic?.genislikMm as number) ?? 4000);
+  const [boyMm, setBoyMm] = useState<number>(() => (baslangic?.boyMm as number) ?? 3000);
+  const [yukseklikMm, setYukseklikMm] = useState<number>(() => (baslangic?.yukseklikMm as number) ?? 2400);
+  const [kolonSayisi, setKolonSayisi] = useState<number>(() => (baslangic?.kolonSayisi as number) ?? 4);
+  const [kolonProfilId, setKolonProfilId] = useState<number | undefined>(() => baslangic?.kolonProfilId as number | undefined);
+  const [kirisProfilId, setKirisProfilId] = useState<number | undefined>(() => baslangic?.kirisProfilId as number | undefined);
+  const [lataProfilId, setLataProfilId] = useState<number | undefined>(() => baslangic?.lataProfilId as number | undefined);
+  const [lataYonu, setLataYonu] = useState<string>(() => (baslangic?.lataYonu as string) ?? "genislik");
+  const [lataAraligiHedefMm, setLataAraligiHedefMm] = useState<number>(() => (baslangic?.lataAraligiHedefMm as number) ?? 200);
+
+  useEffect(() => {
+    onChange({
+      genislikMm,
+      boyMm,
+      yukseklikMm,
+      kolonSayisi,
+      kolonProfilId,
+      kirisProfilId,
+      lataProfilId,
+      lataYonu,
+      lataAraligiHedefMm,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [genislikMm, boyMm, yukseklikMm, kolonSayisi, kolonProfilId, kirisProfilId, lataProfilId, lataYonu, lataAraligiHedefMm]);
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <Sayi label="En (mm)" value={genislikMm} onChange={setGenislikMm} />
+        <Sayi label="Boy (mm)" value={boyMm} onChange={setBoyMm} />
+        <Sayi label="Kolon Yüksekliği (mm)" value={yukseklikMm} onChange={setYukseklikMm} />
+        <Sayi label="Toplam Kolon Sayısı (çift)" value={kolonSayisi} onChange={setKolonSayisi} />
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <MaterialSelect label="Kolon Profili" materials={materials} value={kolonProfilId} onChange={setKolonProfilId} />
+        <MaterialSelect label="Kiriş Profili" materials={materials} value={kirisProfilId} onChange={setKirisProfilId} />
+        <MaterialSelect label="Lata Profili" materials={materials} value={lataProfilId} onChange={setLataProfilId} />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="field-label">Lata Yönü</label>
+          <select className="field-select" value={lataYonu} onChange={(e) => setLataYonu(e.target.value)}>
+            <option value="genislik">En yönünde (boy ekseninde dizilir)</option>
+            <option value="boy">Boy yönünde (en ekseninde dizilir)</option>
+          </select>
+        </div>
+        <Sayi label="Lata Aralığı (mm)" value={lataAraligiHedefMm} onChange={setLataAraligiHedefMm} />
+      </div>
+      <p className="text-xs text-neutral-500 -mt-1">
+        4 kolonlu basit pergolada kolon sayısı 4; geniş açıklıklarda 6/8 gibi çift sayı seçilirse ara kolonlar eşit
+        dağıtılır.
+      </p>
+    </div>
+  );
+}
+
+function FerforjePanelAlanlari({
+  materials,
+  onChange,
+  baslangic,
+}: {
+  materials: Material[];
+  onChange: (p: Record<string, unknown>) => void;
+  baslangic?: Record<string, unknown>;
+}) {
+  const [genislikMm, setGenislikMm] = useState<number>(() => (baslangic?.genislikMm as number) ?? 1200);
+  const [yukseklikMm, setYukseklikMm] = useState<number>(() => (baslangic?.yukseklikMm as number) ?? 1500);
+  const [cerceveProfilId, setCerceveProfilId] = useState<number | undefined>(
+    () => baslangic?.cerceveProfilId as number | undefined
+  );
+  const [dikeyCubukProfilId, setDikeyCubukProfilId] = useState<number | undefined>(
+    () => baslangic?.dikeyCubukProfilId as number | undefined
+  );
+  const [dikeyCubukAraligiHedefMm, setDikeyCubukAraligiHedefMm] = useState<number>(
+    () => (baslangic?.dikeyCubukAraligiHedefMm as number) ?? 120
+  );
+  const [yatayAraKayitSayisi, setYatayAraKayitSayisi] = useState<number>(() => (baslangic?.yatayAraKayitSayisi as number) ?? 0);
+  const [yatayAraKayitProfilId, setYatayAraKayitProfilId] = useState<number | undefined>(
+    () => baslangic?.yatayAraKayitProfilId as number | undefined
+  );
+  const [susVar, setSusVar] = useState<boolean>(() => (baslangic?.susVar as boolean) ?? false);
+  const [susProfilId, setSusProfilId] = useState<number | undefined>(() => baslangic?.susProfilId as number | undefined);
+  const [susSayisi, setSusSayisi] = useState<number>(() => (baslangic?.susSayisi as number) ?? 4);
+  const [susBirimUzunlukMm, setSusBirimUzunlukMm] = useState<number>(() => (baslangic?.susBirimUzunlukMm as number) ?? 300);
+
+  useEffect(() => {
+    onChange({
+      genislikMm,
+      yukseklikMm,
+      cerceveProfilId,
+      dikeyCubukProfilId,
+      dikeyCubukAraligiHedefMm,
+      yatayAraKayitSayisi: yatayAraKayitSayisi || undefined,
+      yatayAraKayitProfilId: yatayAraKayitSayisi > 0 ? yatayAraKayitProfilId : undefined,
+      susVar,
+      susProfilId: susVar ? susProfilId : undefined,
+      susSayisi: susVar ? susSayisi : undefined,
+      susBirimUzunlukMm: susVar ? susBirimUzunlukMm : undefined,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    genislikMm,
+    yukseklikMm,
+    cerceveProfilId,
+    dikeyCubukProfilId,
+    dikeyCubukAraligiHedefMm,
+    yatayAraKayitSayisi,
+    yatayAraKayitProfilId,
+    susVar,
+    susProfilId,
+    susSayisi,
+    susBirimUzunlukMm,
+  ]);
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <Sayi label="Genişlik (mm)" value={genislikMm} onChange={setGenislikMm} />
+        <Sayi label="Yükseklik (mm)" value={yukseklikMm} onChange={setYukseklikMm} />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <MaterialSelect label="Çerçeve Profili" materials={materials} value={cerceveProfilId} onChange={setCerceveProfilId} />
+        <MaterialSelect
+          label="Dikey Çubuk Profili"
+          materials={materials}
+          value={dikeyCubukProfilId}
+          onChange={setDikeyCubukProfilId}
+        />
+      </div>
+      <Sayi label="Dikey Çubuk Aralığı (mm)" value={dikeyCubukAraligiHedefMm} onChange={setDikeyCubukAraligiHedefMm} />
+      <p className="text-xs text-neutral-500 -mt-1">
+        Çocuk güvenliği için pencere korkuluğunda aralığın 120 mm'yi aşmaması önerilir.
+      </p>
+      <details className="rounded-xl border border-neutral-200 p-3">
+        <summary className="font-semibold cursor-pointer">Gelişmiş: Yatay Ara Kayıt ve Süsleme</summary>
+        <div className="mt-3 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <Sayi label="Yatay Ara Kayıt Sayısı" value={yatayAraKayitSayisi} onChange={setYatayAraKayitSayisi} />
+            {yatayAraKayitSayisi > 0 && (
+              <MaterialSelect
+                label="Yatay Ara Kayıt Profili"
+                materials={materials}
+                value={yatayAraKayitProfilId}
+                onChange={setYatayAraKayitProfilId}
+              />
+            )}
+          </div>
+          <label className="flex items-center gap-2 text-sm font-medium">
+            <input type="checkbox" checked={susVar} onChange={(e) => setSusVar(e.target.checked)} />
+            Dekoratif süsleme (kıvrım/motif) ekle
+          </label>
+          {susVar && (
+            <>
+              <div className="grid grid-cols-3 gap-3">
+                <MaterialSelect label="Süsleme Profili (genelde yuvarlak)" materials={materials} value={susProfilId} onChange={setSusProfilId} />
+                <Sayi label="Süsleme Sayısı" value={susSayisi} onChange={setSusSayisi} />
+                <Sayi label="Motif Başına Uzunluk (mm)" value={susBirimUzunlukMm} onChange={setSusBirimUzunlukMm} />
+              </div>
+              <p className="text-xs text-neutral-500">
+                Bu kaba bir malzeme tahminidir; gerçek motif şekli/deseni sahada elle işlenir.
+              </p>
+            </>
+          )}
         </div>
       </details>
     </div>

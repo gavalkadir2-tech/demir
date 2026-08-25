@@ -267,7 +267,11 @@ model Material {
   category          MaterialCategory  @default(PROFILE)
   section           String? // kesit, örn "40x40x2"
   thicknessMm       Float?
-  standardLengthM   Float? // profiller için standart boy
+  standardLengthM   Float? // profiller için standart (birincil) boy
+  // Standart boya ek olarak stokta bulunan alternatif profil boyları (m) - örn. hem 6m hem 12m
+  // satılıyorsa, ya da elde kalan kısa artıklar varsa. Kesim optimizasyonu, her çubuk için bu
+  // listeden (standardLengthM dahil) en az fireli boyu seçer.
+  alternatifBoylarM Float[]           @default([])
   sheetWidthMm      Float? // sac için
   sheetHeightMm     Float? // sac için
   // Yapısal (mukavemet) hesap için kesit tipi - profiller için.
@@ -349,9 +353,9 @@ model CuttingList {
   materialId       Int
   material         Material @relation(fields: [materialId], references: [id])
   groupLabel       String? // "parça başına" modunda parça etiketi (örn. "Dikme"); "malzeme türüne göre" modunda boş
-  standardLengthMm Float
+  standardLengthMm Float // birincil (en uzun) stok boyu - özet gösterim için; çubuk başına gerçek boy barsJson içinde
   kerfMm           Float
-  barsJson         Json // [{ cuts:number[], wasteMm:number }]
+  barsJson         Json // [{ cuts:number[], wasteMm:number, stockLengthMm:number }]
   totalBars        Int
   totalWasteMm     Float
   wastePercent     Float

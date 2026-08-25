@@ -170,6 +170,7 @@ export interface Material {
   section?: string | null;
   thicknessMm?: number | null;
   standardLengthM?: number | null;
+  alternatifBoylarM?: number[];
   sheetWidthMm?: number | null;
   sheetHeightMm?: number | null;
   profilSekli?: ProfilSekli | null;
@@ -338,6 +339,7 @@ export interface Expense {
 export interface KesimCubugu {
   cuts: number[];
   wasteMm: number;
+  stockLengthMm: number;
 }
 
 export interface CuttingList {

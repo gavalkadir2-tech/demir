@@ -36,7 +36,8 @@ export async function generateCuttingListsForProject(projectId: number, mod: Kes
   for (const g of gruplar.values()) {
     try {
       const pieces = expandPieces(g.items);
-      const kesim = optimizeCutting(pieces, g.material.standardLengthM! * 1000, g.material.kerfMm);
+      const mevcutBoylarMm = [g.material.standardLengthM! * 1000, ...g.material.alternatifBoylarM.map((m) => m * 1000)];
+      const kesim = optimizeCutting(pieces, mevcutBoylarMm, g.material.kerfMm);
       const row = await prisma.cuttingList.create({
         data: {
           projectId,

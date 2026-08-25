@@ -13,6 +13,9 @@ import { UrunHesapSonucu } from "../calc/types";
 // gerçek proje için bölge/kullanım amacına göre bir mühendisten onay alınmalıdır.
 const KORKULUK_YATAY_YUK_N_M = 500; // TS EN 1991-1-1, konut/balkon tipi korkuluk için tipik çizgisel yük (0.5 kN/m)
 const KAR_YUKU_N_M2 = 1000; // TS 498, orta rakım/bölge için tipik kar yükü (1.0 kN/m²) - bölgeye göre değişir
+const BASAMAK_CANLI_YUK_N_M2 = 2000; // TS EN 1991-1-1 kategori A (konut) merdiven için tipik canlı yük (2.0 kN/m²)
+const RUZGAR_YUKU_N_M2 = 600; // Düşük katlı hafif yapı duvar paneli için tipik, muhafazakâr rüzgar emme/basınç yükü (0.6 kN/m²)
+const RAF_VARSAYILAN_TASARIM_YUKU_KG_M2 = 100; // Belirtilmezse, atölye/depo rafı için tipik hafif-orta depolama yükü varsayımı
 
 const YAPISAL_KONTROL_UYARISI =
   "Bu, basitleştirilmiş bir mukavemet/sehim kontrolüdür - tam bir statik projelendirme değildir. Kritik/kamusal yapılarda mutlaka bir inşaat mühendisinden onay alın.";
@@ -129,6 +132,163 @@ function catiKafesiKontrolu(
   ]);
 }
 
+function merdivenKontrolu(
+  girdi: Record<string, unknown>,
+  sonuc: UrunHesapSonucu,
+  malzemeler: Record<string, Material>
+): YapiselKontrolSonucu | undefined {
+  const kosegenMm = sonuc.ozetDegerler.kosegenMm;
+  const genislikMm = Number(girdi.genislikMm);
+  const tasiyiciAdet = Number(girdi.tasiyiciAdet) || 2;
+  const tasiyiciMalzeme = malzemeler[String(girdi.tasiyiciProfilKey)];
+  if (!kosegenMm || !genislikMm || !tasiyiciMalzeme) return undefined;
+
+  const tasiyiciKesit = kesitOzellikleriHesapla(tasiyiciMalzeme);
+  if (!tasiyiciKesit) return undefined;
+
+  // Basamak canlı yükü, merdiven genişliği boyunca yayılı; taşıyıcılar arasında eşit paylaşılır.
+  const cizgiselYukNMm = (BASAMAK_CANLI_YUK_N_M2 / 1_000_000) * genislikMm;
+  const toplamYukN = (cizgiselYukNMm * kosegenMm) / tasiyiciAdet;
+
+  const s = kirisKontrolEt({ acikligMm: kosegenMm, mesnetTuru: "basit", yukTuru: "yayili", toplamYukN, kesit: tasiyiciKesit });
+
+  return ozetOlustur([
+    {
+      ...s,
+      eleman: `Taşıyıcı (kiriş, ${tasiyiciAdet} adet arasında paylaşılan yük)`,
+      profilAdi: tasiyiciMalzeme.name,
+      yukAciklamasi: `Basamak canlı yükü ${(BASAMAK_CANLI_YUK_N_M2 / 1000).toFixed(2)} kN/m² × ${(genislikMm / 1000).toFixed(
+        2
+      )} m genişlik, ${(kosegenMm / 1000).toFixed(2)} m açıklık, ${tasiyiciAdet} taşıyıcı arasında paylaşılmış`,
+    },
+  ]);
+}
+
+function donerMerdivenKontrolu(
+  girdi: Record<string, unknown>,
+  sonuc: UrunHesapSonucu,
+  malzemeler: Record<string, Material>
+): YapiselKontrolSonucu | undefined {
+  const radyalUzunlukMm = sonuc.ozetDegerler.radyalUzunlukMm;
+  const basamakGenislikMm = sonuc.ozetDegerler.basamakGenislikMm;
+  const destekMalzeme = malzemeler[String(girdi.basamakDestekProfilKey)];
+  if (!radyalUzunlukMm || !basamakGenislikMm || !destekMalzeme) return undefined;
+
+  const destekKesit = kesitOzellikleriHesapla(destekMalzeme);
+  if (!destekKesit) return undefined;
+
+  // Basamak desteği, merkez kolondan dışa doğru bir konsol; basamağın taşıdığı yayılma
+  // genişliği (basamakGenislikMm) kadar canlı yükü tek başına taşır.
+  const cizgiselYukNMm = (BASAMAK_CANLI_YUK_N_M2 / 1_000_000) * basamakGenislikMm;
+  const toplamYukN = cizgiselYukNMm * radyalUzunlukMm;
+
+  const s = kirisKontrolEt({ acikligMm: radyalUzunlukMm, mesnetTuru: "konsol", yukTuru: "yayili", toplamYukN, kesit: destekKesit });
+
+  const kalemler: YapiselKontrolKalemi[] = [
+    {
+      ...s,
+      eleman: "Basamak desteği (konsol)",
+      profilAdi: destekMalzeme.name,
+      yukAciklamasi: `Basamak canlı yükü ${(BASAMAK_CANLI_YUK_N_M2 / 1000).toFixed(2)} kN/m² × ${(
+        basamakGenislikMm / 1000
+      ).toFixed(2)} m yayılma genişliği, ${(radyalUzunlukMm / 1000).toFixed(2)} m konsol boyu`,
+    },
+  ];
+
+  if (girdi.korkulukVar && girdi.korkulukDikmeProfilKey) {
+    const dikmeMalzeme = malzemeler[String(girdi.korkulukDikmeProfilKey)];
+    const korkulukYuksekligiMm = Number(girdi.korkulukYuksekligiMm);
+    if (dikmeMalzeme && korkulukYuksekligiMm > 0) {
+      const dikmeKesit = kesitOzellikleriHesapla(dikmeMalzeme);
+      if (dikmeKesit) {
+        // Korkuluk dikmesi de konsol; her basamağın dış ucunda tekil, korkulukKontrolu ile aynı
+        // yatay itme yükü ve L/75 sehim sınırı (bkz. korkulukKontrolu notu).
+        const s2 = kirisKontrolEt({
+          acikligMm: korkulukYuksekligiMm,
+          mesnetTuru: "konsol",
+          yukTuru: "tekil",
+          toplamYukN: KORKULUK_YATAY_YUK_N_M * (basamakGenislikMm / 1000),
+          kesit: dikmeKesit,
+          sehimSiniriOrani: 75,
+        });
+        kalemler.push({
+          ...s2,
+          eleman: "Korkuluk dikmesi (konsol, tepe noktasında yatay itme)",
+          profilAdi: dikmeMalzeme.name,
+          yukAciklamasi: `Yatay itme ${(KORKULUK_YATAY_YUK_N_M / 1000).toFixed(2)} kN/m × ${(basamakGenislikMm / 1000).toFixed(
+            2
+          )} m basamak genişliği, ${(korkulukYuksekligiMm / 1000).toFixed(2)} m yükseklikte`,
+        });
+      }
+    }
+  }
+
+  return ozetOlustur(kalemler);
+}
+
+function duvarKontrolu(
+  girdi: Record<string, unknown>,
+  sonuc: UrunHesapSonucu,
+  malzemeler: Record<string, Material>
+): YapiselKontrolSonucu | undefined {
+  const yukseklikMm = Number(girdi.yukseklikMm);
+  const gercekAralikMm = sonuc.ozetDegerler.gercekAralikMm;
+  const dikmeMalzeme = malzemeler[String(girdi.dikmeProfilKey)];
+  if (!yukseklikMm || !gercekAralikMm || !dikmeMalzeme) return undefined;
+
+  const dikmeKesit = kesitOzellikleriHesapla(dikmeMalzeme);
+  if (!dikmeKesit) return undefined;
+
+  // Dikme, üst/alt ray arasında basit mesnetli, düzleme dik (rüzgar) yükü taşır.
+  const cizgiselYukNMm = (RUZGAR_YUKU_N_M2 / 1_000_000) * gercekAralikMm;
+  const toplamYukN = cizgiselYukNMm * yukseklikMm;
+
+  const s = kirisKontrolEt({ acikligMm: yukseklikMm, mesnetTuru: "basit", yukTuru: "yayili", toplamYukN, kesit: dikmeKesit });
+
+  return ozetOlustur([
+    {
+      ...s,
+      eleman: "Dikme (üst/alt ray arası, düzleme dik rüzgar yükü)",
+      profilAdi: dikmeMalzeme.name,
+      yukAciklamasi: `Rüzgar yükü ${(RUZGAR_YUKU_N_M2 / 1000).toFixed(2)} kN/m² × ${(gercekAralikMm / 1000).toFixed(
+        2
+      )} m dikme aralığı, ${(yukseklikMm / 1000).toFixed(2)} m yükseklik`,
+    },
+  ]);
+}
+
+function rafKontrolu(
+  girdi: Record<string, unknown>,
+  sonuc: UrunHesapSonucu,
+  malzemeler: Record<string, Material>
+): YapiselKontrolSonucu | undefined {
+  const genislikMm = Number(girdi.genislikMm);
+  const derinlikMm = Number(girdi.derinlikMm);
+  const cerceveMalzeme = malzemeler[String(girdi.rafCercevesiProfilKey)];
+  if (!genislikMm || !derinlikMm || !cerceveMalzeme) return undefined;
+
+  const cerceveKesit = kesitOzellikleriHesapla(cerceveMalzeme);
+  if (!cerceveKesit) return undefined;
+
+  const tasarimYukuKgM2 = Number(girdi.tasarimYukuKgM2) || RAF_VARSAYILAN_TASARIM_YUKU_KG_M2;
+  const seviyeYukN = kgToN(tasarimYukuKgM2 * (genislikMm / 1000) * (derinlikMm / 1000));
+  // Bir raf seviyesinin yükü ön + arka (genişlik yönü) çerçeve profili arasında yaklaşık eşit paylaşılır.
+  const toplamYukN = seviyeYukN / 2;
+
+  const s = kirisKontrolEt({ acikligMm: genislikMm, mesnetTuru: "basit", yukTuru: "yayili", toplamYukN, kesit: cerceveKesit });
+
+  return ozetOlustur([
+    {
+      ...s,
+      eleman: "Raf çerçevesi (genişlik yönü, ayaklar arası açıklık)",
+      profilAdi: cerceveMalzeme.name,
+      yukAciklamasi: `Tasarım yükü ${tasarimYukuKgM2} kg/m² × ${(genislikMm / 1000).toFixed(2)}×${(derinlikMm / 1000).toFixed(
+        2
+      )} m raf alanı, ön/arka çerçeve arasında paylaşılmış (belirtilmezse ${RAF_VARSAYILAN_TASARIM_YUKU_KG_M2} kg/m² varsayılır)`,
+    },
+  ]);
+}
+
 /** Şablon anahtarına göre uygun yapısal kontrol modelini çalıştırır; desteklenmiyorsa undefined döner. */
 export function yapiselKontrolCalistir(
   templateKey: string,
@@ -139,6 +299,10 @@ export function yapiselKontrolCalistir(
   try {
     if (templateKey === "railing") return korkulukKontrolu(girdi, sonuc, malzemeler);
     if (templateKey === "truss" && girdi.asikProfilKey) return catiKafesiKontrolu(girdi, sonuc, malzemeler);
+    if (templateKey === "stairs") return merdivenKontrolu(girdi, sonuc, malzemeler);
+    if (templateKey === "spiral_stairs") return donerMerdivenKontrolu(girdi, sonuc, malzemeler);
+    if (templateKey === "wall") return duvarKontrolu(girdi, sonuc, malzemeler);
+    if (templateKey === "shelf") return rafKontrolu(girdi, sonuc, malzemeler);
     return undefined;
   } catch {
     // Yapısal kontrol her zaman opsiyoneldir - beklenmeyen bir hata ana hesaplamayı bozmamalı.

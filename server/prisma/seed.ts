@@ -51,6 +51,8 @@ async function main() {
       { key: "wall", name: "Çelik Duvar Paneli", description: "Prefabrik/çelik karkas duvar paneli (dikme + ray + boşluklar)" },
       { key: "truss", name: "Çatı Kafesi", description: "Kral kirişi tipi çatı makası (üst/alt başlık + kral kirişi)" },
       { key: "shelf", name: "Raf", description: "Depo/atölye rafı (4 ayak + çok seviyeli çerçeve, opsiyonel sac yüzey)" },
+      { key: "pergola", name: "Pergola", description: "Serbest duran, açık latalı gölgelik yapısı" },
+      { key: "ferforje_panel", name: "Ferforje Panel", description: "Dekoratif demir panel / pencere korkuluğu" },
       { key: "custom", name: "Manuel / Çelik Konstrüksiyon", description: "Elle parça girişi, hazır şablona bağlı değil" },
     ],
     skipDuplicates: true,

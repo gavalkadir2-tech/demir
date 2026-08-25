@@ -23,6 +23,9 @@ export interface RafGirdi {
   sacKalinlikMm?: number;
   /** Arka yüzde stabilite çaprazı (X) profil kesiti - opsiyonel */
   caprazProfilKey?: string;
+  /** Bir raf seviyesi için tasarım yükü (kg/m²) - malzeme listesini etkilemez, sadece yapısal
+   * kontrolde (bkz. structuralCheck.ts) kullanılır. Belirtilmezse tipik bir varsayım kullanılır. */
+  tasarimYukuKgM2?: number;
 }
 
 const VARSAYILAN = {

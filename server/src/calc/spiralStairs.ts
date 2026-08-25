@@ -143,6 +143,7 @@ export function calculateSpiralStairs(girdi: DonerMerdivenGirdi): UrunHesapSonuc
     gercekBasamakYuksekligiMm: Math.round(gercekBasamakYuksekligiMm * 100) / 100,
     basamakAcisiDerece: Math.round(basamakAcisiDerece * 100) / 100,
     radyalUzunlukMm: Math.round(radyalUzunlukMm),
+    basamakGenislikMm: Math.round(basamakGenislikMm),
     toplamDonusDerecesi,
     icCapMm,
     disCapMm,

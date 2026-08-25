@@ -127,6 +127,7 @@ function MalzemeModal({ malzeme, onClose, onSaved }: { malzeme: Material | null;
   const [form, setForm] = useState<Partial<Material>>(
     malzeme ?? { category: "PROFILE", unit: "KG", unitPrice: 0, kerfMm: 3, stockQty: 0, minStockQty: 0 }
   );
+  const [alternatifBoylarMetin, setAlternatifBoylarMetin] = useState(() => (malzeme?.alternatifBoylarM ?? []).join(", "));
   const [hata, setHata] = useState<string | null>(null);
   const [kaydediliyor, setKaydediliyor] = useState(false);
 
@@ -137,10 +138,15 @@ function MalzemeModal({ malzeme, onClose, onSaved }: { malzeme: Material | null;
       setHata("Malzeme adı zorunlu.");
       return;
     }
+    const alternatifBoylarM = alternatifBoylarMetin
+      .split(",")
+      .map((s) => Number(s.trim()))
+      .filter((n) => Number.isFinite(n) && n > 0);
+
     setKaydediliyor(true);
     setHata(null);
     try {
-      const gövde = { ...form };
+      const gövde = { ...form, alternatifBoylarM };
       if (malzeme) await api.put(`/materials/${malzeme.id}`, gövde);
       else await api.post("/materials", gövde);
       onSaved();
@@ -234,6 +240,21 @@ function MalzemeModal({ malzeme, onClose, onSaved }: { malzeme: Material | null;
             <label className="field-label">Standart Boy (m)</label>
             <input type="number" className="field-input" value={form.standardLengthM ?? ""} onChange={(e) => set("standardLengthM", e.target.value ? Number(e.target.value) : null)} />
           </div>
+          {form.category === "PROFILE" && (
+            <div>
+              <label className="field-label">Alternatif Stok Boyları (m, virgülle ayırın)</label>
+              <input
+                className="field-input"
+                placeholder="örn. 3, 12"
+                value={alternatifBoylarMetin}
+                onChange={(e) => setAlternatifBoylarMetin(e.target.value)}
+              />
+              <p className="text-xs text-neutral-500 mt-1">
+                Standart boya ek olarak stokta bu uzunluklarda da varsa (örn. 12m'lik uzun stok veya elde kalan 3m'lik
+                artık), kesim optimizasyonu her çubuk için fire açısından en uygun boyu otomatik seçer.
+              </p>
+            </div>
+          )}
           <div>
             <label className="field-label">Kesim Payı (mm)</label>
             <input type="number" className="field-input" value={form.kerfMm ?? 3} onChange={(e) => set("kerfMm", Number(e.target.value))} />

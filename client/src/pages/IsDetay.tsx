@@ -26,6 +26,7 @@ import {
   GOREV_TURU_ETIKET,
   ONCELIK_ETIKET,
   ONCELIK_RENK,
+  KesimCubugu,
 } from "../api/types";
 import { Spinner, HataKutusu, UyariKutusu, Badge, Modal, EmptyState } from "../components/ui";
 import MaterialSelect from "../components/MaterialSelect";
@@ -894,6 +895,16 @@ function UrunSablonuModal({
   );
 }
 
+/** Bir kesim listesinde kullanılan farklı stok boylarını "6 m × 4, 3 m × 2" şeklinde özetler. */
+function stokBoyuOzeti(bars: KesimCubugu[]): string {
+  const sayac = new Map<number, number>();
+  for (const b of bars) sayac.set(b.stockLengthMm, (sayac.get(b.stockLengthMm) ?? 0) + 1);
+  return Array.from(sayac.entries())
+    .sort((a, b) => b[0] - a[0])
+    .map(([boyMm, adet]) => `${boyMm / 1000} m × ${adet}`)
+    .join(", ");
+}
+
 function KesimTab({ proje, onChanged }: { proje: Project; onChanged: () => void }) {
   const [uretiliyor, setUretiliyor] = useState(false);
   const [uyarilar, setUyarilar] = useState<string[]>([]);
@@ -957,7 +968,7 @@ function KesimTab({ proje, onChanged }: { proje: Project; onChanged: () => void 
                 {cl.groupLabel && <span className="text-neutral-500 font-normal"> — {cl.groupLabel}</span>}
               </h2>
               <div className="text-sm text-neutral-500">
-                Standart boy: {cl.standardLengthMm / 1000} m • Kesim payı: {cl.kerfMm} mm
+                Kullanılan stok: {stokBoyuOzeti(cl.barsJson)} • Kesim payı: {cl.kerfMm} mm
               </div>
             </div>
             <div className="grid sm:grid-cols-3 gap-3 text-sm">
@@ -976,7 +987,7 @@ function KesimTab({ proje, onChanged }: { proje: Project; onChanged: () => void 
             </div>
             <div className="space-y-2">
               {cl.barsJson.map((bar, i) => (
-                <CuttingBarView key={i} bar={bar} standardLengthMm={cl.standardLengthMm} index={i} />
+                <CuttingBarView key={i} bar={bar} index={i} />
               ))}
             </div>
           </div>

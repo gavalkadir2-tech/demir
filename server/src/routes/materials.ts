@@ -11,6 +11,7 @@ const malzemeSchema = z.object({
   section: z.string().optional().nullable(),
   thicknessMm: z.number().nonnegative().optional().nullable(),
   standardLengthM: z.number().positive().optional().nullable(),
+  alternatifBoylarM: z.array(z.number().positive()).optional(),
   sheetWidthMm: z.number().positive().optional().nullable(),
   sheetHeightMm: z.number().positive().optional().nullable(),
   // Profil kesit tipi (kutu/köşebent/kanal/yuvarlak/boru/lama) - alt kategori filtresi ve yapısal

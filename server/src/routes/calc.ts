@@ -155,6 +155,37 @@ const shelfSchema = z.object({
   rafSacKullan: z.boolean().optional(),
   sacKalinlikMm: z.number().optional(),
   caprazProfilId: z.number().int().optional(),
+  tasarimYukuKgM2: z.number().optional(),
+});
+
+const pergolaSchema = z.object({
+  genislikMm: z.number(),
+  boyMm: z.number(),
+  yukseklikMm: z.number(),
+  kolonSayisi: z.number().int(),
+  kolonProfilId: z.number().int(),
+  kirisProfilId: z.number().int(),
+  lataProfilId: z.number().int(),
+  lataYonu: z.enum(["genislik", "boy"]).optional(),
+  lataAraligiHedefMm: z.number().optional(),
+  plakaEnMm: z.number().optional(),
+  plakaBoyMm: z.number().optional(),
+  plakaKalinlikMm: z.number().optional(),
+  ankrajSayisiPerPlaka: z.number().int().optional(),
+});
+
+const ferforjePanelSchema = z.object({
+  genislikMm: z.number(),
+  yukseklikMm: z.number(),
+  cerceveProfilId: z.number().int(),
+  dikeyCubukProfilId: z.number().int(),
+  dikeyCubukAraligiHedefMm: z.number().optional(),
+  yatayAraKayitSayisi: z.number().int().optional(),
+  yatayAraKayitProfilId: z.number().int().optional(),
+  susVar: z.boolean().optional(),
+  susProfilId: z.number().int().optional(),
+  susSayisi: z.number().int().optional(),
+  susBirimUzunlukMm: z.number().optional(),
 });
 
 const customSchema = z.object({
@@ -192,6 +223,8 @@ export const TEMPLATE_SCHEMAS: Record<string, z.ZodTypeAny> = {
   wall: wallSchema,
   truss: trussSchema,
   shelf: shelfSchema,
+  pergola: pergolaSchema,
+  ferforje_panel: ferforjePanelSchema,
 };
 
 export const CUSTOM_SCHEMA = customSchema;

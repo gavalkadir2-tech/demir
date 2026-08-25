@@ -4,16 +4,26 @@
 // (kesilen son parça ile artan fire arasında ayrıca kesim gerekmez, artan zaten çubuğun ucudur).
 // Bu nedenle bir çubuğa ilk eklenen parça kesim payı harcamaz; sonraki her parça
 // (uzunluk + kesim payı) kadar yer kaplar.
+//
+// Karışık stok boyu desteği: bir malzeme birden fazla standart boyda (örn. 6m ve 12m, ya da elde
+// kalan 3m'lik artıklar) stoklanıyor olabilir. Yeni bir çubuk açılması gerektiğinde, mevcut boylar
+// arasından parçayı taşıyabilecek EN KÜÇÜK boy seçilir - böylece örn. son birkaç küçük parça için
+// 6m'lik tam bir çubuk yerine 3m'lik bir artık/kısa stok kullanılabilir, fire azalır.
 
 import { HesaplamaHatasi, round2 } from "./units";
 
 export interface KesimCubugu {
   cuts: number[]; // mm, kesilecek/kesilmiş parça uzunlukları, kesim sırasıyla
   wasteMm: number;
+  /** Bu çubuğun kesildiği stok boyu (mm). Tek boy verildiğinde tüm çubuklarda aynıdır. */
+  stockLengthMm: number;
 }
 
 export interface KesimSonucu {
+  /** Geriye dönük uyumluluk ve özet gösterim için "birincil" boy - verilen boylardan en uzunu. */
   standardLengthMm: number;
+  /** Kullanıma açık tüm stok boyları (mm), küçükten büyüğe. */
+  availableLengthsMm: number[];
   kerfMm: number;
   bars: KesimCubugu[];
   totalBars: number;
@@ -31,23 +41,39 @@ export function expandPieces(items: { uzunlukMm: number; adet: number }[]): numb
   return out;
 }
 
-export function optimizeCutting(pieces: number[], standardLengthMm: number, kerfMm: number): KesimSonucu {
-  if (standardLengthMm <= 0) throw new HesaplamaHatasi("Standart profil boyu 0'dan büyük olmalı.");
+export function optimizeCutting(pieces: number[], standardLengthMm: number | number[], kerfMm: number): KesimSonucu {
+  const availableLengthsMm = Array.from(
+    new Set((Array.isArray(standardLengthMm) ? standardLengthMm : [standardLengthMm]).filter((n) => n > 0))
+  ).sort((a, b) => a - b);
+
+  if (availableLengthsMm.length === 0) throw new HesaplamaHatasi("Standart profil boyu 0'dan büyük olmalı.");
   if (kerfMm < 0) throw new HesaplamaHatasi("Kesim payı negatif olamaz.");
+
+  const enUzunBoyMm = availableLengthsMm[availableLengthsMm.length - 1];
+
   if (pieces.length === 0) {
-    return { standardLengthMm, kerfMm, bars: [], totalBars: 0, totalWasteMm: 0, wastePercent: 0, totalPieces: 0 };
+    return {
+      standardLengthMm: enUzunBoyMm,
+      availableLengthsMm,
+      kerfMm,
+      bars: [],
+      totalBars: 0,
+      totalWasteMm: 0,
+      wastePercent: 0,
+      totalPieces: 0,
+    };
   }
 
-  const tooLong = pieces.filter((p) => p > standardLengthMm);
+  const tooLong = pieces.filter((p) => p > enUzunBoyMm);
   if (tooLong.length > 0) {
     throw new HesaplamaHatasi(
-      `Kesim listesinde standart boydan (${standardLengthMm} mm) uzun parça var: ${Math.max(...tooLong)} mm. Daha uzun bir standart profil seçin veya parçayı bölün.`
+      `Kesim listesinde mevcut en uzun stoktan (${enUzunBoyMm} mm) uzun parça var: ${Math.max(...tooLong)} mm. Daha uzun bir standart profil seçin veya parçayı bölün.`
     );
   }
 
   const sorted = [...pieces].sort((a, b) => b - a);
 
-  const bars: { cuts: number[]; remaining: number }[] = [];
+  const bars: { cuts: number[]; remaining: number; stockLengthMm: number }[] = [];
 
   for (const p of sorted) {
     let placed = false;
@@ -61,17 +87,21 @@ export function optimizeCutting(pieces: number[], standardLengthMm: number, kerf
       }
     }
     if (!placed) {
-      bars.push({ cuts: [p], remaining: standardLengthMm - p });
+      // Parçayı taşıyabilecek en küçük (en az fireli) stok boyunu seç.
+      const secilenBoy = availableLengthsMm.find((l) => l >= p) ?? enUzunBoyMm;
+      bars.push({ cuts: [p], remaining: secilenBoy - p, stockLengthMm: secilenBoy });
     }
   }
 
-  const resultBars: KesimCubugu[] = bars.map((b) => ({ cuts: b.cuts, wasteMm: round2(b.remaining) }));
+  const resultBars: KesimCubugu[] = bars.map((b) => ({ cuts: b.cuts, wasteMm: round2(b.remaining), stockLengthMm: b.stockLengthMm }));
   const totalWasteMm = round2(resultBars.reduce((s, b) => s + b.wasteMm, 0));
   const totalBars = resultBars.length;
-  const wastePercent = totalBars > 0 ? round2((totalWasteMm / (totalBars * standardLengthMm)) * 100) : 0;
+  const toplamStokMm = resultBars.reduce((s, b) => s + b.stockLengthMm, 0);
+  const wastePercent = toplamStokMm > 0 ? round2((totalWasteMm / toplamStokMm) * 100) : 0;
 
   return {
-    standardLengthMm,
+    standardLengthMm: enUzunBoyMm,
+    availableLengthsMm,
     kerfMm,
     bars: resultBars,
     totalBars,
