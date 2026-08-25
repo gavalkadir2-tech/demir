@@ -44,12 +44,26 @@ export const URUN_EMOJI: Record<string, string> = {
 };
 const EMOJI = URUN_EMOJI;
 
-const KAPLAMA_TURU_SECENEKLERI = [
+const CATI_KAPLAMA_SECENEKLERI = [
   { key: "trapez_sac", label: "Trapez Sac" },
   { key: "sandvic_panel", label: "Sandviç Panel" },
   { key: "etermit", label: "Etermit" },
   { key: "plastik_etermit", label: "Plastik Etermit" },
   { key: "polikarbon", label: "Polikarbon" },
+  { key: "yok", label: "Kaplama Yok" },
+];
+
+// Duvar dış cephesi için: çatıdan farklı olarak etermit/polikarbon gibi ışık geçirir/hafif çatı
+// malzemeleri listelenmez, bunun yerine dış cephe mantolama (petopan) eklenir.
+const DUVAR_DIS_KAPLAMA_SECENEKLERI = [
+  { key: "trapez_sac", label: "Trapez Sac (Cephe)" },
+  { key: "sandvic_panel", label: "Sandviç Panel" },
+  { key: "petopan", label: "Petopan (Dış Cephe Mantolama)" },
+  { key: "yok", label: "Kaplama Yok" },
+];
+
+const DUVAR_IC_KAPLAMA_SECENEKLERI = [
+  { key: "alcipan", label: "Alçıpan" },
   { key: "yok", label: "Kaplama Yok" },
 ];
 
@@ -956,7 +970,7 @@ function SundurmaAlanlari({
       <div>
         <label className="field-label">Çatı Kaplaması</label>
         <select className="field-select" value={kaplamaTuru} onChange={(e) => setKaplamaTuru(e.target.value)}>
-          {KAPLAMA_TURU_SECENEKLERI.map((s) => (
+          {CATI_KAPLAMA_SECENEKLERI.map((s) => (
             <option key={s.key} value={s.key}>
               {s.label}
             </option>
@@ -1039,7 +1053,8 @@ function DuvarAlanlari({
   const [bosluklar, setBosluklar] = useState<DuvarBoslukTaslak[]>(
     () => (baslangic?.bosluklar as DuvarBoslukTaslak[] | undefined) ?? []
   );
-  const [kaplamaTuru, setKaplamaTuru] = useState<string>(() => (baslangic?.kaplamaTuru as string) ?? "yok");
+  const [disKaplamaTuru, setDisKaplamaTuru] = useState<string>(() => (baslangic?.disKaplamaTuru as string) ?? "yok");
+  const [icKaplamaTuru, setIcKaplamaTuru] = useState<string>(() => (baslangic?.icKaplamaTuru as string) ?? "yok");
 
   useEffect(() => {
     onChange({
@@ -1050,10 +1065,11 @@ function DuvarAlanlari({
       altProfilId,
       dikmeProfilId,
       bosluklar,
-      kaplamaTuru: kaplamaTuru === "yok" ? undefined : kaplamaTuru,
+      disKaplamaTuru: disKaplamaTuru === "yok" ? undefined : disKaplamaTuru,
+      icKaplamaTuru: icKaplamaTuru === "yok" ? undefined : icKaplamaTuru,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [genislikMm, yukseklikMm, dikmeAraligiHedefMm, ustProfilId, altProfilId, dikmeProfilId, bosluklar, kaplamaTuru]);
+  }, [genislikMm, yukseklikMm, dikmeAraligiHedefMm, ustProfilId, altProfilId, dikmeProfilId, bosluklar, disKaplamaTuru, icKaplamaTuru]);
 
   const bosluklariGuncelle = (i: number, alan: keyof DuvarBoslukTaslak, deger: string | number) => {
     setBosluklar((liste) => liste.map((b, idx) => (idx === i ? { ...b, [alan]: deger } : b)));
@@ -1071,20 +1087,33 @@ function DuvarAlanlari({
         <MaterialSelect label="Alt Ray" materials={materials} value={altProfilId} onChange={setAltProfilId} />
         <MaterialSelect label="Dikme Profili" materials={materials} value={dikmeProfilId} onChange={setDikmeProfilId} />
       </div>
-      <div>
-        <label className="field-label">Duvar Kaplaması / Yalıtımı (prefabrik ev vb.)</label>
-        <select className="field-select" value={kaplamaTuru} onChange={(e) => setKaplamaTuru(e.target.value)}>
-          {KAPLAMA_TURU_SECENEKLERI.map((s) => (
-            <option key={s.key} value={s.key}>
-              {s.label}
-            </option>
-          ))}
-        </select>
-        <p className="text-xs text-neutral-500 mt-1">
-          Seçilirse duvar yüzeyi için panel/levha miktarı, m² sipariş alanı ve fire ile birlikte hesaplanır (tek yüz; çift
-          taraflı kaplamada iki kez ekleyin). Kapı/pencere boşlukları panelden sahada kesilir, ayrıca düşülmez.
-        </p>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="field-label">Dış Cephe Kaplaması (prefabrik ev vb.)</label>
+          <select className="field-select" value={disKaplamaTuru} onChange={(e) => setDisKaplamaTuru(e.target.value)}>
+            {DUVAR_DIS_KAPLAMA_SECENEKLERI.map((s) => (
+              <option key={s.key} value={s.key}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="field-label">İç Cephe Kaplaması (opsiyonel)</label>
+          <select className="field-select" value={icKaplamaTuru} onChange={(e) => setIcKaplamaTuru(e.target.value)}>
+            {DUVAR_IC_KAPLAMA_SECENEKLERI.map((s) => (
+              <option key={s.key} value={s.key}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
+      <p className="text-xs text-neutral-500 -mt-1">
+        Dış ve iç kaplama birbirinden bağımsızdır, ikisi birden seçilebilir (örn. içeriden alçıpan + dışarıdan petopan). Her
+        biri için panel/levha miktarı, m² sipariş alanı ve fire ayrı hesaplanır. Kapı/pencere boşlukları panelden sahada
+        kesilir, ayrıca düşülmez.
+      </p>
 
       <div className="rounded-xl border border-neutral-200 p-3 space-y-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
@@ -1255,7 +1284,7 @@ function CatiKafesiAlanlari({
       <div>
         <label className="field-label">Çatı Kaplaması</label>
         <select className="field-select" value={kaplamaTuru} onChange={(e) => setKaplamaTuru(e.target.value)}>
-          {KAPLAMA_TURU_SECENEKLERI.map((s) => (
+          {CATI_KAPLAMA_SECENEKLERI.map((s) => (
             <option key={s.key} value={s.key}>
               {s.label}
             </option>

@@ -5,7 +5,6 @@ import { asyncHandler, ApiHatasi } from "../lib/errors";
 import { prisma } from "../lib/prisma";
 import { calculateByTemplateKey } from "../calc";
 import { TEMPLATE_SCHEMAS, idToKey, malzemeSozlugu } from "./calc";
-import { KaplamaTuru } from "../calc/kaplama";
 import { parcaAgirlikKg, sacKalemleriAgirlikKg, yuvarla1 } from "../calc/weight";
 
 const router = Router();
@@ -389,8 +388,7 @@ router.post(
       );
     }
 
-    const kaplamaTuru = (parsed as Record<string, unknown>).kaplamaTuru as KaplamaTuru | undefined;
-    const sacAgirlikKg = sacKalemleriAgirlikKg(sonuc.sacKalemleri, kaplamaTuru);
+    const sacAgirlikKg = sacKalemleriAgirlikKg(sonuc.sacKalemleri);
 
     const toplamAgirlikKg = yuvarla1(profilAgirlikKg + sacAgirlikKg);
 

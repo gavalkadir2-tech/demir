@@ -1,7 +1,18 @@
-// Çatı/kanopi kaplama türleri - ortak tanım. Hem hesaplama motorları (roofTruss, canopy)
+// Çatı/kanopi/duvar kaplama türleri - ortak tanım. Hem hesaplama motorları (roofTruss, canopy, wall)
 // hem de AI malzeme danışmanının ağırlık tahmini bu tabloyu kullanır.
 
-export type KaplamaTuru = "trapez_sac" | "sandvic_panel" | "etermit" | "plastik_etermit" | "polikarbon" | "yok";
+export type KaplamaTuru =
+  | "trapez_sac"
+  | "sandvic_panel"
+  | "etermit"
+  | "plastik_etermit"
+  | "polikarbon"
+  | "alcipan"
+  | "petopan"
+  | "yok";
+
+/** Kaplamanın hangi yüzeyde kullanılabileceği - seçim listelerini bağlama göre filtrelemek için. */
+export type KaplamaKullanimAlani = "cati" | "duvar_dis" | "duvar_ic";
 
 export interface KaplamaBilgisi {
   label: string;
@@ -16,47 +27,70 @@ export interface KaplamaBilgisi {
   /** Yan/uç bindirmeler + kesim fireleri nedeniyle tipik fazladan malzeme oranı (%). Yaklaşık bir
    * saha değeridir; gerçek fire, montaj detayına ve kesim disiplinine göre değişir. */
   tipikFireYuzde: number;
+  /** Hangi yüzey(ler)de kullanıma uygun - seçim listeleri buna göre filtrelenir. */
+  kullanimAlanlari: KaplamaKullanimAlani[];
 }
 
 export const KAPLAMA_BILGI: Record<Exclude<KaplamaTuru, "yok">, KaplamaBilgisi> = {
   trapez_sac: {
-    label: "Çatı kaplaması (trapez sac)",
+    label: "trapez sac",
     varsayilanKalinlikMm: 0.5,
     efektifYogunlukKgM3: 7850,
     faydaliGenislikMm: 1000,
     tipikFireYuzde: 8,
+    kullanimAlanlari: ["cati", "duvar_dis"],
   },
   sandvic_panel: {
-    label: "Çatı kaplaması (sandviç panel)",
+    label: "sandviç panel",
     varsayilanKalinlikMm: 40,
     efektifYogunlukKgM3: 250,
     faydaliGenislikMm: 1000,
     tipikFireYuzde: 5,
+    kullanimAlanlari: ["cati", "duvar_dis"],
   },
   etermit: {
-    label: "Çatı kaplaması (etermit)",
+    label: "etermit",
     varsayilanKalinlikMm: 6,
     efektifYogunlukKgM3: 1900,
     faydaliGenislikMm: 920,
     tipikFireYuzde: 12,
+    kullanimAlanlari: ["cati"],
   },
   plastik_etermit: {
-    label: "Çatı kaplaması (plastik etermit)",
+    label: "plastik etermit",
     varsayilanKalinlikMm: 2,
     efektifYogunlukKgM3: 1400,
     faydaliGenislikMm: 900,
     tipikFireYuzde: 10,
+    kullanimAlanlari: ["cati"],
   },
   polikarbon: {
-    label: "Çatı kaplaması (polikarbon)",
+    label: "polikarbon",
     varsayilanKalinlikMm: 6,
     efektifYogunlukKgM3: 1200,
     faydaliGenislikMm: 2100,
     tipikFireYuzde: 5,
+    kullanimAlanlari: ["cati"],
+  },
+  alcipan: {
+    label: "alçıpan",
+    varsayilanKalinlikMm: 12.5,
+    efektifYogunlukKgM3: 750,
+    faydaliGenislikMm: 1200,
+    tipikFireYuzde: 10,
+    kullanimAlanlari: ["duvar_ic"],
+  },
+  petopan: {
+    label: "petopan / dış cephe mantolama",
+    varsayilanKalinlikMm: 50,
+    efektifYogunlukKgM3: 160,
+    faydaliGenislikMm: 500,
+    tipikFireYuzde: 12,
+    kullanimAlanlari: ["duvar_dis"],
   },
 };
 
-/** Kaplama alanı/sipariş/fire hesaplaması. netAlanM2: çatının gerçek (kaplanan) alanı. Sipariş edilecek
+/** Kaplama alanı/sipariş/fire hesaplaması. netAlanM2: kaplanan yüzeyin gerçek alanı. Sipariş edilecek
  * alan iki fire kaynağını birden hesaba katar: (1) panel genişliğine göre yukarı yuvarlamadan doğan
  * fire, (2) uzunluk yönünde tipik bindirme/kesim fire oranı (tipikFireYuzde). */
 export function kaplamaHesapla(
@@ -79,11 +113,10 @@ export function kaplamaHesapla(
   };
 }
 
-export const KAPLAMA_TURU_SECENEKLERI: { key: KaplamaTuru; label: string }[] = [
-  { key: "trapez_sac", label: "Trapez Sac" },
-  { key: "sandvic_panel", label: "Sandviç Panel" },
-  { key: "etermit", label: "Etermit" },
-  { key: "plastik_etermit", label: "Plastik Etermit" },
-  { key: "polikarbon", label: "Polikarbon" },
-  { key: "yok", label: "Kaplama Yok" },
-];
+/** Belirli bir yüzey (çatı / duvar dış / duvar iç) için uygun kaplama seçeneklerini, "Kaplama Yok" dahil döner. */
+export function kaplamaSecenekleri(alan: KaplamaKullanimAlani): { key: KaplamaTuru; label: string }[] {
+  const uygunlar = (Object.keys(KAPLAMA_BILGI) as Exclude<KaplamaTuru, "yok">[])
+    .filter((key) => KAPLAMA_BILGI[key].kullanimAlanlari.includes(alan))
+    .map((key) => ({ key: key as KaplamaTuru, label: KAPLAMA_BILGI[key].label }));
+  return [...uygunlar, { key: "yok" as const, label: "Kaplama Yok" }];
+}

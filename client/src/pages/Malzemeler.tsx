@@ -1,15 +1,17 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
-import { Material, MaterialCategory, MaterialUnit, MaterialPrice, MALZEME_KATEGORI_ETIKET } from "../api/types";
+import { Material, MaterialCategory, MaterialUnit, MaterialPrice, ProfilSekli, MALZEME_KATEGORI_ETIKET, PROFIL_SEKLI_ETIKET } from "../api/types";
 import { Modal, Spinner, EmptyState, HataKutusu } from "../components/ui";
 import { tl, sayi, tarih } from "../lib/format";
 
 const KATEGORILER: MaterialCategory[] = ["PROFILE", "SHEET", "CONSUMABLE", "FASTENER", "OTHER"];
 const BIRIMLER: MaterialUnit[] = ["M", "KG", "ADET", "M2"];
+const PROFIL_SEKILLERI: ProfilSekli[] = ["BOX", "ANGLE", "CHANNEL", "ROUND_SOLID", "ROUND_PIPE", "FLAT"];
 
 export default function Malzemeler() {
   const [malzemeler, setMalzemeler] = useState<Material[] | null>(null);
   const [kategori, setKategori] = useState<MaterialCategory | "">("");
+  const [profilSekli, setProfilSekli] = useState<ProfilSekli | "">("");
   const [q, setQ] = useState("");
   const [modal, setModal] = useState<Material | "new" | null>(null);
   const [sacModal, setSacModal] = useState(false);
@@ -18,13 +20,14 @@ export default function Malzemeler() {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
     if (kategori) params.set("category", kategori);
+    if (kategori === "PROFILE" && profilSekli) params.set("profilSekli", profilSekli);
     api.get<Material[]>(`/materials?${params}`).then(setMalzemeler);
   };
 
   useEffect(() => {
     yukle();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, kategori]);
+  }, [q, kategori, profilSekli]);
 
   return (
     <div className="space-y-6">
@@ -42,7 +45,14 @@ export default function Malzemeler() {
 
       <div className="flex gap-3 flex-wrap">
         <input className="field-input flex-1 min-w-[200px]" placeholder="Malzeme ara (ad veya kesit)..." value={q} onChange={(e) => setQ(e.target.value)} />
-        <select className="field-select w-auto" value={kategori} onChange={(e) => setKategori(e.target.value as any)}>
+        <select
+          className="field-select w-auto"
+          value={kategori}
+          onChange={(e) => {
+            setKategori(e.target.value as any);
+            setProfilSekli("");
+          }}
+        >
           <option value="">Tüm kategoriler</option>
           {KATEGORILER.map((k) => (
             <option key={k} value={k}>
@@ -50,6 +60,16 @@ export default function Malzemeler() {
             </option>
           ))}
         </select>
+        {kategori === "PROFILE" && (
+          <select className="field-select w-auto" value={profilSekli} onChange={(e) => setProfilSekli(e.target.value as any)}>
+            <option value="">Tüm profil türleri</option>
+            {PROFIL_SEKILLERI.map((p) => (
+              <option key={p} value={p}>
+                {PROFIL_SEKLI_ETIKET[p]}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {!malzemeler ? (
@@ -75,7 +95,10 @@ export default function Malzemeler() {
                     <div className="font-semibold">{m.name}</div>
                     {m.standardLengthM && <div className="text-xs text-neutral-500">Standart boy: {m.standardLengthM} m</div>}
                   </td>
-                  <td className="px-4 py-3">{MALZEME_KATEGORI_ETIKET[m.category]}</td>
+                  <td className="px-4 py-3">
+                    {MALZEME_KATEGORI_ETIKET[m.category]}
+                    {m.profilSekli && <span className="text-neutral-400"> · {PROFIL_SEKLI_ETIKET[m.profilSekli]}</span>}
+                  </td>
                   <td className="px-4 py-3">
                     {tl(m.unitPrice)} / {m.unit === "M" ? "m" : m.unit === "KG" ? "kg" : m.unit === "M2" ? "m²" : "adet"}
                   </td>
@@ -170,6 +193,43 @@ function MalzemeModal({ malzeme, onClose, onSaved }: { malzeme: Material | null;
             <label className="field-label">Kg/m Ağırlık (profil için)</label>
             <input type="number" className="field-input" value={form.unitWeightKgPerM ?? ""} onChange={(e) => set("unitWeightKgPerM", e.target.value ? Number(e.target.value) : null)} />
           </div>
+          {form.category === "PROFILE" && (
+            <>
+              <div>
+                <label className="field-label">Profil Türü</label>
+                <select
+                  className="field-select"
+                  value={form.profilSekli ?? ""}
+                  onChange={(e) => set("profilSekli", e.target.value || null)}
+                >
+                  <option value="">Seçilmedi</option>
+                  {PROFIL_SEKILLERI.map((p) => (
+                    <option key={p} value={p}>
+                      {PROFIL_SEKLI_ETIKET[p]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="field-label">Kesit Genişliği (mm)</label>
+                <input
+                  type="number"
+                  className="field-input"
+                  value={form.widthMm ?? ""}
+                  onChange={(e) => set("widthMm", e.target.value ? Number(e.target.value) : null)}
+                />
+              </div>
+              <div>
+                <label className="field-label">Kesit Yüksekliği (mm, kutu/kanal için)</label>
+                <input
+                  type="number"
+                  className="field-input"
+                  value={form.heightMm ?? ""}
+                  onChange={(e) => set("heightMm", e.target.value ? Number(e.target.value) : null)}
+                />
+              </div>
+            </>
+          )}
           <div>
             <label className="field-label">Standart Boy (m)</label>
             <input type="number" className="field-input" value={form.standardLengthM ?? ""} onChange={(e) => set("standardLengthM", e.target.value ? Number(e.target.value) : null)} />
@@ -191,6 +251,12 @@ function MalzemeModal({ malzeme, onClose, onSaved }: { malzeme: Material | null;
             <input className="field-input" value={form.supplier ?? ""} onChange={(e) => set("supplier", e.target.value)} />
           </div>
         </div>
+        {form.category === "PROFILE" && (
+          <p className="text-xs text-neutral-500">
+            Profil türü ve kesit ölçüleri, malzeme listesini alt kategoriye göre filtrelemek ve yapısal (mukavemet)
+            kontrollerinde kullanılır.
+          </p>
+        )}
         <button className="btn-primary w-full" onClick={kaydet} disabled={kaydediliyor}>
           {kaydediliyor ? "Kaydediliyor..." : "Kaydet"}
         </button>

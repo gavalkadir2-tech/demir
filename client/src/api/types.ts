@@ -144,6 +144,7 @@ export interface MaterialPrice {
 
 export type MaterialCategory = "PROFILE" | "SHEET" | "CONSUMABLE" | "FASTENER" | "OTHER";
 export type MaterialUnit = "M" | "KG" | "ADET" | "M2";
+export type ProfilSekli = "BOX" | "ANGLE" | "CHANNEL" | "ROUND_SOLID" | "ROUND_PIPE" | "FLAT";
 
 export const MALZEME_KATEGORI_ETIKET: Record<MaterialCategory, string> = {
   PROFILE: "Profil",
@@ -151,6 +152,15 @@ export const MALZEME_KATEGORI_ETIKET: Record<MaterialCategory, string> = {
   CONSUMABLE: "Sarf Malzeme",
   FASTENER: "Bağlantı Elemanı",
   OTHER: "Diğer",
+};
+
+export const PROFIL_SEKLI_ETIKET: Record<ProfilSekli, string> = {
+  BOX: "Kutu Profil",
+  ANGLE: "Köşebent",
+  CHANNEL: "U Profil (Kanal)",
+  ROUND_SOLID: "Yuvarlak Demir",
+  ROUND_PIPE: "Boru",
+  FLAT: "Lama",
 };
 
 export interface Material {
@@ -162,6 +172,9 @@ export interface Material {
   standardLengthM?: number | null;
   sheetWidthMm?: number | null;
   sheetHeightMm?: number | null;
+  profilSekli?: ProfilSekli | null;
+  widthMm?: number | null;
+  heightMm?: number | null;
   unit: MaterialUnit;
   unitPrice: number;
   unitWeightKgPerM?: number | null;

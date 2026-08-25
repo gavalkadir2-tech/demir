@@ -126,10 +126,11 @@ test("duvar paneli: kaplama türü belirtilmezse sac kalemi eklenmez (çıplak k
     dikmeProfilKey: "dikme",
   });
   assert.equal(sonuc.sacKalemleri.length, 0);
-  assert.equal(sonuc.ozetDegerler.kaplamaSiparisAlaniM2, undefined);
+  assert.equal(sonuc.ozetDegerler.disKaplamaSiparisAlaniM2, undefined);
+  assert.equal(sonuc.ozetDegerler.icKaplamaSiparisAlaniM2, undefined);
 });
 
-test("duvar paneli: sandviç panel kaplama seçilirse sac kalemi ve sipariş alanı eklenir", () => {
+test("duvar paneli: dış cephe sandviç panel kaplama seçilirse sac kalemi ve sipariş alanı eklenir", () => {
   const sonuc = calculateWallPanel({
     genislikMm: 3000,
     yukseklikMm: 2500,
@@ -137,15 +138,40 @@ test("duvar paneli: sandviç panel kaplama seçilirse sac kalemi ve sipariş ala
     ustProfilKey: "ray",
     altProfilKey: "ray",
     dikmeProfilKey: "dikme",
-    kaplamaTuru: "sandvic_panel",
+    disKaplamaTuru: "sandvic_panel",
   });
 
-  const kaplama = sonuc.sacKalemleri.find((s) => s.label.includes("Duvar kaplaması"))!;
+  const kaplama = sonuc.sacKalemleri.find((s) => s.label.includes("Dış cephe kaplaması"))!;
   assert.ok(kaplama);
   assert.equal(kaplama.boyMm, 2500);
   // 3000mm genişlik / 1000mm faydalı panel genişliği = 3 panel
   assert.equal(kaplama.adet, 3);
-  assert.ok(sonuc.ozetDegerler.kaplamaSiparisAlaniM2! > 0);
+  assert.ok(sonuc.ozetDegerler.disKaplamaSiparisAlaniM2! > 0);
+  assert.equal(sonuc.ozetDegerler.icKaplamaSiparisAlaniM2, undefined);
+});
+
+test("duvar paneli: içeriden alçıpan dışarıdan petopan - iki kat kaplama aynı anda eklenir", () => {
+  const sonuc = calculateWallPanel({
+    genislikMm: 3000,
+    yukseklikMm: 2500,
+    dikmeAraligiHedefMm: 600,
+    ustProfilKey: "ray",
+    altProfilKey: "ray",
+    dikmeProfilKey: "dikme",
+    disKaplamaTuru: "petopan",
+    icKaplamaTuru: "alcipan",
+  });
+
+  const dis = sonuc.sacKalemleri.find((s) => s.label.includes("Dış cephe kaplaması"))!;
+  const ic = sonuc.sacKalemleri.find((s) => s.label.includes("İç cephe kaplaması"))!;
+  assert.ok(dis);
+  assert.ok(ic);
+  assert.ok(dis.label.includes("petopan"));
+  assert.ok(ic.label.includes("alçıpan"));
+  // İki farklı yoğunluk kullanılmalı (petopan hafif EPS sistemi, alçıpan alçı levha)
+  assert.notEqual(dis.yogunlukKgM3, ic.yogunlukKgM3);
+  assert.ok(sonuc.ozetDegerler.disKaplamaSiparisAlaniM2! > 0);
+  assert.ok(sonuc.ozetDegerler.icKaplamaSiparisAlaniM2! > 0);
 });
 
 test("duvar paneli: çakışan boşluklarda hata verir", () => {

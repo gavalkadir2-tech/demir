@@ -14,7 +14,8 @@ export interface DuvarPaneliSemaVeri {
   yukseklikMm: number;
   dikmeAraligiHedefMm: number;
   bosluklar?: DuvarBoslukVeri[];
-  kaplamaVar?: boolean;
+  disKaplamaVar?: boolean;
+  icKaplamaVar?: boolean;
 }
 
 const MARGIN_LEFT = 70;
@@ -27,7 +28,7 @@ const EPSILON = 1;
 
 /** Duvar panelinin önden görünüşünü (dikme/ray/boşluk) ölçekli, ölçüleri etiketli SVG olarak gösterir. */
 export default function WallSchematic({ veri }: { veri: DuvarPaneliSemaVeri }) {
-  const { genislikMm, yukseklikMm, dikmeAraligiHedefMm, bosluklar = [], kaplamaVar = false } = veri;
+  const { genislikMm, yukseklikMm, dikmeAraligiHedefMm, bosluklar = [], disKaplamaVar = false, icKaplamaVar = false } = veri;
   if (!genislikMm || !yukseklikMm || !dikmeAraligiHedefMm) return null;
 
   const gecerliBosluklar = bosluklar
@@ -83,7 +84,8 @@ export default function WallSchematic({ veri }: { veri: DuvarPaneliSemaVeri }) {
     { renk: PALET.ana, etiket: "Dikme" },
     { renk: PALET.yatay, etiket: "Üst/Alt Ray" },
     ...(gecerliBosluklar.length > 0 ? [{ renk: PALET.vurgu, etiket: "Lento/Eşik" }] : []),
-    ...(kaplamaVar ? [{ renk: PALET.destek, etiket: "Kaplama Paneli" }] : []),
+    ...(disKaplamaVar ? [{ renk: PALET.destek, etiket: "Dış Cephe Kaplaması" }] : []),
+    ...(icKaplamaVar ? [{ renk: PALET.ikincil, etiket: "İç Cephe Kaplaması" }] : []),
   ];
 
   return (
@@ -97,7 +99,10 @@ export default function WallSchematic({ veri }: { veri: DuvarPaneliSemaVeri }) {
 
       <line x1={x0 - 15} y1={groundY} x2={x0 + scaledW + 15} y2={groundY} stroke="#a3a3a3" strokeWidth={2} />
 
-      {kaplamaVar && <rect x={x0} y={topY} width={scaledW} height={scaledH} fill={PALET.destek} opacity={0.15} />}
+      {disKaplamaVar && (
+        <rect x={x0 - 6} y={topY - 6} width={scaledW + 12} height={scaledH + 12} fill="none" stroke={PALET.destek} strokeWidth={4} opacity={0.6} />
+      )}
+      {icKaplamaVar && <rect x={x0} y={topY} width={scaledW} height={scaledH} fill={PALET.ikincil} opacity={0.12} />}
 
       {/* Boşluk kesim alanları */}
       {gecerliBosluklar.map((b, i) => {

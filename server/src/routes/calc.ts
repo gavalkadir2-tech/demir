@@ -9,6 +9,9 @@ import { yapiselKontrolCalistir } from "../lib/structuralCheck";
 const router = Router();
 
 const kaplamaTuruEnum = z.enum(["trapez_sac", "sandvic_panel", "etermit", "plastik_etermit", "polikarbon", "yok"]);
+// Duvar dış/iç cephe kaplaması, çatı kaplamasından farklı bir seçenek kümesi kullanır (bkz. calc/kaplama.ts).
+const disKaplamaTuruEnum = z.enum(["trapez_sac", "sandvic_panel", "petopan", "yok"]);
+const icKaplamaTuruEnum = z.enum(["alcipan", "yok"]);
 
 const railingSchema = z.object({
   toplamUzunlukMm: z.number(),
@@ -109,8 +112,10 @@ const wallSchema = z.object({
   lentoProfilId: z.number().int().optional(),
   lentoTasmaMm: z.number().optional(),
   bosluklar: bosluklarSchema.optional(),
-  kaplamaTuru: kaplamaTuruEnum.optional(),
-  kaplamaKalinlikMm: z.number().optional(),
+  disKaplamaTuru: disKaplamaTuruEnum.optional(),
+  disKaplamaKalinlikMm: z.number().optional(),
+  icKaplamaTuru: icKaplamaTuruEnum.optional(),
+  icKaplamaKalinlikMm: z.number().optional(),
 });
 
 const trussSchema = z.object({

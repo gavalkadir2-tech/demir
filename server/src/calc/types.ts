@@ -21,6 +21,8 @@ export interface SacKalemi {
   boyMm: number;
   kalinlikMm?: number;
   adet: number;
+  /** Ağırlık tahmini için efektif yoğunluk (kg/m3). Verilmezse çelik yoğunluğu varsayılır. */
+  yogunlukKgM3?: number;
   not?: string;
 }
 

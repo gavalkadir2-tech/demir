@@ -127,11 +127,12 @@ export function calculateCanopy(girdi: SundurmaGirdi): UrunHesapSonucu {
     const kaplamaBilgisi = KAPLAMA_BILGI[kaplamaTuru];
     kaplamaOzet = kaplamaHesapla(kaplamaTuru, kirisUzunlukMm, genislikMm);
     sonuc.sacKalemleri.push({
-      label: kaplamaBilgisi.label,
+      label: `Çatı kaplaması (${kaplamaBilgisi.label})`,
       enMm: kaplamaBilgisi.faydaliGenislikMm,
       boyMm: Math.ceil(kirisUzunlukMm),
       kalinlikMm: girdi.kaplamaKalinlikMm ?? kaplamaBilgisi.varsayilanKalinlikMm,
       adet: kaplamaOzet.panelSayisi,
+      yogunlukKgM3: kaplamaBilgisi.efektifYogunlukKgM3,
       not: `${kaplamaOzet.panelSayisi} panel (${kaplamaBilgisi.faydaliGenislikMm} mm faydalı genişlik) yan yana; net alan ${kaplamaOzet.netAlaniM2} m², sipariş edilecek alan (fire dahil, ~%${kaplamaBilgisi.tipikFireYuzde} bindirme/kesim payı) ${kaplamaOzet.siparisAlaniM2} m².`,
     });
   }

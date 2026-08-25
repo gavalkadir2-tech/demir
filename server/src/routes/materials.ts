@@ -13,6 +13,11 @@ const malzemeSchema = z.object({
   standardLengthM: z.number().positive().optional().nullable(),
   sheetWidthMm: z.number().positive().optional().nullable(),
   sheetHeightMm: z.number().positive().optional().nullable(),
+  // Profil kesit tipi (kutu/köşebent/kanal/yuvarlak/boru/lama) - alt kategori filtresi ve yapısal
+  // hesap (mukavemet kontrolü) için kullanılır. Sadece category=PROFILE için anlamlıdır.
+  profilSekli: z.enum(["BOX", "ANGLE", "CHANNEL", "ROUND_SOLID", "ROUND_PIPE", "FLAT"]).optional().nullable(),
+  widthMm: z.number().positive().optional().nullable(),
+  heightMm: z.number().positive().optional().nullable(),
   unit: z.enum(["M", "KG", "ADET", "M2"]).default("M"),
   unitPrice: z.number().nonnegative(),
   unitWeightKgPerM: z.number().nonnegative().optional().nullable(),
@@ -28,11 +33,13 @@ router.get(
   asyncHandler(async (req, res) => {
     const q = typeof req.query.q === "string" ? req.query.q : undefined;
     const category = typeof req.query.category === "string" ? req.query.category : undefined;
+    const profilSekli = typeof req.query.profilSekli === "string" ? req.query.profilSekli : undefined;
     const malzemeler = await prisma.material.findMany({
       where: {
         AND: [
           q ? { OR: [{ name: { contains: q, mode: "insensitive" } }, { section: { contains: q, mode: "insensitive" } }] } : {},
           category ? { category: category as any } : {},
+          profilSekli ? { profilSekli: profilSekli as any } : {},
         ],
       },
       orderBy: [{ category: "asc" }, { name: "asc" }],

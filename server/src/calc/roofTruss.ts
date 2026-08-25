@@ -251,11 +251,12 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
     const kaplamaBilgisi = KAPLAMA_BILGI[kaplamaTuru];
     kaplamaOzet = kaplamaHesapla(kaplamaTuru, ustBaslikUzunlukMm, catiUzunluguMm);
     sonuc.sacKalemleri.push({
-      label: kaplamaBilgisi.label,
+      label: `Çatı kaplaması (${kaplamaBilgisi.label})`,
       enMm: kaplamaBilgisi.faydaliGenislikMm,
       boyMm: Math.ceil(ustBaslikUzunlukMm),
       kalinlikMm: girdi.kaplamaKalinlikMm ?? kaplamaBilgisi.varsayilanKalinlikMm,
       adet: kaplamaOzet.panelSayisi * 2, // iki yamaç
+      yogunlukKgM3: kaplamaBilgisi.efektifYogunlukKgM3,
       not: `Her yamaçta ${kaplamaOzet.panelSayisi} panel (${kaplamaBilgisi.faydaliGenislikMm} mm faydalı genişlik) yan yana; toplam net alan ${(kaplamaOzet.netAlaniM2 * 2).toFixed(2)} m², sipariş edilecek alan (fire dahil, ~%${kaplamaBilgisi.tipikFireYuzde} bindirme/kesim payı) ${(kaplamaOzet.siparisAlaniM2 * 2).toFixed(2)} m².`,
     });
   }

@@ -5,7 +5,6 @@ import { asyncHandler } from "../lib/errors";
 import { parcaAgirlikKg, sacKalemleriAgirlikKg, yuvarla1 } from "../calc/weight";
 import { sarfTahminiHesapla } from "../calc/consumables";
 import { UrunHesapSonucu } from "../calc/types";
-import { KaplamaTuru } from "../calc/kaplama";
 
 import projectItemsRouter from "./projectItems";
 import partsRouter from "./parts";
@@ -114,8 +113,7 @@ router.get(
     for (const item of proje.items) {
       const sonuc = item.resultJson as unknown as UrunHesapSonucu | null;
       if (!sonuc?.sacKalemleri?.length) continue;
-      const kaplamaTuru = (item.paramsJson as Record<string, unknown> | null)?.kaplamaTuru as KaplamaTuru | undefined;
-      sacAgirlikKg += sacKalemleriAgirlikKg(sonuc.sacKalemleri, kaplamaTuru);
+      sacAgirlikKg += sacKalemleriAgirlikKg(sonuc.sacKalemleri);
     }
 
     const sarfTahmini = sarfTahminiHesapla(
