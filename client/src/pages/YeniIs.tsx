@@ -30,6 +30,7 @@ const TEMPLATE_KATEGORI: Record<string, ProjectCategory> = {
   shelf: "SHELF",
   pergola: "CANOPY",
   ferforje_panel: "FORGE",
+  steel_frame: "STEEL_STRUCTURE",
   custom: "OTHER",
 };
 
@@ -44,6 +45,7 @@ export const URUN_EMOJI: Record<string, string> = {
   shelf: "🗄️",
   pergola: "🌴",
   ferforje_panel: "🌿",
+  steel_frame: "🏭",
   custom: "🔩",
 };
 const EMOJI = URUN_EMOJI;
@@ -554,6 +556,7 @@ export function UrunFormu({
         {templateKey === "shelf" && <RafAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
         {templateKey === "pergola" && <PergolaAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
         {templateKey === "ferforje_panel" && <FerforjePanelAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
+        {templateKey === "steel_frame" && <KolonKirisAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
 
         <button className="btn-primary w-full" onClick={hesapla} disabled={hesaplaniyor}>
           {hesaplaniyor ? "Hesaplanıyor..." : "🧮 Hesapla"}
@@ -1636,6 +1639,110 @@ function FerforjePanelAlanlari({
                 Bu kaba bir malzeme tahminidir; gerçek motif şekli/deseni sahada elle işlenir.
               </p>
             </>
+          )}
+        </div>
+      </details>
+    </div>
+  );
+}
+
+function KolonKirisAlanlari({
+  materials,
+  onChange,
+  baslangic,
+}: {
+  materials: Material[];
+  onChange: (p: Record<string, unknown>) => void;
+  baslangic?: Record<string, unknown>;
+}) {
+  const [acikligMm, setAcikligMm] = useState<number>(() => (baslangic?.acikligMm as number) ?? 6000);
+  const [uzunlukMm, setUzunlukMm] = useState<number>(() => (baslangic?.uzunlukMm as number) ?? 9000);
+  const [yukseklikMm, setYukseklikMm] = useState<number>(() => (baslangic?.yukseklikMm as number) ?? 3000);
+  const [acikSayisi, setAcikSayisi] = useState<number>(() => (baslangic?.acikSayisi as number) ?? 1);
+  const [kolonProfilId, setKolonProfilId] = useState<number | undefined>(() => baslangic?.kolonProfilId as number | undefined);
+  const [kirisProfilId, setKirisProfilId] = useState<number | undefined>(() => baslangic?.kirisProfilId as number | undefined);
+  const [cerceveAraligiHedefMm, setCerceveAraligiHedefMm] = useState<number>(
+    () => (baslangic?.cerceveAraligiHedefMm as number) ?? 3000
+  );
+  const [baglantiKirisiProfilId, setBaglantiKirisiProfilId] = useState<number | undefined>(
+    () => baslangic?.baglantiKirisiProfilId as number | undefined
+  );
+  const [stabiliteBaglantisiVar, setStabiliteBaglantisiVar] = useState<boolean>(
+    () => (baslangic?.stabiliteBaglantisiVar as boolean) ?? false
+  );
+  const [stabiliteProfilId, setStabiliteProfilId] = useState<number | undefined>(
+    () => baslangic?.stabiliteProfilId as number | undefined
+  );
+
+  useEffect(() => {
+    onChange({
+      acikligMm,
+      uzunlukMm,
+      yukseklikMm,
+      acikSayisi,
+      kolonProfilId,
+      kirisProfilId,
+      cerceveAraligiHedefMm,
+      baglantiKirisiProfilId,
+      stabiliteBaglantisiVar,
+      stabiliteProfilId: stabiliteBaglantisiVar ? stabiliteProfilId : undefined,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    acikligMm,
+    uzunlukMm,
+    yukseklikMm,
+    acikSayisi,
+    kolonProfilId,
+    kirisProfilId,
+    cerceveAraligiHedefMm,
+    baglantiKirisiProfilId,
+    stabiliteBaglantisiVar,
+    stabiliteProfilId,
+  ]);
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <Sayi label="Açıklık (mm)" value={acikligMm} onChange={setAcikligMm} />
+        <Sayi label="Uzunluk / Derinlik (mm)" value={uzunlukMm} onChange={setUzunlukMm} />
+        <Sayi label="Kolon Yüksekliği (mm)" value={yukseklikMm} onChange={setYukseklikMm} />
+        <Sayi label="Açıklık (Bay) Sayısı" value={acikSayisi} onChange={setAcikSayisi} />
+      </div>
+      <p className="text-xs text-neutral-500 -mt-1">
+        Çerçeve sayısı, uzunluk / çerçeve aralığından otomatik hesaplanır. Bu bir çıplak iskelettir; üzerine ayrıca duvar
+        paneli ve/veya çatı kafesi eklenmesi gerekir.
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        <MaterialSelect label="Kolon Profili" materials={materials} value={kolonProfilId} onChange={setKolonProfilId} />
+        <MaterialSelect label="Kiriş Profili" materials={materials} value={kirisProfilId} onChange={setKirisProfilId} />
+      </div>
+      <Sayi label="Çerçeve Aralığı (mm)" value={cerceveAraligiHedefMm} onChange={setCerceveAraligiHedefMm} />
+      <details className="rounded-xl border border-neutral-200 p-3">
+        <summary className="font-semibold cursor-pointer">Gelişmiş: Bağlantı Kirişi ve Stabilite</summary>
+        <div className="mt-3 space-y-3">
+          <MaterialSelect
+            label="Bağlantı Kirişi Profili (boy yönü, opsiyonel)"
+            materials={materials}
+            value={baglantiKirisiProfilId}
+            onChange={setBaglantiKirisiProfilId}
+            allowEmpty
+          />
+          <label className="flex items-center gap-2 text-sm font-medium">
+            <input
+              type="checkbox"
+              checked={stabiliteBaglantisiVar}
+              onChange={(e) => setStabiliteBaglantisiVar(e.target.checked)}
+            />
+            İlk açıklığa stabilite çaprazı (rüzgar/deprem) ekle
+          </label>
+          {stabiliteBaglantisiVar && (
+            <MaterialSelect
+              label="Stabilite Çaprazı Profili (genelde L profil)"
+              materials={materials}
+              value={stabiliteProfilId}
+              onChange={setStabiliteProfilId}
+            />
           )}
         </div>
       </details>

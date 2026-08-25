@@ -8,6 +8,7 @@ import RafSchematic from "./RafSchematic";
 import DonerMerdivenSchematic from "./DonerMerdivenSchematic";
 import PergolaSchematic from "./PergolaSchematic";
 import FerforjePanelSchematic from "./FerforjePanelSchematic";
+import SteelFrameSchematic from "./SteelFrameSchematic";
 
 /** Ürün şablonuna göre uygun şematik çizimi seçip render eder (railing/stairs/canopy/door). */
 export default function SemaGorunum({
@@ -152,6 +153,20 @@ export default function SemaGorunum({
             gercekAralikMm: ozetDegerler.gercekAralikMm,
             yatayAraKayitSayisi: Number(params.yatayAraKayitSayisi ?? 0),
             susVar: Boolean(params.susVar),
+          }}
+        />
+      );
+    case "steel_frame":
+      return (
+        <SteelFrameSchematic
+          veri={{
+            acikligMm: n("acikligMm"),
+            yukseklikMm: n("yukseklikMm"),
+            acikSayisi: n("acikSayisi") || 1,
+            cerceveSayisi: ozetDegerler.cerceveSayisi,
+            gercekAralikMm: ozetDegerler.gercekAralikMm,
+            baglantiKirisiVar: Boolean(params.baglantiKirisiProfilId),
+            stabiliteVar: Boolean(params.stabiliteBaglantisiVar && params.stabiliteProfilId),
           }}
         />
       );

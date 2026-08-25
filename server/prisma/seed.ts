@@ -53,6 +53,7 @@ async function main() {
       { key: "shelf", name: "Raf", description: "Depo/atölye rafı (4 ayak + çok seviyeli çerçeve, opsiyonel sac yüzey)" },
       { key: "pergola", name: "Pergola", description: "Serbest duran, açık latalı gölgelik yapısı" },
       { key: "ferforje_panel", name: "Ferforje Panel", description: "Dekoratif demir panel / pencere korkuluğu" },
+      { key: "steel_frame", name: "Kolon-Kiriş İskelet", description: "Genel amaçlı çelik taşıyıcı iskelet (kolon + kiriş, tek/çok açıklıklı)" },
       { key: "custom", name: "Manuel / Çelik Konstrüksiyon", description: "Elle parça girişi, hazır şablona bağlı değil" },
     ],
     skipDuplicates: true,

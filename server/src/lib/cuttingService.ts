@@ -1,6 +1,8 @@
 import { prisma } from "./prisma";
 import { expandPieces, optimizeCutting } from "../calc/cutting";
+import { nestSheets, SacNestingSonucu } from "../calc/sheetNesting";
 import { HesaplamaHatasi } from "../calc/units";
+import { UrunHesapSonucu } from "../calc/types";
 
 export type KesimGruplamaModu = "malzeme" | "parca";
 
@@ -60,4 +62,53 @@ export async function generateCuttingListsForProject(projectId: number, mod: Kes
   }
 
   return { cuttingLists: created, uyarilar };
+}
+
+export interface SacNestingGrubu extends SacNestingSonucu {
+  kalinlikMm: number;
+}
+
+/**
+ * Projedeki tüm ürünlerin sac kalemlerini (kaplama, taban plakası, basamak plakası vb.) kalınlığa
+ * göre gruplar ve her grup için 2D yerleştirme (nesting) hesaplar. Sac kalemleri profil parçaların
+ * aksine bir Material'a bağlı değildir (bkz. calc/types.ts SacKalemi) - bu yüzden burada kalıcı bir
+ * kesim listesi kaydı OLUŞTURULMAZ, her istekte anlık hesaplanır. Gruplama sadece kalınlığa göredir;
+ * gerçekte farklı malzeme/kaplama türleri aynı kalınlıkta karışabilir - bu bilinen bir basitleştirmedir.
+ */
+export async function generateSheetNestingForProject(
+  projectId: number,
+  sheetWidthMm: number,
+  sheetHeightMm: number,
+  kerfMm: number
+): Promise<{ gruplar: SacNestingGrubu[]; uyarilar: string[] }> {
+  const items = await prisma.projectItem.findMany({ where: { projectId } });
+
+  const parcaGruplari = new Map<number, { enMm: number; boyMm: number; adet: number; label: string }[]>();
+  for (const item of items) {
+    const sonuc = item.resultJson as unknown as UrunHesapSonucu | null;
+    if (!sonuc?.sacKalemleri?.length) continue;
+    for (const sac of sonuc.sacKalemleri) {
+      const kalinlik = Math.round((sac.kalinlikMm ?? 1) * 100) / 100;
+      const liste = parcaGruplari.get(kalinlik) ?? [];
+      liste.push({ enMm: sac.enMm, boyMm: sac.boyMm, adet: sac.adet, label: `${item.name}: ${sac.label}` });
+      parcaGruplari.set(kalinlik, liste);
+    }
+  }
+
+  const gruplar: SacNestingGrubu[] = [];
+  const uyarilar: string[] = [];
+
+  for (const [kalinlikMm, parcalar] of parcaGruplari.entries()) {
+    try {
+      const sonuc = nestSheets(parcalar, sheetWidthMm, sheetHeightMm, kerfMm);
+      gruplar.push({ kalinlikMm, ...sonuc });
+    } catch (err) {
+      const mesaj = err instanceof HesaplamaHatasi ? err.message : "Sac yerleştirmesi hesaplanamadı.";
+      uyarilar.push(`${kalinlikMm} mm kalınlık: ${mesaj}`);
+    }
+  }
+
+  gruplar.sort((a, b) => b.kalinlikMm - a.kalinlikMm);
+
+  return { gruplar, uyarilar };
 }

@@ -188,6 +188,23 @@ const ferforjePanelSchema = z.object({
   susBirimUzunlukMm: z.number().optional(),
 });
 
+const steelFrameSchema = z.object({
+  acikligMm: z.number(),
+  uzunlukMm: z.number(),
+  yukseklikMm: z.number(),
+  acikSayisi: z.number().int().optional(),
+  kolonProfilId: z.number().int(),
+  kirisProfilId: z.number().int(),
+  cerceveAraligiHedefMm: z.number().optional(),
+  baglantiKirisiProfilId: z.number().int().optional(),
+  stabiliteBaglantisiVar: z.boolean().optional(),
+  stabiliteProfilId: z.number().int().optional(),
+  plakaEnMm: z.number().optional(),
+  plakaBoyMm: z.number().optional(),
+  plakaKalinlikMm: z.number().optional(),
+  ankrajSayisiPerPlaka: z.number().int().optional(),
+});
+
 const customSchema = z.object({
   parcalar: z.array(
     z.object({
@@ -225,6 +242,7 @@ export const TEMPLATE_SCHEMAS: Record<string, z.ZodTypeAny> = {
   shelf: shelfSchema,
   pergola: pergolaSchema,
   ferforje_panel: ferforjePanelSchema,
+  steel_frame: steelFrameSchema,
 };
 
 export const CUSTOM_SCHEMA = customSchema;

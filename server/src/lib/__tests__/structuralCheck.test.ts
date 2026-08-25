@@ -6,6 +6,8 @@ import { calculateStairs } from "../../calc/stairs";
 import { calculateSpiralStairs } from "../../calc/spiralStairs";
 import { calculateWallPanel } from "../../calc/wall";
 import { calculateShelf } from "../../calc/shelf";
+import { calculatePergola } from "../../calc/pergola";
+import { calculateSteelFrame } from "../../calc/steelFrame";
 
 function mockMaterial(overrides: Partial<Material>): Material {
   return {
@@ -239,4 +241,108 @@ test("raf kontrolü: tasarım yükü belirtilmezse varsayılan (100 kg/m²) kull
   const kontrol = yapiselKontrolCalistir("shelf", girdi, sonuc, { ayak: GUCLU_BOX, cerceve: GUCLU_BOX });
   assert.ok(kontrol);
   assert.ok(kontrol!.kalemler[0].yukAciklamasi.includes("100 kg/m²"));
+});
+
+test("pergola kontrolü: zayıf kiriş geniş açıklıkta yetersiz çıkar", () => {
+  const sonuc = calculatePergola({
+    genislikMm: 8000,
+    boyMm: 4000,
+    yukseklikMm: 2400,
+    kolonSayisi: 4,
+    kolonProfilKey: "kolon",
+    kirisProfilKey: "kiris",
+    lataProfilKey: "lata",
+  });
+  const girdi = {
+    genislikMm: 8000,
+    boyMm: 4000,
+    yukseklikMm: 2400,
+    kolonSayisi: 4,
+    kolonProfilKey: "kolon",
+    kirisProfilKey: "kiris",
+    lataProfilKey: "lata",
+  };
+  const kontrol = yapiselKontrolCalistir("pergola", girdi, sonuc, { kolon: GUCLU_BOX, kiris: ZAYIF_BOX, lata: GUCLU_BOX });
+  assert.ok(kontrol);
+  assert.equal(kontrol!.genelDurum, "yetersiz");
+  assert.equal(kontrol!.kalemler[0].eleman, "Kenar kirişi (bitişik kolonlar arası açıklık)");
+});
+
+test("pergola kontrolü: güçlü kiriş dar açıklıkta (ara kolonlu) uygun/sınırda çıkar", () => {
+  const sonuc = calculatePergola({
+    genislikMm: 6000,
+    boyMm: 3000,
+    yukseklikMm: 2400,
+    kolonSayisi: 6,
+    kolonProfilKey: "kolon",
+    kirisProfilKey: "kiris",
+    lataProfilKey: "lata",
+  });
+  const girdi = {
+    genislikMm: 6000,
+    boyMm: 3000,
+    yukseklikMm: 2400,
+    kolonSayisi: 6,
+    kolonProfilKey: "kolon",
+    kirisProfilKey: "kiris",
+    lataProfilKey: "lata",
+  };
+  const kontrol = yapiselKontrolCalistir("pergola", girdi, sonuc, { kolon: GUCLU_BOX, kiris: GUCLU_BOX, lata: GUCLU_BOX });
+  assert.ok(kontrol);
+  assert.notEqual(kontrol!.genelDurum, "yetersiz");
+});
+
+test("pergola kontrolü: kiriş malzemesi bulunamazsa undefined döner", () => {
+  const sonuc = calculatePergola({
+    genislikMm: 4000,
+    boyMm: 3000,
+    yukseklikMm: 2400,
+    kolonSayisi: 4,
+    kolonProfilKey: "kolon",
+    kirisProfilKey: "kiris",
+    lataProfilKey: "lata",
+  });
+  const kontrol = yapiselKontrolCalistir("pergola", { kirisProfilKey: "kiris" }, sonuc, {});
+  assert.equal(kontrol, undefined);
+});
+
+test("kolon-kiriş kontrolü: zayıf kiriş geniş açıklıkta yetersiz çıkar", () => {
+  const sonuc = calculateSteelFrame({
+    acikligMm: 8000,
+    uzunlukMm: 9000,
+    yukseklikMm: 3000,
+    kolonProfilKey: "kolon",
+    kirisProfilKey: "kiris",
+  });
+  const girdi = {
+    acikligMm: 8000,
+    uzunlukMm: 9000,
+    yukseklikMm: 3000,
+    kolonProfilKey: "kolon",
+    kirisProfilKey: "kiris",
+  };
+  const kontrol = yapiselKontrolCalistir("steel_frame", girdi, sonuc, { kolon: GUCLU_BOX, kiris: ZAYIF_BOX });
+  assert.ok(kontrol);
+  assert.equal(kontrol!.genelDurum, "yetersiz");
+  assert.equal(kontrol!.kalemler[0].eleman, "Kiriş (açıklık)");
+});
+
+test("kolon-kiriş kontrolü: güçlü kiriş dar açıklıkta uygun/sınırda çıkar", () => {
+  const sonuc = calculateSteelFrame({
+    acikligMm: 3000,
+    uzunlukMm: 6000,
+    yukseklikMm: 3000,
+    kolonProfilKey: "kolon",
+    kirisProfilKey: "kiris",
+  });
+  const girdi = {
+    acikligMm: 3000,
+    uzunlukMm: 6000,
+    yukseklikMm: 3000,
+    kolonProfilKey: "kolon",
+    kirisProfilKey: "kiris",
+  };
+  const kontrol = yapiselKontrolCalistir("steel_frame", girdi, sonuc, { kolon: GUCLU_BOX, kiris: GUCLU_BOX });
+  assert.ok(kontrol);
+  assert.notEqual(kontrol!.genelDurum, "yetersiz");
 });

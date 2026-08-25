@@ -27,10 +27,12 @@ import {
   ONCELIK_ETIKET,
   ONCELIK_RENK,
   KesimCubugu,
+  SacNestingGrubu,
 } from "../api/types";
 import { Spinner, HataKutusu, UyariKutusu, Badge, Modal, EmptyState } from "../components/ui";
 import MaterialSelect from "../components/MaterialSelect";
 import CuttingBarView from "../components/CuttingBarView";
+import SacLevhaGorunumu from "../components/SacLevhaGorunumu";
 import { UrunFormu, URUN_EMOJI } from "./YeniIs";
 import SemaGorunum from "../components/SemaGorunum";
 import { tl, mm, tarih, sayi } from "../lib/format";
@@ -993,6 +995,83 @@ function KesimTab({ proje, onChanged }: { proje: Project; onChanged: () => void 
           </div>
         ))
       )}
+
+      <SacKesimPlaniBolumu projectId={proje.id} />
+    </div>
+  );
+}
+
+function SacKesimPlaniBolumu({ projectId }: { projectId: number }) {
+  const [sheetWidthMm, setSheetWidthMm] = useState(1250);
+  const [sheetHeightMm, setSheetHeightMm] = useState(2500);
+  const [kerfMm, setKerfMm] = useState(3);
+  const [gruplar, setGruplar] = useState<SacNestingGrubu[] | null>(null);
+  const [uyarilar, setUyarilar] = useState<string[]>([]);
+  const [hesaplaniyor, setHesaplaniyor] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+
+  const hesapla = async () => {
+    setHesaplaniyor(true);
+    setHata(null);
+    try {
+      const r = await api.get<{ gruplar: SacNestingGrubu[]; uyarilar: string[] }>(
+        `/projects/${projectId}/cutting/sac?sheetWidthMm=${sheetWidthMm}&sheetHeightMm=${sheetHeightMm}&kerfMm=${kerfMm}`
+      );
+      setGruplar(r.gruplar);
+      setUyarilar(r.uyarilar);
+    } catch (e: any) {
+      setHata(e.message);
+    } finally {
+      setHesaplaniyor(false);
+    }
+  };
+
+  return (
+    <div className="card space-y-3">
+      <h2 className="font-bold text-lg">🗋 Sac Kesim Planı (2D Yerleşim)</h2>
+      <p className="text-xs text-neutral-500">
+        İşteki tüm ürünlerin sac kalemleri (kaplama, taban plakası, basamak plakası vb.) kalınlığa göre gruplanıp seçtiğiniz
+        levha boyutuna yerleştirilir. Basitleştirme: parçalar döndürülmez, farklı malzeme/kaplama türleri sadece kalınlığa
+        göre gruplanır - kalıcı bir kayıt oluşturmaz, her seferinde yeniden hesaplanır.
+      </p>
+      <HataKutusu mesaj={hata} />
+      <UyariKutusu mesajlar={uyarilar} />
+      <div className="flex gap-3 flex-wrap items-end">
+        <div className="w-32">
+          <label className="field-label">Levha Eni (mm)</label>
+          <input type="number" className="field-input" value={sheetWidthMm} onChange={(e) => setSheetWidthMm(Number(e.target.value))} />
+        </div>
+        <div className="w-32">
+          <label className="field-label">Levha Boyu (mm)</label>
+          <input type="number" className="field-input" value={sheetHeightMm} onChange={(e) => setSheetHeightMm(Number(e.target.value))} />
+        </div>
+        <div className="w-28">
+          <label className="field-label">Kesim Payı (mm)</label>
+          <input type="number" className="field-input" value={kerfMm} onChange={(e) => setKerfMm(Number(e.target.value))} />
+        </div>
+        <button className="btn-primary" onClick={hesapla} disabled={hesaplaniyor}>
+          {hesaplaniyor ? "Hesaplanıyor..." : "🗋 Sac Planını Hesapla"}
+        </button>
+      </div>
+
+      {gruplar && gruplar.length === 0 && <EmptyState title="Bu işte sac kalemi bulunamadı" />}
+
+      {gruplar &&
+        gruplar.map((g) => (
+          <div key={g.kalinlikMm} className="rounded-xl border border-neutral-200 p-3 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h3 className="font-semibold">{g.kalinlikMm} mm kalınlık</h3>
+              <div className="text-sm text-neutral-500">
+                {g.toplamLevha} levha • {g.toplamParca} parça • Fire: %{sayi(g.fireYuzde, 1)}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-4">
+              {g.levhalar.map((levha, i) => (
+                <SacLevhaGorunumu key={i} levha={levha} sheetWidthMm={g.sheetWidthMm} sheetHeightMm={g.sheetHeightMm} index={i} />
+              ))}
+            </div>
+          </div>
+        ))}
     </div>
   );
 }

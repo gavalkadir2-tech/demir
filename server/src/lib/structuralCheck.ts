@@ -16,6 +16,7 @@ const KAR_YUKU_N_M2 = 1000; // TS 498, orta rakım/bölge için tipik kar yükü
 const BASAMAK_CANLI_YUK_N_M2 = 2000; // TS EN 1991-1-1 kategori A (konut) merdiven için tipik canlı yük (2.0 kN/m²)
 const RUZGAR_YUKU_N_M2 = 600; // Düşük katlı hafif yapı duvar paneli için tipik, muhafazakâr rüzgar emme/basınç yükü (0.6 kN/m²)
 const RAF_VARSAYILAN_TASARIM_YUKU_KG_M2 = 100; // Belirtilmezse, atölye/depo rafı için tipik hafif-orta depolama yükü varsayımı
+const PERGOLA_YUK_N_M2 = 400; // Açık latalı, kaplamasız pergola için tipik kendi ağırlık + rüzgar yükü (0.4 kN/m²) - solid çatıdan daha hafif
 
 const YAPISAL_KONTROL_UYARISI =
   "Bu, basitleştirilmiş bir mukavemet/sehim kontrolüdür - tam bir statik projelendirme değildir. Kritik/kamusal yapılarda mutlaka bir inşaat mühendisinden onay alın.";
@@ -289,6 +290,72 @@ function rafKontrolu(
   ]);
 }
 
+function pergolaKontrolu(
+  girdi: Record<string, unknown>,
+  sonuc: UrunHesapSonucu,
+  malzemeler: Record<string, Material>
+): YapiselKontrolSonucu | undefined {
+  const genislikMm = Number(girdi.genislikMm);
+  const boyMm = Number(girdi.boyMm);
+  const kolonSiraAdedi = sonuc.ozetDegerler.kolonSiraAdedi;
+  const kirisMalzeme = malzemeler[String(girdi.kirisProfilKey)];
+  if (!genislikMm || !boyMm || !kolonSiraAdedi || kolonSiraAdedi < 2 || !kirisMalzeme) return undefined;
+
+  const kirisKesit = kesitOzellikleriHesapla(kirisMalzeme);
+  if (!kirisKesit) return undefined;
+
+  // Kenar kirişi, aynı sıradaki bitişik kolonlar arasında basit mesnetli; yapının yarı derinliğini
+  // (boyMm/2) taşıdığı varsayılır (ön/arka kenar kirişi arasında yaklaşık eşit paylaşım).
+  const spanMm = genislikMm / (kolonSiraAdedi - 1);
+  const cizgiselYukNMm = (PERGOLA_YUK_N_M2 / 1_000_000) * (boyMm / 2);
+  const toplamYukN = cizgiselYukNMm * spanMm;
+
+  const s = kirisKontrolEt({ acikligMm: spanMm, mesnetTuru: "basit", yukTuru: "yayili", toplamYukN, kesit: kirisKesit });
+
+  return ozetOlustur([
+    {
+      ...s,
+      eleman: "Kenar kirişi (bitişik kolonlar arası açıklık)",
+      profilAdi: kirisMalzeme.name,
+      yukAciklamasi: `Kendi ağırlık + rüzgar yükü ${(PERGOLA_YUK_N_M2 / 1000).toFixed(2)} kN/m² × ${(boyMm / 2000).toFixed(
+        2
+      )} m yayılma genişliği (yapı derinliğinin yarısı), ${(spanMm / 1000).toFixed(2)} m kolon açıklığı`,
+    },
+  ]);
+}
+
+function kolonKirisKontrolu(
+  girdi: Record<string, unknown>,
+  sonuc: UrunHesapSonucu,
+  malzemeler: Record<string, Material>
+): YapiselKontrolSonucu | undefined {
+  const acikligMm = Number(girdi.acikligMm);
+  const gercekAralikMm = sonuc.ozetDegerler.gercekAralikMm; // çerçeveler arası (kirişin taşıdığı yayılma genişliği)
+  const kirisMalzeme = malzemeler[String(girdi.kirisProfilKey)];
+  if (!acikligMm || !gercekAralikMm || !kirisMalzeme) return undefined;
+
+  const kirisKesit = kesitOzellikleriHesapla(kirisMalzeme);
+  if (!kirisKesit) return undefined;
+
+  // İskelet henüz çıplaktır; üzerine sonradan eklenecek çatı/kaplama için tipik kar yükü kadar bir
+  // tasarım yükü varsayılır (bkz. catiKafesiKontrolu ile aynı KAR_YUKU_N_M2 sabiti).
+  const cizgiselYukNMm = (KAR_YUKU_N_M2 / 1_000_000) * gercekAralikMm;
+  const toplamYukN = cizgiselYukNMm * acikligMm;
+
+  const s = kirisKontrolEt({ acikligMm, mesnetTuru: "basit", yukTuru: "yayili", toplamYukN, kesit: kirisKesit });
+
+  return ozetOlustur([
+    {
+      ...s,
+      eleman: "Kiriş (açıklık)",
+      profilAdi: kirisMalzeme.name,
+      yukAciklamasi: `Üzerine eklenecek çatı/kaplama için tipik kar yükü varsayımı ${(KAR_YUKU_N_M2 / 1000).toFixed(
+        2
+      )} kN/m² × ${(gercekAralikMm / 1000).toFixed(2)} m çerçeve aralığı, ${(acikligMm / 1000).toFixed(2)} m açıklık`,
+    },
+  ]);
+}
+
 /** Şablon anahtarına göre uygun yapısal kontrol modelini çalıştırır; desteklenmiyorsa undefined döner. */
 export function yapiselKontrolCalistir(
   templateKey: string,
@@ -303,6 +370,8 @@ export function yapiselKontrolCalistir(
     if (templateKey === "spiral_stairs") return donerMerdivenKontrolu(girdi, sonuc, malzemeler);
     if (templateKey === "wall") return duvarKontrolu(girdi, sonuc, malzemeler);
     if (templateKey === "shelf") return rafKontrolu(girdi, sonuc, malzemeler);
+    if (templateKey === "pergola") return pergolaKontrolu(girdi, sonuc, malzemeler);
+    if (templateKey === "steel_frame") return kolonKirisKontrolu(girdi, sonuc, malzemeler);
     return undefined;
   } catch {
     // Yapısal kontrol her zaman opsiyoneldir - beklenmeyen bir hata ana hesaplamayı bozmamalı.

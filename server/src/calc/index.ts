@@ -10,9 +10,11 @@ export * from "./roofTruss";
 export * from "./shelf";
 export * from "./pergola";
 export * from "./ferforjePanel";
+export * from "./steelFrame";
 export * from "./customProduct";
 export * from "./sheet";
 export * from "./cutting";
+export * from "./sheetNesting";
 export * from "./costing";
 
 import { calculateRailing } from "./railing";
@@ -25,6 +27,7 @@ import { calculateRoofTruss } from "./roofTruss";
 import { calculateShelf } from "./shelf";
 import { calculatePergola } from "./pergola";
 import { calculateFerforjePanel } from "./ferforjePanel";
+import { calculateSteelFrame } from "./steelFrame";
 import { calculateCustomProduct } from "./customProduct";
 import { UrunHesapSonucu } from "./types";
 import { HesaplamaHatasi } from "./units";
@@ -41,6 +44,7 @@ export const URUN_HESAPLAYICILAR: Record<string, (girdi: any) => UrunHesapSonucu
   shelf: calculateShelf,
   pergola: calculatePergola,
   ferforje_panel: calculateFerforjePanel,
+  steel_frame: calculateSteelFrame,
   custom: calculateCustomProduct,
 };
 

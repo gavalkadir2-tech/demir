@@ -342,6 +342,33 @@ export interface KesimCubugu {
   stockLengthMm: number;
 }
 
+export interface SacYerlesenParca {
+  enMm: number;
+  boyMm: number;
+  xMm: number;
+  yMm: number;
+  label?: string;
+}
+
+export interface SacLevhasi {
+  parcalar: SacYerlesenParca[];
+  kullanilanAlanMm2: number;
+}
+
+export interface SacNestingGrubu {
+  kalinlikMm: number;
+  sheetWidthMm: number;
+  sheetHeightMm: number;
+  kerfMm: number;
+  levhalar: SacLevhasi[];
+  toplamLevha: number;
+  toplamParca: number;
+  toplamAlanMm2: number;
+  kullanilanAlanMm2: number;
+  fireAlanMm2: number;
+  fireYuzde: number;
+}
+
 export interface CuttingList {
   id: number;
   projectId: number;
