@@ -40,6 +40,21 @@ const stairsSchema = z.object({
   korkulukDikmeAraligiHedefMm: z.number().optional(),
 });
 
+const spiralStairsSchema = z.object({
+  katYuksekligiMm: z.number(),
+  icCapMm: z.number(),
+  disCapMm: z.number(),
+  toplamDonusDerecesi: z.number(),
+  basamakYuksekligiHedefMm: z.number(),
+  merkezKolonProfilId: z.number().int(),
+  basamakDestekProfilId: z.number().int(),
+  basamakKalinlikMm: z.number().optional(),
+  korkulukVar: z.boolean().optional(),
+  korkulukYuksekligiMm: z.number().optional(),
+  korkulukDikmeProfilId: z.number().int().optional(),
+  korkulukUstProfilId: z.number().int().optional(),
+});
+
 const canopySchema = z.object({
   genislikMm: z.number(),
   boyMm: z.number(),
@@ -164,6 +179,7 @@ export function idToKey(obj: Record<string, unknown>): Record<string, unknown> {
 export const TEMPLATE_SCHEMAS: Record<string, z.ZodTypeAny> = {
   railing: railingSchema,
   stairs: stairsSchema,
+  spiral_stairs: spiralStairsSchema,
   canopy: canopySchema,
   door: doorSchema,
   wall: wallSchema,

@@ -44,7 +44,8 @@ async function main() {
   await prisma.productTemplate.createMany({
     data: [
       { key: "railing", name: "Korkuluk", description: "Bahçe, balkon, teras korkuluğu" },
-      { key: "stairs", name: "Merdiven", description: "Çelik merdiven, isteğe bağlı korkuluk" },
+      { key: "stairs", name: "Düz Merdiven", description: "Düz (tek kollu) çelik merdiven, isteğe bağlı korkuluk" },
+      { key: "spiral_stairs", name: "Döner Merdiven", description: "Merkez kolon etrafında dönen spiral merdiven" },
       { key: "canopy", name: "Sundurma", description: "Sundurma / kanopi çatı sistemi" },
       { key: "door", name: "Kapı", description: "Demir kapı (kasa + kanat)" },
       { key: "wall", name: "Çelik Duvar Paneli", description: "Prefabrik/çelik karkas duvar paneli (dikme + ray + boşluklar)" },
@@ -53,6 +54,11 @@ async function main() {
       { key: "custom", name: "Manuel / Çelik Konstrüksiyon", description: "Elle parça girişi, hazır şablona bağlı değil" },
     ],
     skipDuplicates: true,
+  });
+  // "stairs" adı önceden "Merdiven" idi; döner merdiven eklenince ayrım için yeniden adlandırıldı.
+  await prisma.productTemplate.updateMany({
+    where: { key: "stairs", name: "Merdiven" },
+    data: { name: "Düz Merdiven", description: "Düz (tek kollu) çelik merdiven, isteğe bağlı korkuluk" },
   });
 
   await prisma.settings.upsert({

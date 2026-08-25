@@ -5,6 +5,7 @@ import DoorSchematic from "./DoorSchematic";
 import WallSchematic, { DuvarBoslukVeri } from "./WallSchematic";
 import TrussSchematic from "./TrussSchematic";
 import RafSchematic from "./RafSchematic";
+import DonerMerdivenSchematic from "./DonerMerdivenSchematic";
 
 /** Ürün şablonuna göre uygun şematik çizimi seçip render eder (railing/stairs/canopy/door). */
 export default function SemaGorunum({
@@ -95,6 +96,18 @@ export default function SemaGorunum({
             gercekAralikMm: ozetDegerler.gercekAralikMm,
             stabiliteVar: Boolean(params.stabiliteBaglantisiVar && params.stabiliteProfilId),
             direkSayisi: Number(params.direkSayisi ?? 0),
+          }}
+        />
+      );
+    case "spiral_stairs":
+      return (
+        <DonerMerdivenSchematic
+          veri={{
+            icCapMm: n("icCapMm"),
+            disCapMm: n("disCapMm"),
+            basamakSayisi: ozetDegerler.basamakSayisi,
+            toplamDonusDerecesi: n("toplamDonusDerecesi"),
+            korkulukVar: Boolean(params.korkulukVar),
           }}
         />
       );

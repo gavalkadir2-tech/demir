@@ -2,6 +2,7 @@ export * from "./units";
 export * from "./types";
 export * from "./railing";
 export * from "./stairs";
+export * from "./spiralStairs";
 export * from "./canopy";
 export * from "./door";
 export * from "./wall";
@@ -14,6 +15,7 @@ export * from "./costing";
 
 import { calculateRailing } from "./railing";
 import { calculateStairs } from "./stairs";
+import { calculateSpiralStairs } from "./spiralStairs";
 import { calculateCanopy } from "./canopy";
 import { calculateDoor } from "./door";
 import { calculateWallPanel } from "./wall";
@@ -27,6 +29,7 @@ import { HesaplamaHatasi } from "./units";
 export const URUN_HESAPLAYICILAR: Record<string, (girdi: any) => UrunHesapSonucu> = {
   railing: calculateRailing,
   stairs: calculateStairs,
+  spiral_stairs: calculateSpiralStairs,
   canopy: calculateCanopy,
   door: calculateDoor,
   wall: calculateWallPanel,

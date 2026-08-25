@@ -22,6 +22,7 @@ import TrussIsometricView from "../components/TrussIsometricView";
 const TEMPLATE_KATEGORI: Record<string, ProjectCategory> = {
   railing: "RAILING",
   stairs: "STAIRS",
+  spiral_stairs: "STAIRS",
   canopy: "CANOPY",
   door: "DOOR",
   wall: "STEEL_STRUCTURE",
@@ -33,6 +34,7 @@ const TEMPLATE_KATEGORI: Record<string, ProjectCategory> = {
 export const URUN_EMOJI: Record<string, string> = {
   railing: "🚧",
   stairs: "🪜",
+  spiral_stairs: "🌀",
   canopy: "⛺",
   door: "🚪",
   wall: "🏗️",
@@ -526,6 +528,7 @@ export function UrunFormu({
 
         {templateKey === "railing" && <KorkulukAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
         {templateKey === "stairs" && <MerdivenAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
+        {templateKey === "spiral_stairs" && <DonerMerdivenAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
         {templateKey === "canopy" && <SundurmaAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
         {templateKey === "door" && <KapiAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
         {templateKey === "wall" && <DuvarAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
@@ -751,6 +754,133 @@ function MerdivenAlanlari({
           <MaterialSelect label="Korkuluk Üst Profili" materials={materials} value={korkulukUstProfilId} onChange={setKorkulukUstProfilId} allowEmpty />
         </div>
       </details>
+    </div>
+  );
+}
+
+function DonerMerdivenAlanlari({
+  materials,
+  onChange,
+  baslangic,
+}: {
+  materials: Material[];
+  onChange: (p: Record<string, unknown>) => void;
+  baslangic?: Record<string, unknown>;
+}) {
+  const [katYuksekligiMm, setKatYuksekligiMm] = useState<number>(() => (baslangic?.katYuksekligiMm as number) ?? 2800);
+  const [icCapMm, setIcCapMm] = useState<number>(() => (baslangic?.icCapMm as number) ?? 200);
+  const [disCapMm, setDisCapMm] = useState<number>(() => (baslangic?.disCapMm as number) ?? 1400);
+  const [toplamDonusDerecesi, setToplamDonusDerecesi] = useState<number>(
+    () => (baslangic?.toplamDonusDerecesi as number) ?? 360
+  );
+  const [basamakYuksekligiHedefMm, setBasamakYuksekligiHedefMm] = useState<number>(
+    () => (baslangic?.basamakYuksekligiHedefMm as number) ?? 200
+  );
+  const [merkezKolonProfilId, setMerkezKolonProfilId] = useState<number | undefined>(
+    () => baslangic?.merkezKolonProfilId as number | undefined
+  );
+  const [basamakDestekProfilId, setBasamakDestekProfilId] = useState<number | undefined>(
+    () => baslangic?.basamakDestekProfilId as number | undefined
+  );
+  const [basamakKalinlikMm, setBasamakKalinlikMm] = useState<number>(() => (baslangic?.basamakKalinlikMm as number) ?? 3);
+  const [korkulukVar, setKorkulukVar] = useState<boolean>(() => (baslangic?.korkulukVar as boolean) ?? false);
+  const [korkulukYuksekligiMm, setKorkulukYuksekligiMm] = useState<number>(
+    () => (baslangic?.korkulukYuksekligiMm as number) ?? 900
+  );
+  const [korkulukDikmeProfilId, setKorkulukDikmeProfilId] = useState<number | undefined>(
+    () => baslangic?.korkulukDikmeProfilId as number | undefined
+  );
+  const [korkulukUstProfilId, setKorkulukUstProfilId] = useState<number | undefined>(
+    () => baslangic?.korkulukUstProfilId as number | undefined
+  );
+
+  useEffect(() => {
+    onChange({
+      katYuksekligiMm,
+      icCapMm,
+      disCapMm,
+      toplamDonusDerecesi,
+      basamakYuksekligiHedefMm,
+      merkezKolonProfilId,
+      basamakDestekProfilId,
+      basamakKalinlikMm,
+      korkulukVar,
+      korkulukYuksekligiMm: korkulukVar ? korkulukYuksekligiMm : undefined,
+      korkulukDikmeProfilId: korkulukVar ? korkulukDikmeProfilId : undefined,
+      korkulukUstProfilId: korkulukVar ? korkulukUstProfilId : undefined,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    katYuksekligiMm,
+    icCapMm,
+    disCapMm,
+    toplamDonusDerecesi,
+    basamakYuksekligiHedefMm,
+    merkezKolonProfilId,
+    basamakDestekProfilId,
+    basamakKalinlikMm,
+    korkulukVar,
+    korkulukYuksekligiMm,
+    korkulukDikmeProfilId,
+    korkulukUstProfilId,
+  ]);
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <Sayi label="Kat Yüksekliği (mm)" value={katYuksekligiMm} onChange={setKatYuksekligiMm} />
+        <Sayi label="Hedef Basamak Yüksekliği (mm)" value={basamakYuksekligiHedefMm} onChange={setBasamakYuksekligiHedefMm} />
+        <Sayi label="İç Çap (mm)" value={icCapMm} onChange={setIcCapMm} />
+        <Sayi label="Dış Çap (mm)" value={disCapMm} onChange={setDisCapMm} />
+        <Sayi label="Toplam Dönüş Açısı (derece)" value={toplamDonusDerecesi} onChange={setToplamDonusDerecesi} />
+        <Sayi label="Basamak Kalınlığı (mm)" value={basamakKalinlikMm} onChange={setBasamakKalinlikMm} />
+      </div>
+      <p className="text-xs text-neutral-500 -mt-1">
+        Basamak sayısı ve açısı kat yüksekliği / hedef basamak yüksekliği ve toplam dönüş açısından otomatik hesaplanır.
+        Basamak plakası pasta dilimi şeklindedir; sac kesimi şablonla yapılmalıdır.
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        <MaterialSelect
+          label="Merkez Kolon Profili (genelde boru)"
+          materials={materials}
+          value={merkezKolonProfilId}
+          onChange={setMerkezKolonProfilId}
+        />
+        <MaterialSelect
+          label="Basamak Desteği (Konsol) Profili"
+          materials={materials}
+          value={basamakDestekProfilId}
+          onChange={setBasamakDestekProfilId}
+        />
+      </div>
+      <div className="mt-1 space-y-3">
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input type="checkbox" checked={korkulukVar} onChange={(e) => setKorkulukVar(e.target.checked)} />
+          Korkuluk ekle
+        </label>
+        {korkulukVar && (
+          <div className="grid grid-cols-3 gap-3">
+            <Sayi label="Korkuluk Yüksekliği (mm)" value={korkulukYuksekligiMm} onChange={setKorkulukYuksekligiMm} />
+            <MaterialSelect
+              label="Korkuluk Dikmesi"
+              materials={materials}
+              value={korkulukDikmeProfilId}
+              onChange={setKorkulukDikmeProfilId}
+            />
+            <MaterialSelect
+              label="Korkuluk Üst Profili"
+              materials={materials}
+              value={korkulukUstProfilId}
+              onChange={setKorkulukUstProfilId}
+            />
+          </div>
+        )}
+        {korkulukVar && (
+          <p className="text-xs text-neutral-500">
+            Üst profil düz uzunluk olarak hesaplanır; gerçek montaj helis (spiral) şeklindedir, sahada bükülmesi gerekir.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
