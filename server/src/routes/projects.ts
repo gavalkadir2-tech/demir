@@ -69,8 +69,20 @@ router.get(
   "/",
   asyncHandler(async (req, res) => {
     const status = typeof req.query.status === "string" ? req.query.status : undefined;
+    const q = typeof req.query.q === "string" ? req.query.q : undefined;
     const projeler = await prisma.project.findMany({
-      where: status ? { status: status as any } : undefined,
+      where: {
+        ...(status ? { status: status as any } : {}),
+        ...(q
+          ? {
+              OR: [
+                { title: { contains: q, mode: "insensitive" } },
+                { customer: { name: { contains: q, mode: "insensitive" } } },
+                { customer: { phone: { contains: q, mode: "insensitive" } } },
+              ],
+            }
+          : {}),
+      },
       orderBy: { createdAt: "desc" },
       include: {
         customer: { select: { id: true, name: true } },

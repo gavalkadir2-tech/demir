@@ -1,41 +1,64 @@
 import { useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import BildirimZili from "./BildirimZili";
+import GlobalArama from "./GlobalArama";
 
 const NAV_ITEMS = [
-  { to: "/", label: "Dashboard", emoji: "🏠" },
-  { to: "/yeni-is", label: "Yeni İş", emoji: "➕" },
-  { to: "/isler", label: "İşler", emoji: "🗂️" },
-  { to: "/takvim", label: "Üretim Takvimi", emoji: "📅" },
+  { to: "/", label: "Ana Sayfa", emoji: "🏠" },
+  { to: "/isler", label: "İşler", emoji: "📋" },
+  { to: "/musteriler", label: "Müşteriler", emoji: "👥" },
+  { to: "/takvim", label: "Takvim", emoji: "📅" },
+  { to: "/stok", label: "Stok", emoji: "📦" },
+  { to: "/ayarlar", label: "Ayarlar", emoji: "⚙️" },
+];
+
+// Daha az sık kullanılan sayfalar "Diğer" altında toplanır; işlevsellik korunur, sadece
+// ana menü sadeleştirilir.
+const DIGER_ITEMS = [
   { to: "/urunler", label: "Ürünler", emoji: "📐" },
   { to: "/malzemeler", label: "Malzemeler", emoji: "🧱" },
   { to: "/kesim-listeleri", label: "Kesim Listeleri", emoji: "✂️" },
   { to: "/teklifler", label: "Teklifler", emoji: "📄" },
-  { to: "/stok", label: "Stok", emoji: "📦" },
-  { to: "/musteriler", label: "Müşteriler", emoji: "👤" },
   { to: "/isciler", label: "İşçiler", emoji: "👷" },
-  { to: "/ayarlar", label: "Ayarlar", emoji: "⚙️" },
 ];
 
+const navLinkClass = ({ isActive }: { isActive: boolean }) =>
+  `flex items-center gap-3 rounded-xl px-4 py-3.5 text-base font-semibold transition ${
+    isActive ? "bg-brand-600 text-white" : "text-neutral-700 hover:bg-neutral-100"
+  }`;
+
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
+  const { pathname } = useLocation();
+  const [digerAcik, setDigerAcik] = useState(DIGER_ITEMS.some((i) => i.to === pathname));
+
   return (
     <nav className="flex flex-col gap-1 p-3">
       {NAV_ITEMS.map((item) => (
-        <NavLink
-          key={item.to}
-          to={item.to}
-          end={item.to === "/"}
-          onClick={onNavigate}
-          className={({ isActive }) =>
-            `flex items-center gap-3 rounded-xl px-4 py-3.5 text-base font-semibold transition ${
-              isActive ? "bg-brand-600 text-white" : "text-neutral-700 hover:bg-neutral-100"
-            }`
-          }
-        >
+        <NavLink key={item.to} to={item.to} end={item.to === "/"} onClick={onNavigate} className={navLinkClass}>
           <span className="text-xl leading-none">{item.emoji}</span>
           {item.label}
         </NavLink>
       ))}
+
+      <button
+        type="button"
+        onClick={() => setDigerAcik((v) => !v)}
+        className="flex items-center gap-3 rounded-xl px-4 py-3.5 text-base font-semibold text-neutral-700 hover:bg-neutral-100 transition"
+      >
+        <span className="text-xl leading-none">⋯</span>
+        Diğer
+        <span className="ml-auto text-sm text-neutral-400">{digerAcik ? "▲" : "▼"}</span>
+      </button>
+      {digerAcik && (
+        <div className="flex flex-col gap-1 pl-2">
+          {DIGER_ITEMS.map((item) => (
+            <NavLink key={item.to} to={item.to} onClick={onNavigate} className={navLinkClass}>
+              <span className="text-xl leading-none">{item.emoji}</span>
+              {item.label}
+            </NavLink>
+          ))}
+        </div>
+      )}
     </nav>
   );
 }
@@ -50,22 +73,28 @@ export default function Layout() {
           <div className="text-lg font-bold text-brand-700">🔧 Demirci Atölye</div>
           <BildirimZili />
         </div>
+        <div className="px-3 pt-3">
+          <GlobalArama />
+        </div>
         <NavList />
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="md:hidden sticky top-0 z-30 flex items-center justify-between bg-white border-b border-neutral-200 px-4 py-3">
-          <div className="text-lg font-bold text-brand-700">🔧 Demirci Atölye</div>
-          <div className="flex items-center gap-2">
-            <BildirimZili />
-            <button
-              className="btn-secondary btn-sm"
-              onClick={() => setMenuOpen(true)}
-              aria-label="Menüyü aç"
-            >
-              ☰ Menü
-            </button>
+        <header className="md:hidden sticky top-0 z-30 bg-white border-b border-neutral-200 px-4 py-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="text-lg font-bold text-brand-700">🔧 Demirci Atölye</div>
+            <div className="flex items-center gap-2">
+              <BildirimZili />
+              <button
+                className="btn-secondary btn-sm"
+                onClick={() => setMenuOpen(true)}
+                aria-label="Menüyü aç"
+              >
+                ☰ Menü
+              </button>
+            </div>
           </div>
+          <GlobalArama />
         </header>
 
         {menuOpen && (

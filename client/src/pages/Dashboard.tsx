@@ -27,13 +27,49 @@ export default function Dashboard() {
 
   if (!veri) return <Spinner />;
 
+  const bugunSorunSayisi = veri.gecikmisIsler.length + veri.yaklasanIsler.length + veri.kritikStoklar.length;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <h1 className="text-2xl font-bold">Ana Sayfa</h1>
         <Link to="/yeni-is" className="btn-primary">
           ➕ Yeni İş
         </Link>
+      </div>
+
+      <div className="card border-brand-200 bg-brand-50/40">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-bold text-brand-800">☀️ Bugün</h2>
+          {bugunSorunSayisi === 0 && <span className="text-sm text-emerald-700 font-medium">🟢 Her şey yolunda</span>}
+        </div>
+        <div className="grid grid-cols-3 gap-3 text-center">
+          <div>
+            <div className={`text-2xl font-bold ${veri.gecikmisIsler.length > 0 ? "text-red-600" : "text-neutral-400"}`}>
+              {veri.gecikmisIsler.length}
+            </div>
+            <div className="text-xs text-neutral-600">🔴 Geciken iş</div>
+          </div>
+          <div>
+            <div className={`text-2xl font-bold ${veri.yaklasanIsler.length > 0 ? "text-amber-600" : "text-neutral-400"}`}>
+              {veri.yaklasanIsler.length}
+            </div>
+            <div className="text-xs text-neutral-600">🟡 Yaklaşan termin</div>
+          </div>
+          <div>
+            <div className={`text-2xl font-bold ${veri.kritikStoklar.length > 0 ? "text-amber-600" : "text-neutral-400"}`}>
+              {veri.kritikStoklar.length}
+            </div>
+            <div className="text-xs text-neutral-600">📦 Kritik stok</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Link to="/yeni-is" className="btn-secondary btn-sm">➕ Yeni İş</Link>
+        <Link to="/musteriler" className="btn-secondary btn-sm">👥 Yeni Müşteri</Link>
+        <Link to="/teklifler" className="btn-secondary btn-sm">📄 Teklifler</Link>
+        <Link to="/stok" className="btn-secondary btn-sm">📦 Stok</Link>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
