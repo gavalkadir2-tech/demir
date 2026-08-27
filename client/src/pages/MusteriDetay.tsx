@@ -1,16 +1,18 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
-import { Customer, Project, CustomerNote, DURUM_ETIKET, DURUM_RENK, KATEGORI_ETIKET } from "../api/types";
+import { Customer, Project, CustomerNote, DURUM_ETIKET, DURUM_RENK, DURUM_SIMGE, KATEGORI_ETIKET } from "../api/types";
 import { Spinner, Badge, HataKutusu } from "../components/ui";
-import { tarih } from "../lib/format";
+import { tarih, tl } from "../lib/format";
+
+type MusteriProjesi = Project & { quotes: { total: number }[]; payments: { amount: number }[] };
+type MusteriDetayVeri = Customer & { projects: MusteriProjesi[]; notes: CustomerNote[] };
 
 export default function MusteriDetay() {
   const { id } = useParams();
-  const [musteri, setMusteri] = useState<(Customer & { projects: Project[]; notes: CustomerNote[] }) | null>(null);
+  const [musteri, setMusteri] = useState<MusteriDetayVeri | null>(null);
 
-  const yukle = () =>
-    api.get<Customer & { projects: Project[]; notes: CustomerNote[] }>(`/customers/${id}`).then(setMusteri);
+  const yukle = () => api.get<MusteriDetayVeri>(`/customers/${id}`).then(setMusteri);
 
   useEffect(() => {
     yukle();
@@ -36,25 +38,68 @@ export default function MusteriDetay() {
 
       <MusteriNotlariBolumu musteriId={musteri.id} notlar={musteri.notes} onChanged={yukle} />
 
+      <CariBolumu projeler={musteri.projects} />
+
       <div>
         <h2 className="text-lg font-bold mb-3">Geçmiş İşler</h2>
         {musteri.projects.length === 0 ? (
           <div className="text-neutral-500 text-sm">Bu müşteriye ait iş yok.</div>
         ) : (
           <div className="grid gap-3">
-            {musteri.projects.map((p) => (
-              <Link to={`/isler/${p.id}`} key={p.id} className="card flex items-center justify-between hover:shadow-md">
-                <div>
-                  <div className="font-semibold">{p.title}</div>
-                  <div className="text-sm text-neutral-500">
-                    {KATEGORI_ETIKET[p.category]} • {tarih(p.createdAt)}
+            {musteri.projects.map((p) => {
+              const satis = p.quotes[0]?.total;
+              const tahsilat = p.payments.reduce((s, pay) => s + pay.amount, 0);
+              const alacak = satis != null ? satis - tahsilat : null;
+              return (
+                <Link to={`/isler/${p.id}`} key={p.id} className="card flex items-center justify-between hover:shadow-md">
+                  <div>
+                    <div className="font-semibold">{p.title}</div>
+                    <div className="text-sm text-neutral-500">
+                      {KATEGORI_ETIKET[p.category]} • {tarih(p.createdAt)}
+                    </div>
                   </div>
-                </div>
-                <Badge className={DURUM_RENK[p.status]}>{DURUM_ETIKET[p.status]}</Badge>
-              </Link>
-            ))}
+                  <div className="flex items-center gap-3">
+                    {alacak != null && alacak > 0 && (
+                      <span className="text-sm font-semibold text-amber-700">Alacak: {tl(alacak)}</span>
+                    )}
+                    <Badge className={DURUM_RENK[p.status]}>
+                      {DURUM_SIMGE[p.status]} {DURUM_ETIKET[p.status]}
+                    </Badge>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** Müşterinin tüm işleri üzerinden toplu satış/tahsilat/alacak özeti (cari). */
+function CariBolumu({ projeler }: { projeler: MusteriProjesi[] }) {
+  const toplamSatis = projeler.reduce((s, p) => s + (p.quotes[0]?.total ?? 0), 0);
+  const toplamTahsilat = projeler.reduce((s, p) => s + p.payments.reduce((a, pay) => a + pay.amount, 0), 0);
+  const toplamAlacak = toplamSatis - toplamTahsilat;
+
+  if (toplamSatis === 0 && toplamTahsilat === 0) return null;
+
+  return (
+    <div className="card space-y-3">
+      <h2 className="font-bold">💳 Cari</h2>
+      <div className="grid grid-cols-3 gap-3 text-center">
+        <div className="rounded-xl bg-neutral-50 p-3">
+          <div className="text-lg font-bold">{tl(toplamSatis)}</div>
+          <div className="text-xs text-neutral-500">Toplam Satış</div>
+        </div>
+        <div className="rounded-xl bg-blue-50 p-3">
+          <div className="text-lg font-bold text-blue-700">{tl(toplamTahsilat)}</div>
+          <div className="text-xs text-neutral-500">Tahsil Edilen</div>
+        </div>
+        <div className={`rounded-xl p-3 ${toplamAlacak > 0 ? "bg-amber-50" : "bg-neutral-50"}`}>
+          <div className={`text-lg font-bold ${toplamAlacak > 0 ? "text-amber-700" : "text-neutral-500"}`}>{tl(toplamAlacak)}</div>
+          <div className="text-xs text-neutral-500">Bakiye (Alacak)</div>
+        </div>
       </div>
     </div>
   );

@@ -35,7 +35,10 @@ router.get(
       include: {
         projects: {
           orderBy: { createdAt: "desc" },
-          include: { quotes: { orderBy: { createdAt: "desc" }, take: 1 } },
+          include: {
+            quotes: { where: { status: "ACCEPTED" }, orderBy: { createdAt: "desc" }, take: 1 },
+            payments: { select: { amount: true } },
+          },
         },
         notes: { orderBy: { createdAt: "desc" } },
       },
