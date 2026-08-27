@@ -128,9 +128,21 @@ export interface ProductionTask {
   createdAt: string;
 }
 
+export type PhotoPhase = "KESIF" | "URETIM" | "BOYA" | "MONTAJ" | "SON_HALI" | "DIGER";
+
+export const FAZ_ETIKET: Record<PhotoPhase, string> = {
+  KESIF: "🔍 Keşif",
+  URETIM: "🔨 Üretim",
+  BOYA: "🎨 Boya",
+  MONTAJ: "🔧 Montaj",
+  SON_HALI: "✅ Son Hali",
+  DIGER: "📎 Diğer",
+};
+
 export interface ProjectPhoto {
   id: number;
   projectId: number;
+  phase: PhotoPhase;
   caption?: string | null;
   dataBase64: string;
   mimeType: string;

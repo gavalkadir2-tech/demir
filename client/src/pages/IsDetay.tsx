@@ -14,6 +14,8 @@ import {
   ProductionTask,
   ProductionTaskType,
   ProjectPhoto,
+  PhotoPhase,
+  FAZ_ETIKET,
   LaborType,
   ExpenseType,
   ProductTemplate,
@@ -382,9 +384,12 @@ function GorevlerBolumu({ proje, onChanged }: { proje: Project; onChanged: () =>
   );
 }
 
+const FAZLAR = Object.keys(FAZ_ETIKET) as PhotoPhase[];
+
 function FotograflarBolumu({ proje, onChanged }: { proje: Project; onChanged: () => void }) {
   const [yukleniyor, setYukleniyor] = useState(false);
   const [hata, setHata] = useState<string | null>(null);
+  const [yuklemeFazi, setYuklemeFazi] = useState<PhotoPhase>("URETIM");
   const fotograflar = proje.photos ?? [];
 
   const dosyaSec = (dosya: File) => {
@@ -397,6 +402,7 @@ function FotograflarBolumu({ proje, onChanged }: { proje: Project; onChanged: ()
         await api.post(`/projects/${proje.id}/photos`, {
           imageBase64: dataUrl.slice(dataUrl.indexOf(",") + 1),
           mimeType: dosya.type,
+          phase: yuklemeFazi,
         });
         onChanged();
       } catch (e: any) {
@@ -414,43 +420,143 @@ function FotograflarBolumu({ proje, onChanged }: { proje: Project; onChanged: ()
     onChanged();
   };
 
+  const fazaGoreGrupla = FAZLAR.map((f) => ({ faz: f, fotolar: fotograflar.filter((p) => p.phase === f) })).filter(
+    (g) => g.fotolar.length > 0
+  );
+
   return (
     <div className="card space-y-3">
       <h2 className="font-bold">📷 İş Fotoğrafları</h2>
       <HataKutusu mesaj={hata} />
-      <input
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="field-input"
-        disabled={yukleniyor}
-        onChange={(e) => {
-          const dosya = e.target.files?.[0];
-          if (dosya) dosyaSec(dosya);
-        }}
-      />
+      <div className="flex gap-2 flex-wrap items-end">
+        <div className="flex-1 min-w-[160px]">
+          <label className="field-label">Aşama</label>
+          <select className="field-select" value={yuklemeFazi} onChange={(e) => setYuklemeFazi(e.target.value as PhotoPhase)}>
+            {FAZLAR.map((f) => (
+              <option key={f} value={f}>
+                {FAZ_ETIKET[f]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex-[2] min-w-[200px]">
+          <label className="field-label">Fotoğraf Ekle</label>
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="field-input"
+            disabled={yukleniyor}
+            onChange={(e) => {
+              const dosya = e.target.files?.[0];
+              if (dosya) dosyaSec(dosya);
+            }}
+          />
+        </div>
+      </div>
       {yukleniyor && <div className="text-sm text-neutral-500">Yükleniyor...</div>}
       {fotograflar.length === 0 ? (
         <div className="text-sm text-neutral-500">Henüz fotoğraf eklenmedi.</div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {fotograflar.map((f) => (
-            <div key={f.id} className="relative group">
-              <img
-                src={`data:${f.mimeType};base64,${f.dataBase64}`}
-                alt={f.caption ?? "İş fotoğrafı"}
-                className="w-full aspect-square object-cover rounded-lg border border-neutral-200"
-              />
-              <button
-                className="absolute top-1 right-1 bg-white/90 rounded-full w-6 h-6 text-red-600 text-xs font-bold opacity-0 group-hover:opacity-100 transition"
-                onClick={() => sil(f.id)}
-              >
-                ✕
-              </button>
+        <div className="space-y-4">
+          {fazaGoreGrupla.map((g) => (
+            <div key={g.faz}>
+              <div className="text-sm font-semibold text-neutral-600 mb-2">
+                {FAZ_ETIKET[g.faz]} <span className="text-neutral-400 font-normal">({g.fotolar.length})</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {g.fotolar.map((f) => (
+                  <div key={f.id} className="relative group">
+                    <img
+                      src={`data:${f.mimeType};base64,${f.dataBase64}`}
+                      alt={f.caption ?? "İş fotoğrafı"}
+                      className="w-full aspect-square object-cover rounded-lg border border-neutral-200"
+                    />
+                    <button
+                      className="absolute top-1 right-1 bg-white/90 rounded-full w-6 h-6 text-red-600 text-xs font-bold opacity-0 group-hover:opacity-100 transition"
+                      onClick={() => sil(f.id)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function terminDurumu(dueDate: string | null | undefined): { metin: string; renk: string } | null {
+  if (!dueDate) return null;
+  const kalanGun = Math.ceil((new Date(dueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  if (kalanGun < 0) return { metin: `${Math.abs(kalanGun)} gün gecikti`, renk: "text-red-600" };
+  if (kalanGun === 0) return { metin: "Bugün teslim", renk: "text-amber-600" };
+  if (kalanGun <= 3) return { metin: `${kalanGun} gün kaldı`, renk: "text-amber-600" };
+  return { metin: `${kalanGun} gün kaldı`, renk: "text-neutral-600" };
+}
+
+function OzetKarti({ proje }: { proje: Project }) {
+  const gorevler = proje.tasks ?? [];
+  const tamamlanan = gorevler.filter((g) => g.done).length;
+  const termin = terminDurumu(proje.dueDate);
+  const fotoSayisi = (proje.photos ?? []).length;
+
+  return (
+    <div className="card space-y-3">
+      <h2 className="font-bold">📋 İş Özeti</h2>
+      <div className="grid grid-cols-3 gap-3 text-center">
+        <div>
+          <div className={`text-lg font-bold ${termin?.renk ?? "text-neutral-400"}`}>{termin?.metin ?? "Termin yok"}</div>
+          <div className="text-xs text-neutral-500">📅 Termin</div>
+        </div>
+        <div>
+          <div className="text-lg font-bold">{gorevler.length > 0 ? `${tamamlanan}/${gorevler.length}` : "-"}</div>
+          <div className="text-xs text-neutral-500">🛠️ Üretim Aşaması</div>
+        </div>
+        <div>
+          <div className="text-lg font-bold">{fotoSayisi}</div>
+          <div className="text-xs text-neutral-500">📷 Fotoğraf</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NotlarBolumu({ proje, onChanged }: { proje: Project; onChanged: () => void }) {
+  const [note, setNote] = useState(proje.note ?? "");
+  const [kaydediliyor, setKaydediliyor] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+
+  const kaydet = async () => {
+    setKaydediliyor(true);
+    setHata(null);
+    try {
+      await api.put(`/projects/${proje.id}`, { note });
+      onChanged();
+    } catch (e: any) {
+      setHata(e.message);
+    } finally {
+      setKaydediliyor(false);
+    }
+  };
+
+  return (
+    <div className="card space-y-3">
+      <h2 className="font-bold">📝 Notlar</h2>
+      <HataKutusu mesaj={hata} />
+      <textarea
+        className="field-input"
+        rows={3}
+        placeholder="Keşif ölçüleri, müşteri talepleri, hatırlatmalar..."
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+      />
+      <button className="btn-secondary btn-sm" onClick={kaydet} disabled={kaydediliyor || note === (proje.note ?? "")}>
+        {kaydediliyor ? "Kaydediliyor..." : "Kaydet"}
+      </button>
     </div>
   );
 }
@@ -462,7 +568,6 @@ function OzetTab({ proje, onChanged }: { proje: Project; onChanged: () => void }
     profitValue: proje.profitValue,
     vatPercent: proje.vatPercent,
     validityDays: proje.validityDays,
-    note: proje.note ?? "",
   });
   const [kaydediliyor, setKaydediliyor] = useState(false);
   const [hata, setHata] = useState<string | null>(null);
@@ -501,6 +606,9 @@ function OzetTab({ proje, onChanged }: { proje: Project; onChanged: () => void }
       <HataKutusu mesaj={hata} />
       <UyariKutusu mesajlar={stokUyari} />
 
+      <OzetKarti proje={proje} />
+      <NotlarBolumu proje={proje} onChanged={onChanged} />
+
       <div className="card space-y-3">
         <h2 className="font-bold">Müşteri</h2>
         <div className="text-sm text-neutral-600">
@@ -535,10 +643,6 @@ function OzetTab({ proje, onChanged }: { proje: Project; onChanged: () => void }
             <label className="field-label">Teklif Geçerlilik (gün)</label>
             <input type="number" className="field-input" value={form.validityDays} onChange={(e) => setForm({ ...form, validityDays: Number(e.target.value) })} />
           </div>
-        </div>
-        <div>
-          <label className="field-label">Not</label>
-          <textarea className="field-input" rows={2} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
         </div>
         <button className="btn-primary" onClick={kaydet} disabled={kaydediliyor}>
           {kaydediliyor ? "Kaydediliyor..." : "Kaydet"}

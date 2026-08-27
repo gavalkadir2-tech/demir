@@ -196,15 +196,26 @@ model ProductionTask {
 // Tamamlanan iş fotoğrafları (base64 olarak saklanır - basitlik ve kalıcılık için, ayrı dosya
 // depolama servisi gerektirmez).
 model ProjectPhoto {
-  id         Int      @id @default(autoincrement())
+  id         Int        @id @default(autoincrement())
   projectId  Int
-  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project    Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  phase      PhotoPhase @default(DIGER)
   caption    String?
   dataBase64 String
   mimeType   String
-  createdAt  DateTime @default(now())
+  createdAt  DateTime   @default(now())
 
   @@map("project_photos")
+}
+
+// Fotoğrafın iş sürecindeki hangi aşamada çekildiği - fotoğrafları aşamaya göre gruplamak için.
+enum PhotoPhase {
+  KESIF
+  URETIM
+  BOYA
+  MONTAJ
+  SON_HALI
+  DIGER
 }
 
 // Ürün şablon tanımları (Korkuluk, Merdiven, Sundurma, Kapı, Özel...)
