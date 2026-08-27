@@ -17,6 +17,87 @@ interface GunlukOzet {
   oncelikler: string[];
 }
 
+interface SoruCevap {
+  cevap: string;
+  yetersizVeri: boolean;
+}
+
+interface SohbetSatiri {
+  soru: string;
+  cevap: string;
+  yetersizVeri: boolean;
+}
+
+const ORNEK_SORULAR = [
+  "Bu ay neden kârımız düştü?",
+  "Bu ay hangi müşterilerden ödeme bekliyoruz?",
+  "En kârlı iş türümüz hangisi?",
+  "Hangi malzemeleri sipariş etmem lazım?",
+];
+
+function AiAsistanKarti() {
+  const [soru, setSoru] = useState("");
+  const [gecmis, setGecmis] = useState<SohbetSatiri[]>([]);
+  const [yukleniyor, setYukleniyor] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+
+  const sor = async (metin: string) => {
+    if (!metin.trim() || yukleniyor) return;
+    setYukleniyor(true);
+    setHata(null);
+    try {
+      const sonuc = await api.post<SoruCevap>("/ai/soru-cevap", { soru: metin });
+      setGecmis((g) => [...g, { soru: metin, cevap: sonuc.cevap, yetersizVeri: sonuc.yetersizVeri }]);
+      setSoru("");
+    } catch (e: any) {
+      setHata(e.message);
+    } finally {
+      setYukleniyor(false);
+    }
+  };
+
+  return (
+    <div className="card space-y-3">
+      <h2 className="font-bold">🤖 AI Asistana Sor</h2>
+      {gecmis.length === 0 && (
+        <div className="flex flex-wrap gap-2">
+          {ORNEK_SORULAR.map((s) => (
+            <button key={s} className="btn-secondary btn-sm" onClick={() => sor(s)} disabled={yukleniyor}>
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+      {gecmis.length > 0 && (
+        <div className="space-y-3">
+          {gecmis.map((satir, i) => (
+            <div key={i} className="space-y-1">
+              <div className="text-sm font-semibold text-neutral-700">🙋 {satir.soru}</div>
+              <div className={`text-sm rounded-xl px-3 py-2 ${satir.yetersizVeri ? "bg-amber-50 text-amber-800" : "bg-neutral-50 text-neutral-700"}`}>
+                {satir.cevap}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-2">
+        <input
+          className="field-input flex-1"
+          placeholder="İşletmenle ilgili bir şey sor..."
+          value={soru}
+          onChange={(e) => setSoru(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && sor(soru)}
+          disabled={yukleniyor}
+        />
+        <button className="btn-primary btn-sm" onClick={() => sor(soru)} disabled={yukleniyor || !soru.trim()}>
+          {yukleniyor ? "..." : "Sor"}
+        </button>
+      </div>
+      {hata && <div className="text-sm text-red-600">{hata}</div>}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [veri, setVeri] = useState<DashboardData | null>(null);
   const [trend, setTrend] = useState<AylikTrendVeri[] | null>(null);
@@ -121,6 +202,8 @@ export default function Dashboard() {
           {aiHata && <div className="text-sm text-red-600 mt-2">{aiHata}</div>}
         </div>
       </div>
+
+      <AiAsistanKarti />
 
       <div className="flex flex-wrap gap-2">
         <Link to="/yeni-is" className="btn-secondary btn-sm">➕ Yeni İş</Link>

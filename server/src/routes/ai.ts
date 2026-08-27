@@ -6,6 +6,7 @@ import { prisma } from "../lib/prisma";
 import { calculateByTemplateKey } from "../calc";
 import { TEMPLATE_SCHEMAS, idToKey, malzemeSozlugu } from "./calc";
 import { parcaAgirlikKg, sacKalemleriAgirlikKg, yuvarla1 } from "../calc/weight";
+import { isletmeOzetiMetni } from "../lib/aiContext";
 
 const router = Router();
 
@@ -529,6 +530,53 @@ Kritik stok seviyesindeki malzeme sayısı: ${girdi.kritikStokSayisi}`;
       responseJsonSchema: RAPOR_DEGERLENDIRME_RESPONSE_JSON_SCHEMA,
       zodSchema: raporDegerlendirmeCiktiSchema,
       hataBaglami: "AI rapor-degerlendir",
+    });
+
+    res.json(sonuc);
+  })
+);
+
+const soruCevapIstekSchema = z.object({
+  soru: z.string().min(3, "Soru çok kısa.").max(500, "Soru çok uzun (maks. 500 karakter)."),
+});
+
+const soruCevapCiktiSchema = z.object({
+  cevap: z.string(),
+  yetersizVeri: z.boolean(),
+});
+
+const SORU_CEVAP_RESPONSE_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    cevap: { type: "string" },
+    yetersizVeri: {
+      type: "boolean",
+      description: "Verilen işletme durumu verisi, soruyu tam olarak cevaplamak için yetersizse true.",
+    },
+  },
+  required: ["cevap", "yetersizVeri"],
+};
+
+const SORU_CEVAP_SISTEM_PROMPTU = `Sen bir demirci/çelik konstrüksiyon atölyesinin işletme sahibinin sorularını cevaplayan bir asistansın. Sana atölyenin o anki durumunu özetleyen bir metin verilecek (aktif işler, geciken işler, satış/maliyet/kâr, aylık trend, iş türüne göre kârlılık, müşteri alacakları, kritik stok). Görevin, kullanıcının serbest sorusunu SADECE bu verilen bilgiye dayanarak cevaplamak.
+
+KURALLAR:
+- Sadece verilen veriye dayan, uydurma. Verilen veri soruyu cevaplamaya yetmiyorsa "yetersizVeri" alanını true yap ve "cevap" alanında ne tür bir veri eksik olduğunu dürüstçe belirt (örn. "bu soruyu cevaplamak için X verisi sistemde henüz tutulmuyor").
+- Sayısal analiz gerektiren sorularda (örn. "neden kârımız düştü?") verilen aylık trend ve kategori verilerini karşılaştırarak somut, sayılara dayalı bir açıklama yap.
+- Kısa, doğrudan, samimi bir dille cevap ver - işletme sahibiyle konuşur gibi. Gereksiz uzatma.
+- Türkçe cevap ver, yalnızca geçerli JSON döndür.`;
+
+router.post(
+  "/soru-cevap",
+  asyncHandler(async (req, res) => {
+    const { soru } = soruCevapIstekSchema.parse(req.body);
+    const ozet = await isletmeOzetiMetni();
+
+    const sonuc = await geminiJsonIste({
+      contents: `${ozet}\n\n[SORU]: ${soru}`,
+      systemInstruction: SORU_CEVAP_SISTEM_PROMPTU,
+      responseJsonSchema: SORU_CEVAP_RESPONSE_JSON_SCHEMA,
+      zodSchema: soruCevapCiktiSchema,
+      hataBaglami: "AI soru-cevap",
     });
 
     res.json(sonuc);
