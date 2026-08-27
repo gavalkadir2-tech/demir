@@ -52,6 +52,61 @@ const DURUMLAR: ProjectStatus[] = [
   "CANCELLED",
 ];
 
+// Teknik 9 durumu, akış halinde takip edilebilecek 7 adıma indirger (İptal ayrı gösterilir).
+const ADIM_TANIMLARI: { label: string; emoji: string; durumlar: ProjectStatus[] }[] = [
+  { label: "Talep", emoji: "📥", durumlar: ["DRAFT"] },
+  { label: "Hesaplandı", emoji: "🧮", durumlar: ["CALCULATED"] },
+  { label: "Teklif", emoji: "📄", durumlar: ["QUOTE_READY", "QUOTE_SENT"] },
+  { label: "Onaylandı", emoji: "✅", durumlar: ["APPROVED"] },
+  { label: "Üretimde", emoji: "🔨", durumlar: ["IN_PRODUCTION"] },
+  { label: "Montaj", emoji: "🔧", durumlar: ["INSTALLING"] },
+  { label: "Tamamlandı", emoji: "🏁", durumlar: ["COMPLETED"] },
+];
+
+function DurumAdimlari({ status }: { status: ProjectStatus }) {
+  if (status === "CANCELLED") {
+    return (
+      <div className="rounded-xl bg-red-50 border border-red-200 text-red-700 font-semibold px-4 py-3 text-sm">
+        🔴 Bu iş iptal edildi.
+      </div>
+    );
+  }
+
+  const aktifIndex = ADIM_TANIMLARI.findIndex((a) => a.durumlar.includes(status));
+
+  return (
+    <div className="flex items-center overflow-x-auto pb-1">
+      {ADIM_TANIMLARI.map((adim, i) => {
+        const tamam = i < aktifIndex;
+        const aktif = i === aktifIndex;
+        return (
+          <div key={adim.label} className="flex items-center flex-shrink-0">
+            <div className="flex flex-col items-center gap-1 w-20">
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                  aktif
+                    ? "bg-brand-600 text-white"
+                    : tamam
+                    ? "bg-emerald-100 text-emerald-700"
+                    : "bg-neutral-100 text-neutral-400"
+                }`}
+              >
+                {tamam ? "✓" : adim.emoji}
+              </div>
+              <div className={`text-[11px] text-center leading-tight ${aktif ? "font-bold text-brand-700" : "text-neutral-500"}`}>
+                {adim.label}
+              </div>
+            </div>
+            {i < ADIM_TANIMLARI.length - 1 && (
+              <div className={`h-0.5 w-6 -mt-4 ${i < aktifIndex ? "bg-emerald-300" : "bg-neutral-200"}`} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 const SEKMELER = [
   { key: "ozet", label: "Özet" },
   { key: "uretim", label: "Üretim" },
@@ -116,6 +171,9 @@ export default function IsDetay() {
               ))}
             </select>
           </div>
+        </div>
+        <div className="mt-4 pt-4 border-t border-neutral-100">
+          <DurumAdimlari status={proje.status} />
         </div>
       </div>
 
