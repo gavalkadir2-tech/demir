@@ -27,6 +27,8 @@ export interface MerdivenGirdi {
   korkulukDikmeProfilKey?: string;
   korkulukUstProfilKey?: string;
   korkulukDikmeAraligiHedefMm?: number;
+  /** Korkuluk dikme bağlantı plakasının alınacağı Material id'si (opsiyonel, FASTENER kategorisi). */
+  korkulukBaglantiMalzemeKey?: string;
 }
 
 const VARSAYILAN = {
@@ -123,6 +125,7 @@ export function calculateStairs(girdi: MerdivenGirdi): UrunHesapSonucu {
       label: "Korkuluk dikme bağlantı plakası",
       birim: "adet",
       adet: korkulukDikmeSayisi,
+      materialKey: girdi.korkulukBaglantiMalzemeKey,
     });
   }
 

@@ -87,6 +87,21 @@ test("çatı kafesi: varsayılan kaplama (trapez sac) sac kalemi ekler", () => {
   assert.equal(kaplama.boyMm, 3133);
   assert.equal(kaplama.adet, 18); // 9 panel (9000/1000) x 2 yamaç
   assert.equal(sonuc.ozetDegerler.kaplamaFireYuzde, 8); // trapez sac tipik fire oranı
+  assert.equal(kaplama.materialKey, undefined); // malzeme seçilmediyse bağlanmaz
+});
+
+test("çatı kafesi: kaplamaMalzemeKey verilirse kaplama sac kalemine materialKey olarak yansır", () => {
+  const sonuc = calculateRoofTruss({
+    acikligMm: 6000,
+    egimYuzde: 30,
+    catiUzunluguMm: 9000,
+    kafesAraligiHedefMm: 900,
+    ustBaslikProfilKey: "ust",
+    altBaslikProfilKey: "alt",
+    kaplamaMalzemeKey: "42",
+  });
+  const kaplama = sonuc.sacKalemleri.find((s) => s.label.includes("kaplaması"))!;
+  assert.equal(kaplama.materialKey, "42");
 });
 
 test("çatı kafesi: kaplamaTuru 'yok' verilirse sac kalemi eklenmez", () => {

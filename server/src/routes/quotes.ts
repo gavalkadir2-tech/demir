@@ -5,6 +5,7 @@ import { generateCuttingListsForProject } from "../lib/cuttingService";
 import { calculateCost } from "../calc/costing";
 import { calculateMaterialLineCost, costPerMm } from "../lib/pricing";
 import { sacMalzemeGruplariHesapla, sacGrubuMaliyetHesapla } from "../lib/sheetMaterialAggregation";
+import { baglantiMalzemeGruplariHesapla, baglantiGrubuMaliyetHesapla } from "../lib/fastenerMaterialAggregation";
 
 const router = Router({ mergeParams: true });
 
@@ -107,6 +108,20 @@ router.post(
         unit: `adet x ${grup.nesting.sheetWidthMm / 1000}x${grup.nesting.sheetHeightMm / 1000}m levha`,
         unitPrice: grup.nesting.toplamLevha > 0 ? Math.round((sacMaliyet / grup.nesting.toplamLevha) * 100) / 100 : 0,
         lineTotal: sacMaliyet,
+      });
+    }
+
+    const { gruplar: baglantiGruplari, uyarilar: baglantiUyarilari } = await baglantiMalzemeGruplariHesapla(projectId);
+    uyarilar.push(...baglantiUyarilari);
+    for (const grup of baglantiGruplari) {
+      const baglantiMaliyet = Math.round(baglantiGrubuMaliyetHesapla(grup) * 100) / 100;
+      materialCost += baglantiMaliyet;
+      materialItems.push({
+        description: `${grup.material.name} (bağlantı elemanı)`,
+        qty: grup.toplamAdet,
+        unit: "adet",
+        unitPrice: grup.material.unitPrice,
+        lineTotal: baglantiMaliyet,
       });
     }
 

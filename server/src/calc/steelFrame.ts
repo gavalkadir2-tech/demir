@@ -30,6 +30,8 @@ export interface KolonKirisGirdi {
    * iş onayında stok düşümüne dahil edilir. */
   plakaMalzemeKey?: string;
   ankrajSayisiPerPlaka?: number;
+  /** Ankrajın alınacağı Material id'si (opsiyonel, FASTENER kategorisi). */
+  ankrajMalzemeKey?: string;
 }
 
 const VARSAYILAN = {
@@ -124,6 +126,7 @@ export function calculateSteelFrame(girdi: KolonKirisGirdi): UrunHesapSonucu {
     label: "Ankraj (kimyasal/mekanik dübel)",
     birim: "adet",
     adet: kolonToplamAdet * ankrajSayisiPerPlaka,
+    materialKey: girdi.ankrajMalzemeKey,
   });
 
   const tabanAlaniM2 = (acikligMm * acikSayisi / 1000) * (uzunlukMm / 1000);

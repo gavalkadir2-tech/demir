@@ -42,6 +42,9 @@ export interface CatiKafesiGirdi {
   /** Çatı kaplama türü */
   kaplamaTuru?: KaplamaTuru;
   kaplamaKalinlikMm?: number;
+  /** Kaplamanın alınacağı sac Material id'si (opsiyonel) - verilirse teklif maliyetine ve
+   * iş onayında stok düşümüne dahil edilir. */
+  kaplamaMalzemeKey?: string;
   plakaEnMm?: number;
   plakaBoyMm?: number;
   plakaKalinlikMm?: number;
@@ -49,6 +52,8 @@ export interface CatiKafesiGirdi {
    * iş onayında stok düşümüne dahil edilir. */
   plakaMalzemeKey?: string;
   ankrajSayisiPerPlaka?: number;
+  /** Ankrajın alınacağı Material id'si (opsiyonel, FASTENER kategorisi). */
+  ankrajMalzemeKey?: string;
   /** İlk açıklıkta (ilk iki kafes arası) yatay+düşey stabilite (rüzgar/deprem) çaprazları eklensin mi. */
   stabiliteBaglantisiVar?: boolean;
   /** Stabilite çaprazı profil kesiti (genellikle L profil) - stabiliteBaglantisiVar true ise zorunlu. */
@@ -247,6 +252,7 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
     label: "Ankraj (kimyasal/mekanik dübel)",
     birim: "adet",
     adet: 2 * kafesSayisi * ankrajSayisiPerPlaka,
+    materialKey: girdi.ankrajMalzemeKey,
   });
 
   const kaplamaTuru = girdi.kaplamaTuru ?? VARSAYILAN.kaplamaTuru;
@@ -261,6 +267,7 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
       kalinlikMm: girdi.kaplamaKalinlikMm ?? kaplamaBilgisi.varsayilanKalinlikMm,
       adet: kaplamaOzet.panelSayisi * 2, // iki yamaç
       yogunlukKgM3: kaplamaBilgisi.efektifYogunlukKgM3,
+      materialKey: girdi.kaplamaMalzemeKey,
       not: `Her yamaçta ${kaplamaOzet.panelSayisi} panel (${kaplamaBilgisi.faydaliGenislikMm} mm faydalı genişlik) yan yana; toplam net alan ${(kaplamaOzet.netAlaniM2 * 2).toFixed(2)} m², sipariş edilecek alan (fire dahil, ~%${kaplamaBilgisi.tipikFireYuzde} bindirme/kesim payı) ${(kaplamaOzet.siparisAlaniM2 * 2).toFixed(2)} m².`,
     });
   }

@@ -148,6 +148,27 @@ test("duvar paneli: dış cephe sandviç panel kaplama seçilirse sac kalemi ve 
   assert.equal(kaplama.adet, 3);
   assert.ok(sonuc.ozetDegerler.disKaplamaSiparisAlaniM2! > 0);
   assert.equal(sonuc.ozetDegerler.icKaplamaSiparisAlaniM2, undefined);
+  assert.equal(kaplama.materialKey, undefined);
+});
+
+test("duvar paneli: dış/iç kaplama malzeme id'leri ayrı ayrı materialKey olarak yansır", () => {
+  const sonuc = calculateWallPanel({
+    genislikMm: 3000,
+    yukseklikMm: 2500,
+    dikmeAraligiHedefMm: 600,
+    ustProfilKey: "ray",
+    altProfilKey: "ray",
+    dikmeProfilKey: "dikme",
+    disKaplamaTuru: "sandvic_panel",
+    disKaplamaMalzemeKey: "10",
+    icKaplamaTuru: "alcipan",
+    icKaplamaMalzemeKey: "20",
+  });
+
+  const dis = sonuc.sacKalemleri.find((s) => s.label.includes("Dış cephe kaplaması"))!;
+  const ic = sonuc.sacKalemleri.find((s) => s.label.includes("İç cephe kaplaması"))!;
+  assert.equal(dis.materialKey, "10");
+  assert.equal(ic.materialKey, "20");
 });
 
 test("duvar paneli: içeriden alçıpan dışarıdan petopan - iki kat kaplama aynı anda eklenir", () => {

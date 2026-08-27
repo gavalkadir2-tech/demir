@@ -35,6 +35,10 @@ export interface BaglantiKalemi {
   label: string;
   birim: string;
   adet: number;
+  /** Bağlı olduğu Material id'si (string) - verilirse teklif maliyetine ve iş onayında stok
+   * düşümüne dahil edilir (bkz. lib/fastenerMaterialAggregation.ts). Verilmezse (varsayılan) bu
+   * kalem maliyet/stok hesabına hiç dahil edilmez. */
+  materialKey?: string;
 }
 
 /** Bir ürün hesaplayıcısının ürettiği toplam sonuç. */

@@ -26,6 +26,10 @@ export interface KapiGirdi {
   menteseAdet?: number;
   kilitAdet?: number;
   kolAdet?: number;
+  /** Menteşe/kilit/kolun alınacağı Material id'leri (opsiyonel, FASTENER kategorisi). */
+  menteseMalzemeKey?: string;
+  kilitMalzemeKey?: string;
+  kolMalzemeKey?: string;
 }
 
 const VARSAYILAN = {
@@ -91,9 +95,9 @@ export function calculateDoor(girdi: KapiGirdi): UrunHesapSonucu {
     });
   }
 
-  sonuc.baglantiKalemleri.push({ label: "Menteşe", birim: "adet", adet: menteseAdet });
-  sonuc.baglantiKalemleri.push({ label: "Kilit", birim: "adet", adet: kilitAdet });
-  sonuc.baglantiKalemleri.push({ label: "Kol", birim: "adet", adet: kolAdet });
+  sonuc.baglantiKalemleri.push({ label: "Menteşe", birim: "adet", adet: menteseAdet, materialKey: girdi.menteseMalzemeKey });
+  sonuc.baglantiKalemleri.push({ label: "Kilit", birim: "adet", adet: kilitAdet, materialKey: girdi.kilitMalzemeKey });
+  sonuc.baglantiKalemleri.push({ label: "Kol", birim: "adet", adet: kolAdet, materialKey: girdi.kolMalzemeKey });
 
   sonuc.ozetDegerler = {
     kanatGenislikMm: Math.round(kanatGenislikMm),

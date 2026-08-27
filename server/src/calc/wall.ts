@@ -44,9 +44,16 @@ export interface DuvarPaneliGirdi {
   /** Dış cephe kaplaması (prefabrik ev duvarı için trapez sac, sandviç panel, petopan/mantolama vb.). Verilmezse çıplak karkas hesaplanır. */
   disKaplamaTuru?: KaplamaTuru;
   disKaplamaKalinlikMm?: number;
+  /** Dış kaplamanın alınacağı sac Material id'si (opsiyonel) - verilirse teklif maliyetine ve
+   * iş onayında stok düşümüne dahil edilir. */
+  disKaplamaMalzemeKey?: string;
   /** İç cephe kaplaması (örn. alçıpan). Dış kaplamadan bağımsız, aynı anda ikisi de seçilebilir. */
   icKaplamaTuru?: KaplamaTuru;
   icKaplamaKalinlikMm?: number;
+  /** İç kaplamanın alınacağı sac Material id'si (opsiyonel). */
+  icKaplamaMalzemeKey?: string;
+  /** Ray dübelinin alınacağı Material id'si (opsiyonel, FASTENER kategorisi). */
+  dubelMalzemeKey?: string;
 }
 
 const VARSAYILAN = {
@@ -58,6 +65,7 @@ function kaplamaKalemiEkle(
   yon: "dış" | "iç",
   kaplamaTuru: KaplamaTuru,
   kalinlikMmOverride: number | undefined,
+  malzemeKey: string | undefined,
   yukseklikMm: number,
   genislikMm: number
 ): ReturnType<typeof kaplamaHesapla> | null {
@@ -71,6 +79,7 @@ function kaplamaKalemiEkle(
     kalinlikMm: kalinlikMmOverride ?? kaplamaBilgisi.varsayilanKalinlikMm,
     adet: ozet.panelSayisi,
     yogunlukKgM3: kaplamaBilgisi.efektifYogunlukKgM3,
+    materialKey: malzemeKey,
     not: `${ozet.panelSayisi} panel (${kaplamaBilgisi.faydaliGenislikMm} mm faydalı genişlik) yan yana; net alan ${ozet.netAlaniM2} m², sipariş edilecek alan (fire dahil, ~%${kaplamaBilgisi.tipikFireYuzde} bindirme/kesim payı) ${ozet.siparisAlaniM2} m². Kapı/pencere boşlukları panelden sahada kesilir, ayrıca düşülmemiştir.`,
   });
   return ozet;
@@ -194,10 +203,26 @@ export function calculateWallPanel(girdi: DuvarPaneliGirdi): UrunHesapSonucu {
   const duvarAlaniM2 = (genislikMm / 1000) * (yukseklikMm / 1000);
   const dubelSayisi = 2 * Math.ceil(genislikMm / 500); // üst + alt ray, ~500mm aralıkla
 
-  sonuc.baglantiKalemleri.push({ label: "Ray dübeli", birim: "adet", adet: dubelSayisi });
+  sonuc.baglantiKalemleri.push({ label: "Ray dübeli", birim: "adet", adet: dubelSayisi, materialKey: girdi.dubelMalzemeKey });
 
-  const disKaplamaOzet = kaplamaKalemiEkle(sonuc, "dış", disKaplamaTuru, girdi.disKaplamaKalinlikMm, yukseklikMm, genislikMm);
-  const icKaplamaOzet = kaplamaKalemiEkle(sonuc, "iç", icKaplamaTuru, girdi.icKaplamaKalinlikMm, yukseklikMm, genislikMm);
+  const disKaplamaOzet = kaplamaKalemiEkle(
+    sonuc,
+    "dış",
+    disKaplamaTuru,
+    girdi.disKaplamaKalinlikMm,
+    girdi.disKaplamaMalzemeKey,
+    yukseklikMm,
+    genislikMm
+  );
+  const icKaplamaOzet = kaplamaKalemiEkle(
+    sonuc,
+    "iç",
+    icKaplamaTuru,
+    girdi.icKaplamaKalinlikMm,
+    girdi.icKaplamaMalzemeKey,
+    yukseklikMm,
+    genislikMm
+  );
 
   sonuc.ozetDegerler = {
     dikmeSayisi: dikmePozisyonlari.length,

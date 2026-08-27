@@ -31,6 +31,8 @@ export interface PergolaGirdi {
    * iş onayında stok düşümüne dahil edilir. */
   plakaMalzemeKey?: string;
   ankrajSayisiPerPlaka?: number;
+  /** Ankrajın alınacağı Material id'si (opsiyonel, FASTENER kategorisi). */
+  ankrajMalzemeKey?: string;
 }
 
 const VARSAYILAN = {
@@ -122,6 +124,7 @@ export function calculatePergola(girdi: PergolaGirdi): UrunHesapSonucu {
     label: "Ankraj (kimyasal/mekanik dübel)",
     birim: "adet",
     adet: kolonSayisi * ankrajSayisiPerPlaka,
+    materialKey: girdi.ankrajMalzemeKey,
   });
 
   const alanM2 = (genislikMm / 1000) * (boyMm / 1000);

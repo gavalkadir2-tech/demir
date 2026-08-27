@@ -31,6 +31,8 @@ export interface KorkulukGirdi {
   plakaMalzemeKey?: string;
   /** Plaka başına ankraj sayısı */
   ankrajSayisiPerPlaka?: number;
+  /** Ankrajın alınacağı Material id'si (opsiyonel, FASTENER kategorisi). */
+  ankrajMalzemeKey?: string;
 }
 
 const VARSAYILAN = {
@@ -131,6 +133,7 @@ export function calculateRailing(girdi: KorkulukGirdi): UrunHesapSonucu {
       label: "Ankraj (kimyasal/mekanik dübel)",
       birim: "adet",
       adet: dikmeSayisi * ankrajSayisiPerPlaka,
+      materialKey: girdi.ankrajMalzemeKey,
     });
   }
 

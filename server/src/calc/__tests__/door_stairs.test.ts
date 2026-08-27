@@ -73,6 +73,23 @@ test("sundurma: çatı alanı ve eğim hesaplanır", () => {
   assert.equal(sonuc.ozetDegerler.dikmeSayisi, 3);
 });
 
+test("sundurma: kaplamaMalzemeKey verilirse kaplama sac kalemine materialKey olarak yansır", () => {
+  const sonuc = calculateCanopy({
+    genislikMm: 4000,
+    boyMm: 3000,
+    yukseklikMm: 2200,
+    egimYuzde: 10,
+    dikmeSayisi: 3,
+    anaTasiyiciProfilKey: "80x40x3",
+    araTasiyiciProfilKey: "40x40x2",
+    dikmeProfilKey: "80x80x3",
+    kaplamaMalzemeKey: "7",
+  });
+  const kaplama = sonuc.sacKalemleri.find((s) => s.label.includes("kaplaması"))!;
+  assert.ok(kaplama);
+  assert.equal(kaplama.materialKey, "7");
+});
+
 test("kapı: kanat boşluğu ölçüden büyükse hata verir", () => {
   assert.throws(
     () =>

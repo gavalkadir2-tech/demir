@@ -115,11 +115,13 @@ export default function YeniIs() {
   const [sablonlar, setSablonlar] = useState<ProductTemplate[] | null>(null);
   const [materials, setMaterials] = useState<Material[] | null>(null);
   const [sacMalzemeler, setSacMalzemeler] = useState<Material[]>([]);
+  const [baglantiMalzemeler, setBaglantiMalzemeler] = useState<Material[]>([]);
 
   useEffect(() => {
     api.get<ProductTemplate[]>("/product-templates").then(setSablonlar);
     api.get<Material[]>("/materials?category=PROFILE").then(setMaterials);
     api.get<Material[]>("/materials?category=SHEET").then(setSacMalzemeler);
+    api.get<Material[]>("/materials?category=FASTENER").then(setBaglantiMalzemeler);
   }, []);
 
   const templateSecildi = (key: string) => {
@@ -186,6 +188,7 @@ export default function YeniIs() {
         projectId={projectId}
         materials={materials}
         sacMalzemeler={sacMalzemeler}
+        baglantiMalzemeler={baglantiMalzemeler}
         baslangic={aiAlanlar ?? undefined}
       />
     </div>
@@ -463,6 +466,7 @@ export function UrunFormu({
   projectId,
   materials,
   sacMalzemeler,
+  baglantiMalzemeler,
   onSaved,
   baslangic,
   duzenlemeItemId,
@@ -474,6 +478,9 @@ export function UrunFormu({
   /** Sac (levha) kategorisindeki malzemeler - taban plakası/basamak plakası/raf plakası vb. için
    * opsiyonel malzeme bağlama alanlarında kullanılır. Verilmezse (eski çağrılarla uyum için) boş liste. */
   sacMalzemeler?: Material[];
+  /** Bağlantı elemanı (FASTENER) kategorisindeki malzemeler - ankraj/menteşe/kilit/kol vb. için
+   * opsiyonel malzeme bağlama alanlarında kullanılır. Verilmezse boş liste. */
+  baglantiMalzemeler?: Material[];
   onSaved?: () => void;
   baslangic?: Record<string, unknown>;
   /** Verilirse form düzenleme modunda çalışır: kaydet POST yerine bu id'ye PUT yapar. */
@@ -556,33 +563,89 @@ export function UrunFormu({
         </div>
 
         {templateKey === "railing" && (
-          <KorkulukAlanlari materials={materials} sacMalzemeler={sacMalzemeler ?? []} onChange={setParams} baslangic={baslangic} />
+          <KorkulukAlanlari
+            materials={materials}
+            sacMalzemeler={sacMalzemeler ?? []}
+            baglantiMalzemeler={baglantiMalzemeler ?? []}
+            onChange={setParams}
+            baslangic={baslangic}
+          />
         )}
         {templateKey === "stairs" && (
-          <MerdivenAlanlari materials={materials} sacMalzemeler={sacMalzemeler ?? []} onChange={setParams} baslangic={baslangic} />
+          <MerdivenAlanlari
+            materials={materials}
+            sacMalzemeler={sacMalzemeler ?? []}
+            baglantiMalzemeler={baglantiMalzemeler ?? []}
+            onChange={setParams}
+            baslangic={baslangic}
+          />
         )}
         {templateKey === "spiral_stairs" && (
-          <DonerMerdivenAlanlari materials={materials} sacMalzemeler={sacMalzemeler ?? []} onChange={setParams} baslangic={baslangic} />
+          <DonerMerdivenAlanlari
+            materials={materials}
+            sacMalzemeler={sacMalzemeler ?? []}
+            baglantiMalzemeler={baglantiMalzemeler ?? []}
+            onChange={setParams}
+            baslangic={baslangic}
+          />
         )}
         {templateKey === "canopy" && (
-          <SundurmaAlanlari materials={materials} sacMalzemeler={sacMalzemeler ?? []} onChange={setParams} baslangic={baslangic} />
+          <SundurmaAlanlari
+            materials={materials}
+            sacMalzemeler={sacMalzemeler ?? []}
+            baglantiMalzemeler={baglantiMalzemeler ?? []}
+            onChange={setParams}
+            baslangic={baslangic}
+          />
         )}
         {templateKey === "door" && (
-          <KapiAlanlari materials={materials} sacMalzemeler={sacMalzemeler ?? []} onChange={setParams} baslangic={baslangic} />
+          <KapiAlanlari
+            materials={materials}
+            sacMalzemeler={sacMalzemeler ?? []}
+            baglantiMalzemeler={baglantiMalzemeler ?? []}
+            onChange={setParams}
+            baslangic={baslangic}
+          />
         )}
-        {templateKey === "wall" && <DuvarAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
+        {templateKey === "wall" && (
+          <DuvarAlanlari
+            materials={materials}
+            sacMalzemeler={sacMalzemeler ?? []}
+            baglantiMalzemeler={baglantiMalzemeler ?? []}
+            onChange={setParams}
+            baslangic={baslangic}
+          />
+        )}
         {templateKey === "truss" && (
-          <CatiKafesiAlanlari materials={materials} sacMalzemeler={sacMalzemeler ?? []} onChange={setParams} baslangic={baslangic} />
+          <CatiKafesiAlanlari
+            materials={materials}
+            sacMalzemeler={sacMalzemeler ?? []}
+            baglantiMalzemeler={baglantiMalzemeler ?? []}
+            onChange={setParams}
+            baslangic={baslangic}
+          />
         )}
         {templateKey === "shelf" && (
           <RafAlanlari materials={materials} sacMalzemeler={sacMalzemeler ?? []} onChange={setParams} baslangic={baslangic} />
         )}
         {templateKey === "pergola" && (
-          <PergolaAlanlari materials={materials} sacMalzemeler={sacMalzemeler ?? []} onChange={setParams} baslangic={baslangic} />
+          <PergolaAlanlari
+            materials={materials}
+            sacMalzemeler={sacMalzemeler ?? []}
+            baglantiMalzemeler={baglantiMalzemeler ?? []}
+            onChange={setParams}
+            baslangic={baslangic}
+          />
         )}
         {templateKey === "ferforje_panel" && <FerforjePanelAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
         {templateKey === "steel_frame" && (
-          <KolonKirisAlanlari materials={materials} sacMalzemeler={sacMalzemeler ?? []} onChange={setParams} baslangic={baslangic} />
+          <KolonKirisAlanlari
+            materials={materials}
+            sacMalzemeler={sacMalzemeler ?? []}
+            baglantiMalzemeler={baglantiMalzemeler ?? []}
+            onChange={setParams}
+            baslangic={baslangic}
+          />
         )}
 
         <button className="btn-primary w-full" onClick={hesapla} disabled={hesaplaniyor}>
@@ -677,11 +740,13 @@ function Sayi({ label, value, onChange }: { label: string; value: number | undef
 function KorkulukAlanlari({
   materials,
   sacMalzemeler,
+  baglantiMalzemeler,
   onChange,
   baslangic,
 }: {
   materials: Material[];
   sacMalzemeler: Material[];
+  baglantiMalzemeler: Material[];
   onChange: (p: Record<string, unknown>) => void;
   baslangic?: Record<string, unknown>;
 }) {
@@ -696,6 +761,7 @@ function KorkulukAlanlari({
     () => baslangic?.araKayitProfilId as number | undefined
   );
   const [plakaMalzemeId, setPlakaMalzemeId] = useState<number | undefined>(() => baslangic?.plakaMalzemeId as number | undefined);
+  const [ankrajMalzemeId, setAnkrajMalzemeId] = useState<number | undefined>(() => baslangic?.ankrajMalzemeId as number | undefined);
 
   useEffect(() => {
     onChange({
@@ -708,6 +774,7 @@ function KorkulukAlanlari({
       araKayitSayisi,
       araKayitProfilId,
       plakaMalzemeId,
+      ankrajMalzemeId,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -720,6 +787,7 @@ function KorkulukAlanlari({
     araKayitSayisi,
     araKayitProfilId,
     plakaMalzemeId,
+    ankrajMalzemeId,
   ]);
 
   return (
@@ -746,6 +814,13 @@ function KorkulukAlanlari({
             onChange={setPlakaMalzemeId}
             allowEmpty
           />
+          <MaterialSelect
+            label="Ankraj Malzemesi (opsiyonel, stok/maliyet için)"
+            materials={baglantiMalzemeler}
+            value={ankrajMalzemeId}
+            onChange={setAnkrajMalzemeId}
+            allowEmpty
+          />
         </div>
       </details>
     </div>
@@ -755,11 +830,13 @@ function KorkulukAlanlari({
 function MerdivenAlanlari({
   materials,
   sacMalzemeler,
+  baglantiMalzemeler,
   onChange,
   baslangic,
 }: {
   materials: Material[];
   sacMalzemeler: Material[];
+  baglantiMalzemeler: Material[];
   onChange: (p: Record<string, unknown>) => void;
   baslangic?: Record<string, unknown>;
 }) {
@@ -784,6 +861,9 @@ function MerdivenAlanlari({
   const [basamakSacMalzemeId, setBasamakSacMalzemeId] = useState<number | undefined>(
     () => baslangic?.basamakSacMalzemeId as number | undefined
   );
+  const [korkulukBaglantiMalzemeId, setKorkulukBaglantiMalzemeId] = useState<number | undefined>(
+    () => baslangic?.korkulukBaglantiMalzemeId as number | undefined
+  );
 
   useEffect(() => {
     onChange({
@@ -796,6 +876,7 @@ function MerdivenAlanlari({
       korkulukDikmeProfilId,
       korkulukUstProfilId,
       basamakSacMalzemeId,
+      korkulukBaglantiMalzemeId: korkulukYuksekligiMm ? korkulukBaglantiMalzemeId : undefined,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -808,6 +889,7 @@ function MerdivenAlanlari({
     korkulukDikmeProfilId,
     korkulukUstProfilId,
     basamakSacMalzemeId,
+    korkulukBaglantiMalzemeId,
   ]);
 
   return (
@@ -835,6 +917,13 @@ function MerdivenAlanlari({
           <Sayi label="Korkuluk Yüksekliği (mm)" value={korkulukYuksekligiMm} onChange={setKorkulukYuksekligiMm} />
           <MaterialSelect label="Korkuluk Dikmesi" materials={materials} value={korkulukDikmeProfilId} onChange={setKorkulukDikmeProfilId} allowEmpty />
           <MaterialSelect label="Korkuluk Üst Profili" materials={materials} value={korkulukUstProfilId} onChange={setKorkulukUstProfilId} allowEmpty />
+          <MaterialSelect
+            label="Korkuluk Bağlantı Plakası Malzemesi (opsiyonel)"
+            materials={baglantiMalzemeler}
+            value={korkulukBaglantiMalzemeId}
+            onChange={setKorkulukBaglantiMalzemeId}
+            allowEmpty
+          />
         </div>
       </details>
     </div>
@@ -844,11 +933,13 @@ function MerdivenAlanlari({
 function DonerMerdivenAlanlari({
   materials,
   sacMalzemeler,
+  baglantiMalzemeler,
   onChange,
   baslangic,
 }: {
   materials: Material[];
   sacMalzemeler: Material[];
+  baglantiMalzemeler: Material[];
   onChange: (p: Record<string, unknown>) => void;
   baslangic?: Record<string, unknown>;
 }) {
@@ -881,6 +972,9 @@ function DonerMerdivenAlanlari({
   const [basamakSacMalzemeId, setBasamakSacMalzemeId] = useState<number | undefined>(
     () => baslangic?.basamakSacMalzemeId as number | undefined
   );
+  const [korkulukBaglantiMalzemeId, setKorkulukBaglantiMalzemeId] = useState<number | undefined>(
+    () => baslangic?.korkulukBaglantiMalzemeId as number | undefined
+  );
 
   useEffect(() => {
     onChange({
@@ -897,6 +991,7 @@ function DonerMerdivenAlanlari({
       korkulukYuksekligiMm: korkulukVar ? korkulukYuksekligiMm : undefined,
       korkulukDikmeProfilId: korkulukVar ? korkulukDikmeProfilId : undefined,
       korkulukUstProfilId: korkulukVar ? korkulukUstProfilId : undefined,
+      korkulukBaglantiMalzemeId: korkulukVar ? korkulukBaglantiMalzemeId : undefined,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -913,6 +1008,7 @@ function DonerMerdivenAlanlari({
     korkulukYuksekligiMm,
     korkulukDikmeProfilId,
     korkulukUstProfilId,
+    korkulukBaglantiMalzemeId,
   ]);
 
   return (
@@ -970,6 +1066,13 @@ function DonerMerdivenAlanlari({
               value={korkulukUstProfilId}
               onChange={setKorkulukUstProfilId}
             />
+            <MaterialSelect
+              label="Korkuluk Bağlantı Plakası Malzemesi (opsiyonel)"
+              materials={baglantiMalzemeler}
+              value={korkulukBaglantiMalzemeId}
+              onChange={setKorkulukBaglantiMalzemeId}
+              allowEmpty
+            />
           </div>
         )}
         {korkulukVar && (
@@ -985,11 +1088,13 @@ function DonerMerdivenAlanlari({
 function SundurmaAlanlari({
   materials,
   sacMalzemeler,
+  baglantiMalzemeler,
   onChange,
   baslangic,
 }: {
   materials: Material[];
   sacMalzemeler: Material[];
+  baglantiMalzemeler: Material[];
   onChange: (p: Record<string, unknown>) => void;
   baslangic?: Record<string, unknown>;
 }) {
@@ -1009,7 +1114,11 @@ function SundurmaAlanlari({
     () => baslangic?.caprazProfilId as number | undefined
   );
   const [kaplamaTuru, setKaplamaTuru] = useState<string>(() => (baslangic?.kaplamaTuru as string) ?? "trapez_sac");
+  const [kaplamaMalzemeId, setKaplamaMalzemeId] = useState<number | undefined>(
+    () => baslangic?.kaplamaMalzemeId as number | undefined
+  );
   const [plakaMalzemeId, setPlakaMalzemeId] = useState<number | undefined>(() => baslangic?.plakaMalzemeId as number | undefined);
+  const [ankrajMalzemeId, setAnkrajMalzemeId] = useState<number | undefined>(() => baslangic?.ankrajMalzemeId as number | undefined);
 
   useEffect(() => {
     onChange({
@@ -1023,7 +1132,9 @@ function SundurmaAlanlari({
       dikmeProfilId,
       caprazProfilId,
       kaplamaTuru,
+      kaplamaMalzemeId: kaplamaTuru !== "yok" ? kaplamaMalzemeId : undefined,
       plakaMalzemeId,
+      ankrajMalzemeId,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -1037,7 +1148,9 @@ function SundurmaAlanlari({
     dikmeProfilId,
     caprazProfilId,
     kaplamaTuru,
+    kaplamaMalzemeId,
     plakaMalzemeId,
+    ankrajMalzemeId,
   ]);
 
   return (
@@ -1065,11 +1178,27 @@ function SundurmaAlanlari({
           ))}
         </select>
       </div>
+      {kaplamaTuru !== "yok" && (
+        <MaterialSelect
+          label="Kaplama Sac Malzemesi (opsiyonel, stok/maliyet için)"
+          materials={sacMalzemeler}
+          value={kaplamaMalzemeId}
+          onChange={setKaplamaMalzemeId}
+          allowEmpty
+        />
+      )}
       <MaterialSelect
         label="Taban Plakası Sac Malzemesi (opsiyonel, stok/maliyet için)"
         materials={sacMalzemeler}
         value={plakaMalzemeId}
         onChange={setPlakaMalzemeId}
+        allowEmpty
+      />
+      <MaterialSelect
+        label="Ankraj Malzemesi (opsiyonel, stok/maliyet için)"
+        materials={baglantiMalzemeler}
+        value={ankrajMalzemeId}
+        onChange={setAnkrajMalzemeId}
         allowEmpty
       />
     </div>
@@ -1079,11 +1208,13 @@ function SundurmaAlanlari({
 function KapiAlanlari({
   materials,
   sacMalzemeler,
+  baglantiMalzemeler,
   onChange,
   baslangic,
 }: {
   materials: Material[];
   sacMalzemeler: Material[];
+  baglantiMalzemeler: Material[];
   onChange: (p: Record<string, unknown>) => void;
   baslangic?: Record<string, unknown>;
 }) {
@@ -1096,11 +1227,40 @@ function KapiAlanlari({
   const [menteseAdet, setMenteseAdet] = useState<number>(() => (baslangic?.menteseAdet as number) ?? 3);
   const [kilitAdet, setKilitAdet] = useState<number>(() => (baslangic?.kilitAdet as number) ?? 1);
   const [kolAdet, setKolAdet] = useState<number>(() => (baslangic?.kolAdet as number) ?? 1);
+  const [menteseMalzemeId, setMenteseMalzemeId] = useState<number | undefined>(() => baslangic?.menteseMalzemeId as number | undefined);
+  const [kilitMalzemeId, setKilitMalzemeId] = useState<number | undefined>(() => baslangic?.kilitMalzemeId as number | undefined);
+  const [kolMalzemeId, setKolMalzemeId] = useState<number | undefined>(() => baslangic?.kolMalzemeId as number | undefined);
 
   useEffect(() => {
-    onChange({ genislikMm, yukseklikMm, kasaProfilId, kanatProfilId, sacKalinlikMm, sacMalzemeId, menteseAdet, kilitAdet, kolAdet });
+    onChange({
+      genislikMm,
+      yukseklikMm,
+      kasaProfilId,
+      kanatProfilId,
+      sacKalinlikMm,
+      sacMalzemeId,
+      menteseAdet,
+      kilitAdet,
+      kolAdet,
+      menteseMalzemeId,
+      kilitMalzemeId,
+      kolMalzemeId,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [genislikMm, yukseklikMm, kasaProfilId, kanatProfilId, sacKalinlikMm, sacMalzemeId, menteseAdet, kilitAdet, kolAdet]);
+  }, [
+    genislikMm,
+    yukseklikMm,
+    kasaProfilId,
+    kanatProfilId,
+    sacKalinlikMm,
+    sacMalzemeId,
+    menteseAdet,
+    kilitAdet,
+    kolAdet,
+    menteseMalzemeId,
+    kilitMalzemeId,
+    kolMalzemeId,
+  ]);
 
   return (
     <div className="space-y-3">
@@ -1124,8 +1284,29 @@ function KapiAlanlari({
             allowEmpty
           />
           <Sayi label="Menteşe Adedi" value={menteseAdet} onChange={setMenteseAdet} />
+          <MaterialSelect
+            label="Menteşe Malzemesi (opsiyonel, stok/maliyet için)"
+            materials={baglantiMalzemeler}
+            value={menteseMalzemeId}
+            onChange={setMenteseMalzemeId}
+            allowEmpty
+          />
           <Sayi label="Kilit Adedi" value={kilitAdet} onChange={setKilitAdet} />
+          <MaterialSelect
+            label="Kilit Malzemesi (opsiyonel, stok/maliyet için)"
+            materials={baglantiMalzemeler}
+            value={kilitMalzemeId}
+            onChange={setKilitMalzemeId}
+            allowEmpty
+          />
           <Sayi label="Kol Adedi" value={kolAdet} onChange={setKolAdet} />
+          <MaterialSelect
+            label="Kol Malzemesi (opsiyonel, stok/maliyet için)"
+            materials={baglantiMalzemeler}
+            value={kolMalzemeId}
+            onChange={setKolMalzemeId}
+            allowEmpty
+          />
         </div>
       </details>
     </div>
@@ -1142,10 +1323,14 @@ interface DuvarBoslukTaslak {
 
 function DuvarAlanlari({
   materials,
+  sacMalzemeler,
+  baglantiMalzemeler,
   onChange,
   baslangic,
 }: {
   materials: Material[];
+  sacMalzemeler: Material[];
+  baglantiMalzemeler: Material[];
   onChange: (p: Record<string, unknown>) => void;
   baslangic?: Record<string, unknown>;
 }) {
@@ -1159,7 +1344,14 @@ function DuvarAlanlari({
     () => (baslangic?.bosluklar as DuvarBoslukTaslak[] | undefined) ?? []
   );
   const [disKaplamaTuru, setDisKaplamaTuru] = useState<string>(() => (baslangic?.disKaplamaTuru as string) ?? "yok");
+  const [disKaplamaMalzemeId, setDisKaplamaMalzemeId] = useState<number | undefined>(
+    () => baslangic?.disKaplamaMalzemeId as number | undefined
+  );
   const [icKaplamaTuru, setIcKaplamaTuru] = useState<string>(() => (baslangic?.icKaplamaTuru as string) ?? "yok");
+  const [icKaplamaMalzemeId, setIcKaplamaMalzemeId] = useState<number | undefined>(
+    () => baslangic?.icKaplamaMalzemeId as number | undefined
+  );
+  const [dubelMalzemeId, setDubelMalzemeId] = useState<number | undefined>(() => baslangic?.dubelMalzemeId as number | undefined);
 
   useEffect(() => {
     onChange({
@@ -1171,10 +1363,26 @@ function DuvarAlanlari({
       dikmeProfilId,
       bosluklar,
       disKaplamaTuru: disKaplamaTuru === "yok" ? undefined : disKaplamaTuru,
+      disKaplamaMalzemeId: disKaplamaTuru !== "yok" ? disKaplamaMalzemeId : undefined,
       icKaplamaTuru: icKaplamaTuru === "yok" ? undefined : icKaplamaTuru,
+      icKaplamaMalzemeId: icKaplamaTuru !== "yok" ? icKaplamaMalzemeId : undefined,
+      dubelMalzemeId,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [genislikMm, yukseklikMm, dikmeAraligiHedefMm, ustProfilId, altProfilId, dikmeProfilId, bosluklar, disKaplamaTuru, icKaplamaTuru]);
+  }, [
+    genislikMm,
+    yukseklikMm,
+    dikmeAraligiHedefMm,
+    ustProfilId,
+    altProfilId,
+    dikmeProfilId,
+    bosluklar,
+    disKaplamaTuru,
+    disKaplamaMalzemeId,
+    icKaplamaTuru,
+    icKaplamaMalzemeId,
+    dubelMalzemeId,
+  ]);
 
   const bosluklariGuncelle = (i: number, alan: keyof DuvarBoslukTaslak, deger: string | number) => {
     setBosluklar((liste) => liste.map((b, idx) => (idx === i ? { ...b, [alan]: deger } : b)));
@@ -1213,6 +1421,31 @@ function DuvarAlanlari({
             ))}
           </select>
         </div>
+        {disKaplamaTuru !== "yok" && (
+          <MaterialSelect
+            label="Dış Kaplama Sac Malzemesi (opsiyonel, stok/maliyet için)"
+            materials={sacMalzemeler}
+            value={disKaplamaMalzemeId}
+            onChange={setDisKaplamaMalzemeId}
+            allowEmpty
+          />
+        )}
+        {icKaplamaTuru !== "yok" && (
+          <MaterialSelect
+            label="İç Kaplama Sac Malzemesi (opsiyonel, stok/maliyet için)"
+            materials={sacMalzemeler}
+            value={icKaplamaMalzemeId}
+            onChange={setIcKaplamaMalzemeId}
+            allowEmpty
+          />
+        )}
+        <MaterialSelect
+          label="Ray Dübeli Malzemesi (opsiyonel, stok/maliyet için)"
+          materials={baglantiMalzemeler}
+          value={dubelMalzemeId}
+          onChange={setDubelMalzemeId}
+          allowEmpty
+        />
       </div>
       <p className="text-xs text-neutral-500 -mt-1">
         Dış ve iç kaplama birbirinden bağımsızdır, ikisi birden seçilebilir (örn. içeriden alçıpan + dışarıdan petopan). Her
@@ -1285,11 +1518,13 @@ function DuvarAlanlari({
 function CatiKafesiAlanlari({
   materials,
   sacMalzemeler,
+  baglantiMalzemeler,
   onChange,
   baslangic,
 }: {
   materials: Material[];
   sacMalzemeler: Material[];
+  baglantiMalzemeler: Material[];
   onChange: (p: Record<string, unknown>) => void;
   baslangic?: Record<string, unknown>;
 }) {
@@ -1315,6 +1550,9 @@ function CatiKafesiAlanlari({
   const [asikProfilId, setAsikProfilId] = useState<number | undefined>(() => baslangic?.asikProfilId as number | undefined);
   const [asikAraligiHedefMm, setAsikAraligiHedefMm] = useState<number>(() => (baslangic?.asikAraligiHedefMm as number) ?? 1000);
   const [kaplamaTuru, setKaplamaTuru] = useState<string>(() => (baslangic?.kaplamaTuru as string) ?? "trapez_sac");
+  const [kaplamaMalzemeId, setKaplamaMalzemeId] = useState<number | undefined>(
+    () => baslangic?.kaplamaMalzemeId as number | undefined
+  );
   const [stabiliteBaglantisiVar, setStabiliteBaglantisiVar] = useState(
     () => (baslangic?.stabiliteBaglantisiVar as boolean) ?? false
   );
@@ -1327,6 +1565,7 @@ function CatiKafesiAlanlari({
   const [direkSayisi, setDirekSayisi] = useState<number>(() => (baslangic?.direkSayisi as number) ?? 0);
   const [direkProfilId, setDirekProfilId] = useState<number | undefined>(() => baslangic?.direkProfilId as number | undefined);
   const [plakaMalzemeId, setPlakaMalzemeId] = useState<number | undefined>(() => baslangic?.plakaMalzemeId as number | undefined);
+  const [ankrajMalzemeId, setAnkrajMalzemeId] = useState<number | undefined>(() => baslangic?.ankrajMalzemeId as number | undefined);
 
   useEffect(() => {
     onChange({
@@ -1342,6 +1581,7 @@ function CatiKafesiAlanlari({
       asikProfilId,
       asikAraligiHedefMm,
       kaplamaTuru,
+      kaplamaMalzemeId: kaplamaTuru !== "yok" ? kaplamaMalzemeId : undefined,
       stabiliteBaglantisiVar,
       stabiliteProfilId: stabiliteBaglantisiVar ? stabiliteProfilId : undefined,
       olukluMu,
@@ -1350,6 +1590,7 @@ function CatiKafesiAlanlari({
       direkSayisi,
       direkProfilId: direkSayisi > 0 ? direkProfilId : undefined,
       plakaMalzemeId,
+      ankrajMalzemeId,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -1365,6 +1606,7 @@ function CatiKafesiAlanlari({
     asikProfilId,
     asikAraligiHedefMm,
     kaplamaTuru,
+    kaplamaMalzemeId,
     stabiliteBaglantisiVar,
     stabiliteProfilId,
     olukluMu,
@@ -1373,6 +1615,7 @@ function CatiKafesiAlanlari({
     direkSayisi,
     direkProfilId,
     plakaMalzemeId,
+    ankrajMalzemeId,
   ]);
 
   return (
@@ -1401,11 +1644,27 @@ function CatiKafesiAlanlari({
           ))}
         </select>
       </div>
+      {kaplamaTuru !== "yok" && (
+        <MaterialSelect
+          label="Kaplama Sac Malzemesi (opsiyonel, stok/maliyet için)"
+          materials={sacMalzemeler}
+          value={kaplamaMalzemeId}
+          onChange={setKaplamaMalzemeId}
+          allowEmpty
+        />
+      )}
       <MaterialSelect
         label="Mesnet Plakası Sac Malzemesi (opsiyonel, stok/maliyet için)"
         materials={sacMalzemeler}
         value={plakaMalzemeId}
         onChange={setPlakaMalzemeId}
+        allowEmpty
+      />
+      <MaterialSelect
+        label="Ankraj Malzemesi (opsiyonel, stok/maliyet için)"
+        materials={baglantiMalzemeler}
+        value={ankrajMalzemeId}
+        onChange={setAnkrajMalzemeId}
         allowEmpty
       />
       <details className="rounded-xl border border-neutral-200 p-3">
@@ -1597,11 +1856,13 @@ function RafAlanlari({
 function PergolaAlanlari({
   materials,
   sacMalzemeler,
+  baglantiMalzemeler,
   onChange,
   baslangic,
 }: {
   materials: Material[];
   sacMalzemeler: Material[];
+  baglantiMalzemeler: Material[];
   onChange: (p: Record<string, unknown>) => void;
   baslangic?: Record<string, unknown>;
 }) {
@@ -1615,6 +1876,7 @@ function PergolaAlanlari({
   const [lataYonu, setLataYonu] = useState<string>(() => (baslangic?.lataYonu as string) ?? "genislik");
   const [lataAraligiHedefMm, setLataAraligiHedefMm] = useState<number>(() => (baslangic?.lataAraligiHedefMm as number) ?? 200);
   const [plakaMalzemeId, setPlakaMalzemeId] = useState<number | undefined>(() => baslangic?.plakaMalzemeId as number | undefined);
+  const [ankrajMalzemeId, setAnkrajMalzemeId] = useState<number | undefined>(() => baslangic?.ankrajMalzemeId as number | undefined);
 
   useEffect(() => {
     onChange({
@@ -1628,6 +1890,7 @@ function PergolaAlanlari({
       lataYonu,
       lataAraligiHedefMm,
       plakaMalzemeId,
+      ankrajMalzemeId,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -1641,6 +1904,7 @@ function PergolaAlanlari({
     lataYonu,
     lataAraligiHedefMm,
     plakaMalzemeId,
+    ankrajMalzemeId,
   ]);
 
   return (
@@ -1675,6 +1939,13 @@ function PergolaAlanlari({
         materials={sacMalzemeler}
         value={plakaMalzemeId}
         onChange={setPlakaMalzemeId}
+        allowEmpty
+      />
+      <MaterialSelect
+        label="Ankraj Malzemesi (opsiyonel, stok/maliyet için)"
+        materials={baglantiMalzemeler}
+        value={ankrajMalzemeId}
+        onChange={setAnkrajMalzemeId}
         allowEmpty
       />
     </div>
@@ -1797,11 +2068,13 @@ function FerforjePanelAlanlari({
 function KolonKirisAlanlari({
   materials,
   sacMalzemeler,
+  baglantiMalzemeler,
   onChange,
   baslangic,
 }: {
   materials: Material[];
   sacMalzemeler: Material[];
+  baglantiMalzemeler: Material[];
   onChange: (p: Record<string, unknown>) => void;
   baslangic?: Record<string, unknown>;
 }) {
@@ -1824,6 +2097,7 @@ function KolonKirisAlanlari({
     () => baslangic?.stabiliteProfilId as number | undefined
   );
   const [plakaMalzemeId, setPlakaMalzemeId] = useState<number | undefined>(() => baslangic?.plakaMalzemeId as number | undefined);
+  const [ankrajMalzemeId, setAnkrajMalzemeId] = useState<number | undefined>(() => baslangic?.ankrajMalzemeId as number | undefined);
 
   useEffect(() => {
     onChange({
@@ -1838,6 +2112,7 @@ function KolonKirisAlanlari({
       stabiliteBaglantisiVar,
       stabiliteProfilId: stabiliteBaglantisiVar ? stabiliteProfilId : undefined,
       plakaMalzemeId,
+      ankrajMalzemeId,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -1852,6 +2127,7 @@ function KolonKirisAlanlari({
     stabiliteBaglantisiVar,
     stabiliteProfilId,
     plakaMalzemeId,
+    ankrajMalzemeId,
   ]);
 
   return (
@@ -1876,6 +2152,13 @@ function KolonKirisAlanlari({
         materials={sacMalzemeler}
         value={plakaMalzemeId}
         onChange={setPlakaMalzemeId}
+        allowEmpty
+      />
+      <MaterialSelect
+        label="Ankraj Malzemesi (opsiyonel, stok/maliyet için)"
+        materials={baglantiMalzemeler}
+        value={ankrajMalzemeId}
+        onChange={setAnkrajMalzemeId}
         allowEmpty
       />
       <details className="rounded-xl border border-neutral-200 p-3">

@@ -28,6 +28,9 @@ export interface SundurmaGirdi {
   /** Çatı kaplama türü */
   kaplamaTuru?: KaplamaTuru;
   kaplamaKalinlikMm?: number;
+  /** Kaplamanın alınacağı sac Material id'si (opsiyonel) - verilirse teklif maliyetine ve
+   * iş onayında stok düşümüne dahil edilir. */
+  kaplamaMalzemeKey?: string;
   plakaEnMm?: number;
   plakaBoyMm?: number;
   plakaKalinlikMm?: number;
@@ -35,6 +38,9 @@ export interface SundurmaGirdi {
    * iş onayında stok düşümüne dahil edilir. */
   plakaMalzemeKey?: string;
   ankrajSayisiPerPlaka?: number;
+  /** Ankrajın alınacağı Material id'si (opsiyonel, FASTENER kategorisi) - verilirse teklif
+   * maliyetine ve iş onayında stok düşümüne dahil edilir. */
+  ankrajMalzemeKey?: string;
 }
 
 const VARSAYILAN = {
@@ -137,6 +143,7 @@ export function calculateCanopy(girdi: SundurmaGirdi): UrunHesapSonucu {
       kalinlikMm: girdi.kaplamaKalinlikMm ?? kaplamaBilgisi.varsayilanKalinlikMm,
       adet: kaplamaOzet.panelSayisi,
       yogunlukKgM3: kaplamaBilgisi.efektifYogunlukKgM3,
+      materialKey: girdi.kaplamaMalzemeKey,
       not: `${kaplamaOzet.panelSayisi} panel (${kaplamaBilgisi.faydaliGenislikMm} mm faydalı genişlik) yan yana; net alan ${kaplamaOzet.netAlaniM2} m², sipariş edilecek alan (fire dahil, ~%${kaplamaBilgisi.tipikFireYuzde} bindirme/kesim payı) ${kaplamaOzet.siparisAlaniM2} m².`,
     });
   }
@@ -145,6 +152,7 @@ export function calculateCanopy(girdi: SundurmaGirdi): UrunHesapSonucu {
     label: "Ankraj (kimyasal/mekanik dübel)",
     birim: "adet",
     adet: dikmeSayisi * ankrajSayisiPerPlaka,
+    materialKey: girdi.ankrajMalzemeKey,
   });
 
   sonuc.ozetDegerler = {
