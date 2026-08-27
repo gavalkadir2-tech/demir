@@ -86,6 +86,16 @@ export default function Ayarlar() {
       <button className="btn-primary w-full" onClick={kaydet} disabled={kaydediliyor}>
         {kaydediliyor ? "Kaydediliyor..." : "Kaydet"}
       </button>
+
+      <div className="card space-y-2">
+        <h2 className="font-bold text-neutral-700">💾 Veri Yedekleme</h2>
+        <p className="text-sm text-neutral-500">
+          Tüm müşteri, iş, malzeme ve teklif verilerini tek bir JSON dosyası olarak indirin.
+        </p>
+        <a className="btn-secondary" href="/api/backup/export" download>
+          ⬇️ Tüm Verileri İndir
+        </a>
+      </div>
     </div>
   );
 }

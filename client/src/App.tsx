@@ -15,6 +15,7 @@ import MusteriDetay from "./pages/MusteriDetay";
 import Ayarlar from "./pages/Ayarlar";
 import Takvim from "./pages/Takvim";
 import Isciler from "./pages/Isciler";
+import Raporlar from "./pages/Raporlar";
 import TeklifOnay from "./pages/TeklifOnay";
 import IsTakip from "./pages/IsTakip";
 
@@ -38,6 +39,7 @@ export default function App() {
         <Route path="/musteriler/:id" element={<MusteriDetay />} />
         <Route path="/takvim" element={<Takvim />} />
         <Route path="/isciler" element={<Isciler />} />
+        <Route path="/raporlar" element={<Raporlar />} />
         <Route path="/ayarlar" element={<Ayarlar />} />
       </Route>
     </Routes>

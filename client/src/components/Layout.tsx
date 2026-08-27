@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { to: "/musteriler", label: "Müşteriler", emoji: "👥" },
   { to: "/takvim", label: "Takvim", emoji: "📅" },
   { to: "/stok", label: "Stok", emoji: "📦" },
+  { to: "/raporlar", label: "Raporlar", emoji: "📊" },
   { to: "/ayarlar", label: "Ayarlar", emoji: "⚙️" },
 ];
 
