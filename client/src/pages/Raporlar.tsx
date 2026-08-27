@@ -15,6 +15,7 @@ interface RaporVerisi {
   fireOranlari: { materialId: number; materialName: string; ortalamaFireYuzde: number }[];
   aylikOzet: { ay: string; satis: number; kar: number }[];
   tahminiSureler: { kategori: string; ortalamaGun: number; ornekSayisi: number }[];
+  kategoriKarliligi: { kategori: string; ciro: number; kar: number; marjYuzde: number; isSayisi: number }[];
 }
 
 const AY_ADI = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
@@ -93,6 +94,44 @@ export default function Raporlar() {
           </div>
         )}
         {aiHata && <div className="text-sm text-red-600">{aiHata}</div>}
+      </div>
+
+      <div className="card">
+        <h2 className="font-bold mb-3">🏆 Atölyenin Kârlılığı (İş Türüne Göre)</h2>
+        {veri.kategoriKarliligi.length === 0 ? (
+          <div className="text-sm text-neutral-500">Henüz kabul edilmiş teklif yok.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-neutral-50 text-neutral-500 text-left">
+                <tr>
+                  <th className="px-3 py-2">Kategori</th>
+                  <th className="px-3 py-2">Kâr Marjı</th>
+                  <th className="px-3 py-2">Ciro</th>
+                  <th className="px-3 py-2">Kâr</th>
+                  <th className="px-3 py-2">İş Sayısı</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-100">
+                {veri.kategoriKarliligi.map((k, i) => (
+                  <tr key={k.kategori}>
+                    <td className="px-3 py-2 font-medium">
+                      {i === 0 && "🥇 "}
+                      {i === veri.kategoriKarliligi.length - 1 && veri.kategoriKarliligi.length > 1 && "⚠️ "}
+                      {KATEGORI_ETIKET[k.kategori as ProjectCategory] ?? k.kategori}
+                    </td>
+                    <td className={`px-3 py-2 font-bold ${k.marjYuzde >= 25 ? "text-emerald-700" : k.marjYuzde >= 10 ? "text-amber-700" : "text-red-600"}`}>
+                      %{sayi(k.marjYuzde, 1)}
+                    </td>
+                    <td className="px-3 py-2">{tl(k.ciro)}</td>
+                    <td className="px-3 py-2">{tl(k.kar)}</td>
+                    <td className="px-3 py-2 text-neutral-500">{k.isSayisi}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="card">

@@ -49,6 +49,31 @@ router.get(
   })
 );
 
+// Henüz stoktan düşülmemiş, aktif (tamamlanmamış/iptal olmamış) işlere ayrılmış parça
+// miktarlarını malzeme başına toplar - "mevcut stok" fiziksel olarak yerinde dursa da bu miktar
+// zaten başka bir işe planlanmış demektir, iki işe aynı malzeme yanlışlıkla ayrılmasın diye.
+router.get(
+  "/rezervasyonlar",
+  asyncHandler(async (_req, res) => {
+    const parcalar = await prisma.part.findMany({
+      where: {
+        project: { status: { notIn: ["COMPLETED", "CANCELLED"] }, stockDeducted: false },
+      },
+      select: { materialId: true, lengthMm: true, qty: true, material: { select: { unit: true, unitWeightKgPerM: true } } },
+    });
+    const map = new Map<number, number>();
+    for (const p of parcalar) {
+      const metre = (p.lengthMm / 1000) * p.qty;
+      // Malzemenin stok birimi metre değilse (çoğu profil kg üzerinden takip ediliyor), rezerve
+      // miktarı da aynı birime çevrilmeli - yoksa "35 kg rezerve" gibi yanlış bir sayı gösterilir.
+      const miktar = p.material.unit === "KG" ? metre * (p.material.unitWeightKgPerM ?? 0) : metre;
+      if (p.material.unit !== "M" && p.material.unit !== "KG") continue; // ADET/M2 için Part tabanlı rezervasyon anlamlı değil
+      map.set(p.materialId, (map.get(p.materialId) ?? 0) + miktar);
+    }
+    res.json(Array.from(map.entries()).map(([materialId, rezerveMiktar]) => ({ materialId, rezerveMiktar: Math.round(rezerveMiktar * 100) / 100 })));
+  })
+);
+
 router.get(
   "/kritik-stok",
   asyncHandler(async (_req, res) => {

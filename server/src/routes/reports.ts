@@ -9,7 +9,10 @@ router.get(
   asyncHandler(async (_req, res) => {
     const [toplamIsSayisi, kabulEdilenTeklifler, malzemeler, kesimListeleri] = await Promise.all([
       prisma.project.count(),
-      prisma.quote.findMany({ where: { status: "ACCEPTED" }, select: { total: true, totalCost: true, profitAmount: true, date: true } }),
+      prisma.quote.findMany({
+        where: { status: "ACCEPTED" },
+        select: { total: true, totalCost: true, profitAmount: true, date: true, project: { select: { category: true } } },
+      }),
       prisma.material.findMany({ orderBy: { name: "asc" } }),
       prisma.cuttingList.findMany({ select: { materialId: true, wastePercent: true } }),
     ]);
@@ -77,6 +80,26 @@ router.get(
       }))
       .sort((a, b) => b.ornekSayisi - a.ornekSayisi);
 
+    // Kategori bazlı kârlılık (marj%) - "en kârlı / en az kârlı iş türleri" sıralaması için.
+    const karMap = new Map<string, { ciro: number; kar: number; isSayisi: number }>();
+    for (const q of kabulEdilenTeklifler) {
+      const kategori = q.project.category;
+      const mevcut = karMap.get(kategori) ?? { ciro: 0, kar: 0, isSayisi: 0 };
+      mevcut.ciro += q.total;
+      mevcut.kar += q.profitAmount;
+      mevcut.isSayisi += 1;
+      karMap.set(kategori, mevcut);
+    }
+    const kategoriKarliligi = Array.from(karMap.entries())
+      .map(([kategori, v]) => ({
+        kategori,
+        ciro: Math.round(v.ciro * 100) / 100,
+        kar: Math.round(v.kar * 100) / 100,
+        marjYuzde: v.ciro > 0 ? Math.round((v.kar / v.ciro) * 1000) / 10 : 0,
+        isSayisi: v.isSayisi,
+      }))
+      .sort((a, b) => b.marjYuzde - a.marjYuzde);
+
     res.json({
       toplamIsSayisi,
       toplamSatis: Math.round(toplamSatis * 100) / 100,
@@ -87,6 +110,7 @@ router.get(
       fireOranlari,
       aylikOzet,
       tahminiSureler,
+      kategoriKarliligi,
     });
   })
 );

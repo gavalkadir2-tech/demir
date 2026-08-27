@@ -4,13 +4,24 @@ import { Material, StockMovement } from "../api/types";
 import { Modal, Spinner, HataKutusu } from "../components/ui";
 import { sayi, tarih, tl } from "../lib/format";
 
+interface Rezervasyon {
+  materialId: number;
+  rezerveMiktar: number;
+}
+
 export default function Stok() {
   const [malzemeler, setMalzemeler] = useState<Material[] | null>(null);
+  const [rezervasyonlar, setRezervasyonlar] = useState<Record<number, number>>({});
   const [hareketModal, setHareketModal] = useState<Material | null>(null);
   const [gecmisModal, setGecmisModal] = useState<Material | null>(null);
   const [sadeceKritik, setSadeceKritik] = useState(false);
 
-  const yukle = () => api.get<Material[]>("/materials").then(setMalzemeler);
+  const yukle = () => {
+    api.get<Material[]>("/materials").then(setMalzemeler);
+    api.get<Rezervasyon[]>("/materials/rezervasyonlar").then((liste) =>
+      setRezervasyonlar(Object.fromEntries(liste.map((r) => [r.materialId, r.rezerveMiktar])))
+    );
+  };
 
   useEffect(() => {
     yukle();
@@ -34,12 +45,24 @@ export default function Stok() {
         <div className="grid gap-3">
           {gorunenler.map((m) => {
             const kritik = m.minStockQty > 0 && m.stockQty <= m.minStockQty;
+            const birim = m.unit === "M" ? "m" : m.unit === "KG" ? "kg" : m.unit === "M2" ? "m²" : "adet";
+            const rezerve = rezervasyonlar[m.id] ?? 0;
+            const kullanilabilir = m.stockQty - rezerve;
             return (
               <div key={m.id} className={`card flex items-center justify-between ${kritik ? "border-amber-300 bg-amber-50" : ""}`}>
                 <div>
                   <div className="font-bold">{m.name}</div>
                   <div className="text-sm text-neutral-500">
-                    Stok: {sayi(m.stockQty)} {m.unit === "M" ? "m" : m.unit === "KG" ? "kg" : "adet"}
+                    Mevcut: {sayi(m.stockQty)} {birim}
+                    {rezerve > 0 && (
+                      <>
+                        {" "}
+                        • Rezerve: <span className="text-amber-700 font-semibold">{sayi(rezerve)} {birim}</span> • Kullanılabilir:{" "}
+                        <span className={`font-semibold ${kullanilabilir < 0 ? "text-red-600" : "text-emerald-700"}`}>
+                          {sayi(kullanilabilir)} {birim}
+                        </span>
+                      </>
+                    )}
                     {m.minStockQty > 0 && ` • Min: ${sayi(m.minStockQty)}`}
                     {kritik && <span className="text-amber-700 font-semibold"> • Kritik!</span>}
                   </div>
