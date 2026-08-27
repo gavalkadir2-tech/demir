@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
+import BildirimZili from "./BildirimZili";
 
 const NAV_ITEMS = [
   { to: "/", label: "Dashboard", emoji: "🏠" },
@@ -45,8 +46,9 @@ export default function Layout() {
   return (
     <div className="min-h-screen md:flex">
       <aside className="hidden md:flex md:w-64 md:flex-col md:border-r md:border-neutral-200 md:bg-white">
-        <div className="p-5 border-b border-neutral-200">
+        <div className="p-5 border-b border-neutral-200 flex items-center justify-between">
           <div className="text-lg font-bold text-brand-700">🔧 Demirci Atölye</div>
+          <BildirimZili />
         </div>
         <NavList />
       </aside>
@@ -54,13 +56,16 @@ export default function Layout() {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="md:hidden sticky top-0 z-30 flex items-center justify-between bg-white border-b border-neutral-200 px-4 py-3">
           <div className="text-lg font-bold text-brand-700">🔧 Demirci Atölye</div>
-          <button
-            className="btn-secondary btn-sm"
-            onClick={() => setMenuOpen(true)}
-            aria-label="Menüyü aç"
-          >
-            ☰ Menü
-          </button>
+          <div className="flex items-center gap-2">
+            <BildirimZili />
+            <button
+              className="btn-secondary btn-sm"
+              onClick={() => setMenuOpen(true)}
+              aria-label="Menüyü aç"
+            >
+              ☰ Menü
+            </button>
+          </div>
         </header>
 
         {menuOpen && (

@@ -504,3 +504,19 @@ export interface EnCokKullanilanMalzeme {
   name: string;
   toplamMetre: number;
 }
+
+export type BildirimTuru =
+  | "DUSUK_STOK"
+  | "TEKLIF_SURESI_DOLDU"
+  | "TEKLIF_SURESI_YAKLASIYOR"
+  | "IS_TESLIMI_GECIKTI"
+  | "IS_TESLIMI_YAKLASIYOR";
+
+export interface Bildirim {
+  id: string;
+  tur: BildirimTuru;
+  onem: "kritik" | "uyari";
+  baslik: string;
+  mesaj: string;
+  link: string;
+}
