@@ -126,6 +126,7 @@ model Project {
   date         DateTime        @default(now())
 
   dueDate      DateTime?       // planlanan teslim tarihi
+  completedAt  DateTime?       // status COMPLETED'e geçtiği an - kategori bazlı "tahmini teslim süresi" için
   priority     ProjectPriority @default(NORMAL)
 
   laborMode    LaborMode       @default(PER_HOUR)

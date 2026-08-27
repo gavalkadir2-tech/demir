@@ -57,6 +57,26 @@ router.get(
       .map(([ay, v]) => ({ ay, satis: Math.round(v.satis * 100) / 100, kar: Math.round(v.kar * 100) / 100 }))
       .sort((a, b) => a.ay.localeCompare(b.ay));
 
+    const tamamlananIsler = await prisma.project.findMany({
+      where: { completedAt: { not: null } },
+      select: { category: true, createdAt: true, completedAt: true },
+    });
+    const sureMap = new Map<string, number[]>();
+    for (const p of tamamlananIsler) {
+      if (!p.completedAt) continue;
+      const gun = (p.completedAt.getTime() - p.createdAt.getTime()) / (1000 * 60 * 60 * 24);
+      const arr = sureMap.get(p.category) ?? [];
+      arr.push(gun);
+      sureMap.set(p.category, arr);
+    }
+    const tahminiSureler = Array.from(sureMap.entries())
+      .map(([kategori, gunler]) => ({
+        kategori,
+        ortalamaGun: Math.round((gunler.reduce((a, b) => a + b, 0) / gunler.length) * 10) / 10,
+        ornekSayisi: gunler.length,
+      }))
+      .sort((a, b) => b.ornekSayisi - a.ornekSayisi);
+
     res.json({
       toplamIsSayisi,
       toplamSatis: Math.round(toplamSatis * 100) / 100,
@@ -66,7 +86,34 @@ router.get(
       stokDurumu: malzemeler.map((m) => ({ id: m.id, name: m.name, stockQty: m.stockQty, minStockQty: m.minStockQty, unit: m.unit })),
       fireOranlari,
       aylikOzet,
+      tahminiSureler,
     });
+  })
+);
+
+// Yeni iş oluştururken kategoriye göre "tahmini teslim süresi" ipucu göstermek için hafif uç nokta
+// (tüm /reports gövdesini çekmeye gerek kalmadan).
+router.get(
+  "/tahmini-sureler",
+  asyncHandler(async (_req, res) => {
+    const tamamlananIsler = await prisma.project.findMany({
+      where: { completedAt: { not: null } },
+      select: { category: true, createdAt: true, completedAt: true },
+    });
+    const sureMap = new Map<string, number[]>();
+    for (const p of tamamlananIsler) {
+      if (!p.completedAt) continue;
+      const gun = (p.completedAt.getTime() - p.createdAt.getTime()) / (1000 * 60 * 60 * 24);
+      const arr = sureMap.get(p.category) ?? [];
+      arr.push(gun);
+      sureMap.set(p.category, arr);
+    }
+    const tahminiSureler = Array.from(sureMap.entries()).map(([kategori, gunler]) => ({
+      kategori,
+      ortalamaGun: Math.round((gunler.reduce((a, b) => a + b, 0) / gunler.length) * 10) / 10,
+      ornekSayisi: gunler.length,
+    }));
+    res.json(tahminiSureler);
   })
 );
 

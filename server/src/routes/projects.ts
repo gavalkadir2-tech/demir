@@ -173,6 +173,8 @@ router.put(
         ...data,
         date: data.date ? new Date(data.date) : undefined,
         dueDate: data.dueDate === undefined ? undefined : data.dueDate ? new Date(data.dueDate) : null,
+        // Kategori bazlı "tahmini teslim süresi" hesabı için gerçek tamamlanma anını kaydet.
+        completedAt: data.status === undefined ? undefined : data.status === "COMPLETED" ? new Date() : null,
       },
     });
     res.json(proje);

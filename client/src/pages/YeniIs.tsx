@@ -17,6 +17,7 @@ import MaterialSelect from "../components/MaterialSelect";
 import HesapSonucuGorunum from "../components/HesapSonucuGorunum";
 import YapiselKontrolGorunum from "../components/YapiselKontrolGorunum";
 import SemaGorunum from "../components/SemaGorunum";
+import { sayi } from "../lib/format";
 
 const TEMPLATE_KATEGORI: Record<string, ProjectCategory> = {
   railing: "RAILING",
@@ -225,6 +226,14 @@ function IsBilgisiAdimi({
   const [priority, setPriority] = useState<ProjectPriority>("NORMAL");
   const [hata, setHata] = useState<string | null>(null);
   const [kaydediliyor, setKaydediliyor] = useState(false);
+  const [tahminiSureler, setTahminiSureler] = useState<{ kategori: string; ortalamaGun: number; ornekSayisi: number }[]>([]);
+
+  useEffect(() => {
+    api
+      .get<{ kategori: string; ortalamaGun: number; ornekSayisi: number }[]>("/reports/tahmini-sureler")
+      .then(setTahminiSureler)
+      .catch(() => {});
+  }, []);
 
   const [aiMetin, setAiMetin] = useState("");
   const [aiCalisiyor, setAiCalisiyor] = useState(false);
@@ -435,6 +444,14 @@ function IsBilgisiAdimi({
           <div>
             <label className="field-label">Teslim Tarihi (opsiyonel)</label>
             <input type="date" className="field-input" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            {(() => {
+              const t = tahminiSureler.find((s) => s.kategori === category);
+              return t ? (
+                <div className="text-xs text-neutral-500 mt-1">
+                  ⏱️ Bu kategori geçmişte ortalama {sayi(t.ortalamaGun, 1)} gün sürdü ({t.ornekSayisi} iş)
+                </div>
+              ) : null;
+            })()}
           </div>
           <div>
             <label className="field-label">Öncelik</label>

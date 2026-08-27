@@ -430,4 +430,109 @@ Hesaplama motorunun ürettiği uyarılar: ${sonuc.uyarilar.length > 0 ? sonuc.uy
   })
 );
 
+const gunlukOzetIstekSchema = z.object({
+  gecikmisIsler: z.array(z.object({ baslik: z.string(), musteri: z.string(), kacGunGecikti: z.number() })),
+  yaklasanIsler: z.array(z.object({ baslik: z.string(), musteri: z.string(), kacGunKaldi: z.number() })),
+  kritikStoklar: z.array(z.object({ ad: z.string(), stok: z.number(), minStok: z.number(), birim: z.string() })),
+  bekleyenTeklifSayisi: z.number(),
+  aktifIsSayisi: z.number(),
+});
+
+const gunlukOzetCiktiSchema = z.object({
+  ozet: z.string(),
+  oncelikler: z.array(z.string()),
+});
+
+const GUNLUK_OZET_RESPONSE_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    ozet: { type: "string" },
+    oncelikler: { type: "array", items: { type: "string" } },
+  },
+  required: ["ozet", "oncelikler"],
+};
+
+const GUNLUK_OZET_SISTEM_PROMPTU = `Sen bir demirci/çelik konstrüksiyon atölyesinin sahibine her sabah günlük durumu özetleyen bir asistansın. Sana atölyenin o anki geciken işleri, yaklaşan teslim tarihleri, kritik stok seviyesindeki malzemeleri, bekleyen teklif ve aktif iş sayılarını vereceğim. Görevin, bunları samimi ve kısa bir Türkçe paragrafta ("ozet") özetlemek ve bugün öncelikli yapılması gerekenleri madde madde ("oncelikler", en fazla 5 madde) listelemek. Abartılı/resmi olma, işletme sahibiyle konuşur gibi doğal bir dil kullan. Hiçbir sorun yoksa bunu olumlu şekilde belirt ve kısa tut.`;
+
+router.post(
+  "/gunluk-ozet",
+  asyncHandler(async (req, res) => {
+    const girdi = gunlukOzetIstekSchema.parse(req.body);
+
+    const girdiMetni = `Geciken işler (${girdi.gecikmisIsler.length}): ${
+      girdi.gecikmisIsler.map((i) => `${i.baslik} (${i.musteri}, ${i.kacGunGecikti} gün gecikti)`).join("; ") || "yok"
+    }
+Yaklaşan teslimler (${girdi.yaklasanIsler.length}): ${
+      girdi.yaklasanIsler.map((i) => `${i.baslik} (${i.musteri}, ${i.kacGunKaldi} gün kaldı)`).join("; ") || "yok"
+    }
+Kritik stoktaki malzemeler (${girdi.kritikStoklar.length}): ${
+      girdi.kritikStoklar.map((m) => `${m.ad} (${m.stok}/${m.minStok} ${m.birim})`).join("; ") || "yok"
+    }
+Bekleyen teklif sayısı: ${girdi.bekleyenTeklifSayisi}
+Aktif iş sayısı: ${girdi.aktifIsSayisi}`;
+
+    const sonuc = await geminiJsonIste({
+      contents: girdiMetni,
+      systemInstruction: GUNLUK_OZET_SISTEM_PROMPTU,
+      responseJsonSchema: GUNLUK_OZET_RESPONSE_JSON_SCHEMA,
+      zodSchema: gunlukOzetCiktiSchema,
+      hataBaglami: "AI gunluk-ozet",
+    });
+
+    res.json(sonuc);
+  })
+);
+
+const raporDegerlendirmeIstekSchema = z.object({
+  toplamIsSayisi: z.number(),
+  toplamSatis: z.number(),
+  toplamMaliyet: z.number(),
+  toplamKar: z.number(),
+  aylikOzet: z.array(z.object({ ay: z.string(), satis: z.number(), kar: z.number() })),
+  fireOranlari: z.array(z.object({ materialName: z.string(), ortalamaFireYuzde: z.number() })),
+  kritikStokSayisi: z.number(),
+});
+
+const raporDegerlendirmeCiktiSchema = z.object({
+  degerlendirme: z.string(),
+  dikkatEdilmesiGerekenler: z.array(z.string()),
+});
+
+const RAPOR_DEGERLENDIRME_RESPONSE_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    degerlendirme: { type: "string" },
+    dikkatEdilmesiGerekenler: { type: "array", items: { type: "string" } },
+  },
+  required: ["degerlendirme", "dikkatEdilmesiGerekenler"],
+};
+
+const RAPOR_DEGERLENDIRME_SISTEM_PROMPTU = `Sen bir demirci/çelik konstrüksiyon atölyesi için işletme verilerini yorumlayan bir mali/işletme danışmanısın. Sana toplam iş sayısı, toplam satış/maliyet/kâr, aylık satış-kâr trendi, malzeme fire oranları ve kritik stok sayısı verilecek. Görevin: bu verileri kısa, anlaşılır bir Türkçe paragrafta ("degerlendirme") yorumlamak - kâr marjı sağlıklı mı, trend nasıl, fire oranları normal mi vb. - ve işletme sahibinin dikkat etmesi gereken somut noktaları ("dikkatEdilmesiGerekenler", en fazla 5 madde) listelemek. Teknik jargon yerine sade dil kullan, veriye dayan, veri azsa/yetersizse bunu belirt.`;
+
+router.post(
+  "/rapor-degerlendir",
+  asyncHandler(async (req, res) => {
+    const girdi = raporDegerlendirmeIstekSchema.parse(req.body);
+
+    const karMarji = girdi.toplamSatis > 0 ? ((girdi.toplamKar / girdi.toplamSatis) * 100).toFixed(1) : "0";
+    const girdiMetni = `Toplam iş sayısı: ${girdi.toplamIsSayisi}
+Toplam satış: ${girdi.toplamSatis} TL
+Toplam maliyet: ${girdi.toplamMaliyet} TL
+Toplam kâr: ${girdi.toplamKar} TL (kâr marjı: %${karMarji})
+Aylık satış/kâr: ${girdi.aylikOzet.map((a) => `${a.ay}: satış ${a.satis} TL, kâr ${a.kar} TL`).join("; ") || "veri yok"}
+Ortalama fire oranları: ${girdi.fireOranlari.map((f) => `${f.materialName}: %${f.ortalamaFireYuzde}`).join("; ") || "veri yok"}
+Kritik stok seviyesindeki malzeme sayısı: ${girdi.kritikStokSayisi}`;
+
+    const sonuc = await geminiJsonIste({
+      contents: girdiMetni,
+      systemInstruction: RAPOR_DEGERLENDIRME_SISTEM_PROMPTU,
+      responseJsonSchema: RAPOR_DEGERLENDIRME_RESPONSE_JSON_SCHEMA,
+      zodSchema: raporDegerlendirmeCiktiSchema,
+      hataBaglami: "AI rapor-degerlendir",
+    });
+
+    res.json(sonuc);
+  })
+);
+
 export default router;

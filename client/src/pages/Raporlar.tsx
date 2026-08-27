@@ -3,6 +3,7 @@ import { api } from "../api/client";
 import { Spinner, StatCard } from "../components/ui";
 import { YatayBarGrafik } from "../components/DashboardGrafikleri";
 import { tl, sayi } from "../lib/format";
+import { KATEGORI_ETIKET, ProjectCategory } from "../api/types";
 
 interface RaporVerisi {
   toplamIsSayisi: number;
@@ -13,6 +14,7 @@ interface RaporVerisi {
   stokDurumu: { id: number; name: string; stockQty: number; minStockQty: number; unit: string }[];
   fireOranlari: { materialId: number; materialName: string; ortalamaFireYuzde: number }[];
   aylikOzet: { ay: string; satis: number; kar: number }[];
+  tahminiSureler: { kategori: string; ortalamaGun: number; ornekSayisi: number }[];
 }
 
 const AY_ADI = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
@@ -21,8 +23,16 @@ const ayEtiketi = (ay: string) => {
   return `${AY_ADI[Number(ayNo) - 1]} '${yil.slice(2)}`;
 };
 
+interface AiDegerlendirme {
+  degerlendirme: string;
+  dikkatEdilmesiGerekenler: string[];
+}
+
 export default function Raporlar() {
   const [veri, setVeri] = useState<RaporVerisi | null>(null);
+  const [aiSonuc, setAiSonuc] = useState<AiDegerlendirme | null>(null);
+  const [aiYukleniyor, setAiYukleniyor] = useState(false);
+  const [aiHata, setAiHata] = useState<string | null>(null);
 
   useEffect(() => {
     api.get<RaporVerisi>("/reports").then(setVeri);
@@ -31,6 +41,27 @@ export default function Raporlar() {
   if (!veri) return <Spinner />;
 
   const kritikStoklar = veri.stokDurumu.filter((m) => m.minStockQty > 0 && m.stockQty <= m.minStockQty);
+
+  const aiDegerlendir = async () => {
+    setAiYukleniyor(true);
+    setAiHata(null);
+    try {
+      const sonuc = await api.post<AiDegerlendirme>("/ai/rapor-degerlendir", {
+        toplamIsSayisi: veri.toplamIsSayisi,
+        toplamSatis: veri.toplamSatis,
+        toplamMaliyet: veri.toplamMaliyet,
+        toplamKar: veri.toplamKar,
+        aylikOzet: veri.aylikOzet,
+        fireOranlari: veri.fireOranlari,
+        kritikStokSayisi: kritikStoklar.length,
+      });
+      setAiSonuc(sonuc);
+    } catch (e: any) {
+      setAiHata(e.message);
+    } finally {
+      setAiYukleniyor(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -41,6 +72,27 @@ export default function Raporlar() {
         <StatCard label="Toplam Satış" value={tl(veri.toplamSatis)} />
         <StatCard label="Toplam Maliyet" value={tl(veri.toplamMaliyet)} />
         <StatCard label="Gerçekleşen Kâr" value={tl(veri.toplamKar)} />
+      </div>
+
+      <div className="card space-y-2">
+        <h2 className="font-bold">🤖 AI Değerlendirmesi</h2>
+        {!aiSonuc ? (
+          <button className="btn-secondary btn-sm" onClick={aiDegerlendir} disabled={aiYukleniyor}>
+            {aiYukleniyor ? "Değerlendiriliyor..." : "AI ile Değerlendir"}
+          </button>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-sm text-neutral-700">{aiSonuc.degerlendirme}</p>
+            {aiSonuc.dikkatEdilmesiGerekenler.length > 0 && (
+              <ul className="text-sm text-neutral-700 list-disc pl-5 space-y-0.5">
+                {aiSonuc.dikkatEdilmesiGerekenler.map((o, i) => (
+                  <li key={i}>{o}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+        {aiHata && <div className="text-sm text-red-600">{aiHata}</div>}
       </div>
 
       <div className="card">
@@ -124,6 +176,36 @@ export default function Raporlar() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="card">
+        <h2 className="font-bold mb-3">⏱️ Tahmini Teslim Süresi (Kategoriye Göre)</h2>
+        {veri.tahminiSureler.length === 0 ? (
+          <div className="text-sm text-neutral-500">
+            Henüz tamamlanmış iş yok - kategori bazlı ortalama süre, ilk işler tamamlandıkça burada görünecek.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-neutral-50 text-neutral-500 text-left">
+                <tr>
+                  <th className="px-3 py-2">Kategori</th>
+                  <th className="px-3 py-2">Ortalama Süre</th>
+                  <th className="px-3 py-2">Örnek Sayısı</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-100">
+                {veri.tahminiSureler.map((t) => (
+                  <tr key={t.kategori}>
+                    <td className="px-3 py-2 font-medium">{KATEGORI_ETIKET[t.kategori as ProjectCategory] ?? t.kategori}</td>
+                    <td className="px-3 py-2">{sayi(t.ortalamaGun, 1)} gün</td>
+                    <td className="px-3 py-2 text-neutral-500">{t.ornekSayisi} iş</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

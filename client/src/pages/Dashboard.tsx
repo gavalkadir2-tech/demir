@@ -12,11 +12,19 @@ import {
   enCokKullanilanKalemleri,
 } from "../components/DashboardGrafikleri";
 
+interface GunlukOzet {
+  ozet: string;
+  oncelikler: string[];
+}
+
 export default function Dashboard() {
   const [veri, setVeri] = useState<DashboardData | null>(null);
   const [trend, setTrend] = useState<AylikTrendVeri[] | null>(null);
   const [kategoriKarliligi, setKategoriKarliligi] = useState<KategoriKarliligiVeri[] | null>(null);
   const [enCokKullanilan, setEnCokKullanilan] = useState<EnCokKullanilanMalzeme[] | null>(null);
+  const [aiOzet, setAiOzet] = useState<GunlukOzet | null>(null);
+  const [aiYukleniyor, setAiYukleniyor] = useState(false);
+  const [aiHata, setAiHata] = useState<string | null>(null);
 
   useEffect(() => {
     api.get<DashboardData>("/dashboard").then(setVeri);
@@ -26,6 +34,35 @@ export default function Dashboard() {
   }, []);
 
   if (!veri) return <Spinner />;
+
+  const gunToFarki = (iso: string) => Math.round((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24));
+
+  const aiOzetOlustur = async () => {
+    setAiYukleniyor(true);
+    setAiHata(null);
+    try {
+      const sonuc = await api.post<GunlukOzet>("/ai/gunluk-ozet", {
+        gecikmisIsler: veri.gecikmisIsler.map((p) => ({
+          baslik: p.title,
+          musteri: p.customer.name,
+          kacGunGecikti: p.dueDate ? gunToFarki(p.dueDate) : 0,
+        })),
+        yaklasanIsler: veri.yaklasanIsler.map((p) => ({
+          baslik: p.title,
+          musteri: p.customer.name,
+          kacGunKaldi: p.dueDate ? -gunToFarki(p.dueDate) : 0,
+        })),
+        kritikStoklar: veri.kritikStoklar.map((m) => ({ ad: m.name, stok: m.stockQty, minStok: m.minStockQty, birim: m.unit })),
+        bekleyenTeklifSayisi: veri.bekleyenTeklifler,
+        aktifIsSayisi: veri.aktifIsler,
+      });
+      setAiOzet(sonuc);
+    } catch (e: any) {
+      setAiHata(e.message);
+    } finally {
+      setAiYukleniyor(false);
+    }
+  };
 
   const bugunSorunSayisi = veri.gecikmisIsler.length + veri.yaklasanIsler.length + veri.kritikStoklar.length;
 
@@ -62,6 +99,26 @@ export default function Dashboard() {
             </div>
             <div className="text-xs text-neutral-600">📦 Kritik stok</div>
           </div>
+        </div>
+
+        <div className="mt-3 pt-3 border-t border-brand-100">
+          {!aiOzet ? (
+            <button className="btn-secondary btn-sm" onClick={aiOzetOlustur} disabled={aiYukleniyor}>
+              {aiYukleniyor ? "Hazırlanıyor..." : "🤖 AI Günlük Özet"}
+            </button>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-sm text-neutral-700">{aiOzet.ozet}</p>
+              {aiOzet.oncelikler.length > 0 && (
+                <ul className="text-sm text-neutral-700 list-disc pl-5 space-y-0.5">
+                  {aiOzet.oncelikler.map((o, i) => (
+                    <li key={i}>{o}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+          {aiHata && <div className="text-sm text-red-600 mt-2">{aiHata}</div>}
         </div>
       </div>
 
