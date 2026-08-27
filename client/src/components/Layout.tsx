@@ -22,19 +22,25 @@ const DIGER_ITEMS = [
   { to: "/isciler", label: "İşçiler", emoji: "👷" },
 ];
 
-const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-  `flex items-center gap-3 rounded-xl px-4 py-3.5 text-base font-semibold transition ${
-    isActive ? "bg-brand-600 text-white" : "text-neutral-700 hover:bg-neutral-100"
-  }`;
+const navLinkClass = (koyu: boolean) =>
+  ({ isActive }: { isActive: boolean }) =>
+    `flex items-center gap-3 rounded-xl px-4 py-3.5 text-base font-semibold transition ${
+      isActive
+        ? "bg-brand-600 text-white"
+        : koyu
+        ? "text-neutral-300 hover:bg-neutral-800 hover:text-white"
+        : "text-neutral-700 hover:bg-neutral-100"
+    }`;
 
-function NavList({ onNavigate }: { onNavigate?: () => void }) {
+function NavList({ onNavigate, koyu = false }: { onNavigate?: () => void; koyu?: boolean }) {
   const { pathname } = useLocation();
   const [digerAcik, setDigerAcik] = useState(DIGER_ITEMS.some((i) => i.to === pathname));
+  const linkClass = navLinkClass(koyu);
 
   return (
     <nav className="flex flex-col gap-1 p-3">
       {NAV_ITEMS.map((item) => (
-        <NavLink key={item.to} to={item.to} end={item.to === "/"} onClick={onNavigate} className={navLinkClass}>
+        <NavLink key={item.to} to={item.to} end={item.to === "/"} onClick={onNavigate} className={linkClass}>
           <span className="text-xl leading-none">{item.emoji}</span>
           {item.label}
         </NavLink>
@@ -43,16 +49,18 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
       <button
         type="button"
         onClick={() => setDigerAcik((v) => !v)}
-        className="flex items-center gap-3 rounded-xl px-4 py-3.5 text-base font-semibold text-neutral-700 hover:bg-neutral-100 transition"
+        className={`flex items-center gap-3 rounded-xl px-4 py-3.5 text-base font-semibold transition ${
+          koyu ? "text-neutral-300 hover:bg-neutral-800 hover:text-white" : "text-neutral-700 hover:bg-neutral-100"
+        }`}
       >
         <span className="text-xl leading-none">⋯</span>
         Diğer
-        <span className="ml-auto text-sm text-neutral-400">{digerAcik ? "▲" : "▼"}</span>
+        <span className={`ml-auto text-sm ${koyu ? "text-neutral-500" : "text-neutral-400"}`}>{digerAcik ? "▲" : "▼"}</span>
       </button>
       {digerAcik && (
         <div className="flex flex-col gap-1 pl-2">
           {DIGER_ITEMS.map((item) => (
-            <NavLink key={item.to} to={item.to} onClick={onNavigate} className={navLinkClass}>
+            <NavLink key={item.to} to={item.to} onClick={onNavigate} className={linkClass}>
               <span className="text-xl leading-none">{item.emoji}</span>
               {item.label}
             </NavLink>
@@ -68,15 +76,15 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen md:flex">
-      <aside className="hidden md:flex md:w-64 md:flex-col md:border-r md:border-neutral-200 md:bg-white">
-        <div className="p-5 border-b border-neutral-200 flex items-center justify-between">
-          <div className="text-lg font-bold text-brand-700">🔧 Demirci Atölye</div>
-          <BildirimZili />
+      <aside className="hidden md:flex md:w-64 md:flex-col md:bg-neutral-900">
+        <div className="p-5 border-b border-neutral-800 flex items-center justify-between">
+          <div className="text-lg font-bold text-brand-500">🔧 Demirci Atölye</div>
+          <BildirimZili koyu />
         </div>
         <div className="px-3 pt-3">
           <GlobalArama />
         </div>
-        <NavList />
+        <NavList koyu />
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">

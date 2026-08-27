@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { Dashboard as DashboardData, AylikTrendVeri, KategoriKarliligiVeri, EnCokKullanilanMalzeme } from "../api/types";
-import { DURUM_ETIKET, DURUM_RENK, KATEGORI_ETIKET } from "../api/types";
+import { DURUM_ETIKET, DURUM_RENK, DURUM_SIMGE, KATEGORI_ETIKET } from "../api/types";
 import { Spinner, StatCard, Badge } from "../components/ui";
 import { tl, tarih } from "../lib/format";
 import {
@@ -172,7 +172,9 @@ export default function Dashboard() {
                     {p.customer.name} • {KATEGORI_ETIKET[p.category]} • {tarih(p.createdAt)}
                   </div>
                 </div>
-                <Badge className={DURUM_RENK[p.status]}>{DURUM_ETIKET[p.status]}</Badge>
+                <Badge className={DURUM_RENK[p.status]}>
+                  {DURUM_SIMGE[p.status]} {DURUM_ETIKET[p.status]}
+                </Badge>
               </Link>
             ))}
           </div>

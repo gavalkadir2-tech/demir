@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
-import { Project, ProjectStatus, DURUM_ETIKET, DURUM_RENK, KATEGORI_ETIKET, ONCELIK_ETIKET, ONCELIK_RENK } from "../api/types";
+import { Project, ProjectStatus, DURUM_ETIKET, DURUM_RENK, DURUM_SIMGE, KATEGORI_ETIKET, ONCELIK_ETIKET, ONCELIK_RENK } from "../api/types";
 import { Spinner, EmptyState, Badge } from "../components/ui";
 import { tarih } from "../lib/format";
 
@@ -63,7 +63,9 @@ export default function Isler() {
                   {p.dueDate && ` • Teslim: ${tarih(p.dueDate)}`}
                 </div>
               </div>
-              <Badge className={DURUM_RENK[p.status]}>{DURUM_ETIKET[p.status]}</Badge>
+              <Badge className={DURUM_RENK[p.status]}>
+                {DURUM_SIMGE[p.status]} {DURUM_ETIKET[p.status]}
+              </Badge>
             </Link>
           ))}
         </div>

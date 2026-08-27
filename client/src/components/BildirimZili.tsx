@@ -16,7 +16,7 @@ const TUR_IKON: Record<Bildirim["tur"], string> = {
 /** Sağ üstteki bildirim zili: düşük stok, süresi dolan/dolmak üzere teklifler ve teslim tarihi
  * geçen/yaklaşan işleri periyodik olarak çekip listeler. Ayrı bir "okundu" durumu tutulmaz - liste
  * her zaman mevcut duruma göre canlı hesaplanır. */
-export default function BildirimZili() {
+export default function BildirimZili({ koyu = false }: { koyu?: boolean }) {
   const [bildirimler, setBildirimler] = useState<Bildirim[]>([]);
   const [acik, setAcik] = useState(false);
   const kutuRef = useRef<HTMLDivElement>(null);
@@ -45,7 +45,9 @@ export default function BildirimZili() {
   return (
     <div className="relative" ref={kutuRef}>
       <button
-        className="relative flex items-center justify-center w-10 h-10 rounded-xl hover:bg-neutral-100 text-xl"
+        className={`relative flex items-center justify-center w-10 h-10 rounded-xl text-xl ${
+          koyu ? "hover:bg-neutral-800" : "hover:bg-neutral-100"
+        }`}
         onClick={() => setAcik((v) => !v)}
         aria-label="Bildirimler"
       >

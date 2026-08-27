@@ -64,6 +64,20 @@ export const DURUM_RENK: Record<ProjectStatus, string> = {
   CANCELLED: "bg-red-100 text-red-700",
 };
 
+// Ayrıntılı 9 durumu, tek bakışta anlaşılır 5 anlamsal renge indirger:
+// 🟢 Tamamlandı, 🔵 Devam ediyor, 🟡 Bekliyor, 🔴 İptal, ⚪ Başlamadı.
+export const DURUM_SIMGE: Record<ProjectStatus, string> = {
+  DRAFT: "⚪",
+  CALCULATED: "⚪",
+  QUOTE_READY: "🟡",
+  QUOTE_SENT: "🟡",
+  APPROVED: "🔵",
+  IN_PRODUCTION: "🔵",
+  INSTALLING: "🔵",
+  COMPLETED: "🟢",
+  CANCELLED: "🔴",
+};
+
 export interface Customer {
   id: number;
   name: string;

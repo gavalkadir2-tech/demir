@@ -21,6 +21,7 @@ import {
   GIDER_ETIKET,
   DURUM_ETIKET,
   DURUM_RENK,
+  DURUM_SIMGE,
   KATEGORI_ETIKET,
   TEKLIF_DURUM_ETIKET,
   GOREV_TURU_ETIKET,
@@ -108,7 +109,7 @@ export default function IsDetay() {
             >
               {DURUMLAR.map((d) => (
                 <option key={d} value={d}>
-                  {DURUM_ETIKET[d]}
+                  {DURUM_SIMGE[d]} {DURUM_ETIKET[d]}
                 </option>
               ))}
             </select>
