@@ -167,8 +167,8 @@ function UstenGorunum({ veri }: { veri: DuvarPaneliSemaVeri }) {
   const x0 = MARGIN_LEFT;
   const scaledW = genislikMm * scale;
 
-  const postW = Math.max(4, en * scale);
-  const postD = Math.max(4, derinlikMm * scale);
+  const postW = olcekliKalinlikPx(en, scale, 4);
+  const postD = olcekliKalinlikPx(derinlikMm, scale, 4);
 
   return (
     <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H + LEGEND_H}`} className="w-full h-auto" role="img" aria-label="Duvar paneli üstten (plan) görünüş şematik çizimi">

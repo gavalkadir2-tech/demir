@@ -106,9 +106,9 @@ function YandanGorunum({ veri }: { veri: KapiSemaVeri }) {
   const topY = MARGIN_TOP;
   const groundY = topY + yukseklikMm * scale;
 
-  const kasaW = Math.max(6, kasaDerinlik * scale);
-  const kanatW = Math.max(4, kanatDerinlik * scale);
-  const sacW = Math.max(2, sacKalinlikMm * scale);
+  const kasaW = olcekliKalinlikPx(kasaDerinlik, scale, 6);
+  const kanatW = olcekliKalinlikPx(kanatDerinlik, scale, 4);
+  const sacW = olcekliKalinlikPx(sacKalinlikMm, scale, 2);
 
   return (
     <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H + LEGEND_H}`} className="w-full h-auto" role="img" aria-label="Kapı yandan görünüş (kesit) şematik çizimi">

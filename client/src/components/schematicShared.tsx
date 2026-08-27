@@ -153,10 +153,13 @@ export function kesitOlcusu(material?: Material | null, varsayilan: KesitOlcusu 
   return { enMm: en, kalinlikMm: kalinlik };
 }
 
-/** Gerçek mm ölçüsünü verilen çizim ölçeğinde piksele çevirir; çok ince profillerin görünmez
- * olmaması için en az minPx genişlikte tutar. */
-export function olcekliKalinlikPx(gercekMm: number, scale: number, minPx = 1.5): number {
-  return Math.max(minPx, gercekMm * scale);
+/** Gerçek mm ölçüsünü verilen çizim ölçeğinde piksele çevirir. Çok ince profillerin görünmez
+ * olmaması için en az minPx, çok kalın/büyük ölçülü bir malzeme (örn. geniş bir I-profili veya
+ * yanlışlıkla girilmiş bir sac ölçüsü) tüm çizimi kaplayıp taşırmasın diye en fazla maxPx
+ * genişlikte tutar - teknik şemalarda alışılan, gerçek orana birebir değil okunabilirliğe göre
+ * ölçeklenmiş kalınlık gösterimi. */
+export function olcekliKalinlikPx(gercekMm: number, scale: number, minPx = 1.5, maxPx = 24): number {
+  return Math.min(maxPx, Math.max(minPx, gercekMm * scale));
 }
 
 // --- Çoklu açı görünüm sekmesi ----------------------------------------------------------------

@@ -117,8 +117,8 @@ function UstenGorunum({ veri }: { veri: KorkulukSemaVeri }) {
   const scaledW = toplamUzunlukMm * scale;
 
   const postXs = Array.from({ length: dikmeSayisi }, (_, i) => x0 + Math.min(i, araliklarSayisi) * gercekAralikMm * scale);
-  const postW = Math.max(4, en * scale);
-  const postD = Math.max(4, derinlikMm * scale);
+  const postW = olcekliKalinlikPx(en, scale, 4);
+  const postD = olcekliKalinlikPx(derinlikMm, scale, 4);
 
   return (
     <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H + LEGEND_H}`} className="w-full h-auto" role="img" aria-label="Korkuluk üstten (plan) görünüş şematik çizimi">

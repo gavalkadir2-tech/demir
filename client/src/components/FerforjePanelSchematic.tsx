@@ -106,7 +106,7 @@ function YandanGorunum({ veri }: { veri: FerforjePanelSemaVeri }) {
   const x0 = MARGIN_LEFT + 60;
   const topY = MARGIN_TOP;
   const groundY = topY + yukseklikMm * scale;
-  const derinlikPx = Math.max(6, derinlikMm * scale);
+  const derinlikPx = olcekliKalinlikPx(derinlikMm, scale, 6);
 
   return (
     <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H + LEGEND_H}`} className="w-full h-auto" role="img" aria-label="Ferforje panel yandan görünüş (kesit) şematik çizimi">
