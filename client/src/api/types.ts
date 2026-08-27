@@ -348,6 +348,7 @@ export interface Project {
   parts?: Part[];
   laborItems?: LaborItem[];
   expenses?: Expense[];
+  payments?: Payment[];
   cuttingLists?: CuttingList[];
   quotes?: Quote[];
   tasks?: ProductionTask[];
@@ -389,6 +390,15 @@ export interface Expense {
   type: ExpenseType;
   name: string;
   amount: number;
+}
+
+export interface Payment {
+  id: number;
+  projectId: number;
+  amount: number;
+  date: string;
+  note?: string | null;
+  createdAt: string;
 }
 
 export interface KesimCubugu {
@@ -507,6 +517,7 @@ export interface Dashboard {
   buAyYapilanIsler: number;
   buAyToplamSatis: number;
   tahminiKar: number;
+  toplamAlacak: number;
   kritikStoklar: Material[];
   sonIsler: (Project & { customer: { name: string } })[];
   gecikmisIsler: (Project & { customer: { name: string } })[];

@@ -13,8 +13,17 @@ router.get(
     const ayBasi = new Date(now.getFullYear(), now.getMonth(), 1);
     const ayBitis = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
-    const [aktifIsler, bekleyenTeklifler, buAyTamamlanan, buAyKabulEdilenTeklifler, kritikStoklar, sonIsler, gecikmisIsler, yaklasanIsler] =
-      await Promise.all([
+    const [
+      aktifIsler,
+      bekleyenTeklifler,
+      buAyTamamlanan,
+      buAyKabulEdilenTeklifler,
+      kritikStoklar,
+      sonIsler,
+      gecikmisIsler,
+      yaklasanIsler,
+      alacakliProjeler,
+    ] = await Promise.all([
         prisma.project.count({ where: { status: { notIn: ["COMPLETED", "CANCELLED"] } } }),
         prisma.project.count({ where: { status: { in: ["QUOTE_READY", "QUOTE_SENT"] } } }),
         prisma.project.count({ where: { status: "COMPLETED", updatedAt: { gte: ayBasi, lt: ayBitis } } }),
@@ -44,11 +53,23 @@ router.get(
           orderBy: { dueDate: "asc" },
           include: { customer: { select: { name: true } } },
         }),
+        prisma.project.findMany({
+          where: { status: { not: "CANCELLED" }, quotes: { some: { status: "ACCEPTED" } } },
+          include: {
+            quotes: { where: { status: "ACCEPTED" }, orderBy: { createdAt: "desc" }, take: 1 },
+            payments: { select: { amount: true } },
+          },
+        }),
       ]);
 
     const buAyToplamSatis = buAyKabulEdilenTeklifler.reduce((s, q) => s + q.total, 0);
     const tahminiKar = buAyKabulEdilenTeklifler.reduce((s, q) => s + q.profitAmount, 0);
     const kritikStoklarFiltreli = kritikStoklar.filter((m) => m.stockQty <= m.minStockQty);
+    const toplamAlacak = alacakliProjeler.reduce((s, p) => {
+      const satis = p.quotes[0]?.total ?? 0;
+      const tahsilat = p.payments.reduce((a, pay) => a + pay.amount, 0);
+      return s + Math.max(0, satis - tahsilat);
+    }, 0);
 
     res.json({
       aktifIsler,
@@ -56,6 +77,7 @@ router.get(
       buAyYapilanIsler: buAyTamamlanan,
       buAyToplamSatis: Math.round(buAyToplamSatis * 100) / 100,
       tahminiKar: Math.round(tahminiKar * 100) / 100,
+      toplamAlacak: Math.round(toplamAlacak * 100) / 100,
       kritikStoklar: kritikStoklarFiltreli,
       sonIsler,
       gecikmisIsler,

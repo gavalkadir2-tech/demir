@@ -10,6 +10,7 @@ import projectItemsRouter from "./projectItems";
 import partsRouter from "./parts";
 import laborRouter from "./labor";
 import expensesRouter from "./expenses";
+import paymentsRouter from "./payments";
 import cuttingRouter from "./cutting";
 import quotesRouter from "./quotes";
 import stockRouter from "./stock";
@@ -105,6 +106,7 @@ router.get(
         parts: { include: { material: true }, orderBy: { createdAt: "asc" } },
         laborItems: { orderBy: { createdAt: "asc" } },
         expenses: { orderBy: { createdAt: "asc" } },
+        payments: { orderBy: { date: "desc" } },
         cuttingLists: { include: { material: true }, orderBy: { generatedAt: "desc" } },
         quotes: { orderBy: { createdAt: "desc" } },
         tasks: { include: { worker: true }, orderBy: { order: "asc" } },
@@ -189,6 +191,7 @@ router.use("/:projectId/items", projectItemsRouter);
 router.use("/:projectId/parts", partsRouter);
 router.use("/:projectId/labor", laborRouter);
 router.use("/:projectId/expenses", expensesRouter);
+router.use("/:projectId/payments", paymentsRouter);
 router.use("/:projectId/cutting", cuttingRouter);
 router.use("/:projectId/quotes", quotesRouter);
 router.use("/:projectId/stock", stockRouter);

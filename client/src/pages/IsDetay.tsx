@@ -112,7 +112,7 @@ const SEKMELER = [
   { key: "uretim", label: "Üretim" },
   { key: "parcalar", label: "Parçalar" },
   { key: "kesim", label: "Kesim Listesi" },
-  { key: "maliyet", label: "İşçilik & Giderler" },
+  { key: "maliyet", label: "Maliyet & Tahsilat" },
   { key: "teklifler", label: "Teklifler" },
 ] as const;
 
@@ -1259,10 +1259,161 @@ function SacKesimPlaniBolumu({ projectId }: { projectId: number }) {
 function MaliyetTab({ proje, onChanged }: { proje: Project; onChanged: () => void }) {
   return (
     <div className="space-y-6">
+      <ParaOzetiKarti proje={proje} />
       <SarfTahminiKarti proje={proje} />
       <IscilikBolumu proje={proje} onChanged={onChanged} />
       <GiderBolumu proje={proje} onChanged={onChanged} />
+      <TahsilatBolumu proje={proje} onChanged={onChanged} />
     </div>
+  );
+}
+
+/** Kâr ve tahsilat/alacak özetini gösterir. Kâr, kabul edilen teklifin satış tutarı ile o
+ * teklif oluşturulurken hesaplanan gerçek maliyeti üzerinden bulunur (tahsil edilip
+ * edilmediğinden bağımsız - tahakkuk esaslı); Alacak ise satıştan tahsilatın düşülmesiyle,
+ * yani nakit akışı olarak ayrıca gösterilir. */
+function ParaOzetiKarti({ proje }: { proje: Project }) {
+  const kabulEdilenTeklif = (proje.quotes ?? []).find((q) => q.status === "ACCEPTED");
+  const tahsilat = (proje.payments ?? []).reduce((s, p) => s + p.amount, 0);
+
+  if (!kabulEdilenTeklif) {
+    return (
+      <div className="card space-y-2">
+        <h2 className="font-bold">💰 Para</h2>
+        <p className="text-sm text-neutral-500">
+          Kâr ve alacak hesaplanabilmesi için önce "Teklifler" sekmesinden bir teklif oluşturup kabul edilmiş olarak
+          işaretleyin.
+        </p>
+        {tahsilat > 0 && (
+          <div className="text-sm">
+            Bu güne kadar tahsil edilen: <span className="font-bold">{tl(tahsilat)}</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const satis = kabulEdilenTeklif.total;
+  const kar = kabulEdilenTeklif.profitAmount;
+  const alacak = satis - tahsilat;
+
+  return (
+    <div className="card space-y-3">
+      <h2 className="font-bold">💰 Para</h2>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+        <div className="rounded-xl bg-neutral-50 p-3">
+          <div className="text-lg font-bold">{tl(satis)}</div>
+          <div className="text-xs text-neutral-500">Satış</div>
+        </div>
+        <div className="rounded-xl bg-emerald-50 p-3">
+          <div className="text-lg font-bold text-emerald-700">{tl(kar)}</div>
+          <div className="text-xs text-neutral-500">Kâr</div>
+        </div>
+        <div className="rounded-xl bg-blue-50 p-3">
+          <div className="text-lg font-bold text-blue-700">{tl(tahsilat)}</div>
+          <div className="text-xs text-neutral-500">Tahsil Edilen</div>
+        </div>
+        <div className={`rounded-xl p-3 ${alacak > 0 ? "bg-amber-50" : "bg-neutral-50"}`}>
+          <div className={`text-lg font-bold ${alacak > 0 ? "text-amber-700" : "text-neutral-500"}`}>{tl(alacak)}</div>
+          <div className="text-xs text-neutral-500">Alacak</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TahsilatBolumu({ proje, onChanged }: { proje: Project; onChanged: () => void }) {
+  const [modal, setModal] = useState(false);
+  const sil = async (id: number) => {
+    if (!confirm("Bu tahsilat kaydını silmek istediğinize emin misiniz?")) return;
+    await api.del(`/projects/${proje.id}/payments/${id}`);
+    onChanged();
+  };
+  const odemeler = proje.payments ?? [];
+  return (
+    <div className="card space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="font-bold">🧾 Tahsilat</h2>
+        <button className="btn-secondary btn-sm" onClick={() => setModal(true)}>
+          ➕ Ödeme Kaydet
+        </button>
+      </div>
+      {odemeler.length === 0 ? (
+        <div className="text-sm text-neutral-500">Henüz tahsilat kaydı yok.</div>
+      ) : (
+        <div className="divide-y divide-neutral-100">
+          {odemeler.map((p) => (
+            <div key={p.id} className="flex items-center justify-between py-2 text-sm">
+              <div>
+                <span className="text-neutral-500">{tarih(p.date)}</span>
+                {p.note && ` — ${p.note}`}
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="font-bold text-emerald-700">{tl(p.amount)}</span>
+                <button className="text-red-600 text-xs font-semibold" onClick={() => sil(p.id)}>
+                  Sil
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {modal && (
+        <TahsilatModal
+          projectId={proje.id}
+          onClose={() => setModal(false)}
+          onSaved={() => {
+            setModal(false);
+            onChanged();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function TahsilatModal({ projectId, onClose, onSaved }: { projectId: number; onClose: () => void; onSaved: () => void }) {
+  const [amount, setAmount] = useState(0);
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [note, setNote] = useState("");
+  const [hata, setHata] = useState<string | null>(null);
+  const [kaydediliyor, setKaydediliyor] = useState(false);
+
+  const kaydet = async () => {
+    if (!amount || amount <= 0) return setHata("Tutar girin.");
+    setKaydediliyor(true);
+    setHata(null);
+    try {
+      await api.post(`/projects/${projectId}/payments`, { amount, date: new Date(date).toISOString(), note: note || undefined });
+      onSaved();
+    } catch (e: any) {
+      setHata(e.message);
+    } finally {
+      setKaydediliyor(false);
+    }
+  };
+
+  return (
+    <Modal open onClose={onClose} title="Ödeme Kaydet">
+      <div className="space-y-3">
+        <HataKutusu mesaj={hata} />
+        <div>
+          <label className="field-label">Tutar (TL)</label>
+          <input type="number" className="field-input" value={amount} onChange={(e) => setAmount(Number(e.target.value))} />
+        </div>
+        <div>
+          <label className="field-label">Tarih</label>
+          <input type="date" className="field-input" value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+        <div>
+          <label className="field-label">Not (opsiyonel)</label>
+          <input className="field-input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Örn. kapora, ara ödeme..." />
+        </div>
+        <button className="btn-primary w-full" onClick={kaydet} disabled={kaydediliyor}>
+          {kaydediliyor ? "Kaydediliyor..." : "Kaydet"}
+        </button>
+      </div>
+    </Modal>
   );
 }
 

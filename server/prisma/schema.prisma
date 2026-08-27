@@ -145,6 +145,7 @@ model Project {
   parts         Part[]
   laborItems    LaborItem[]
   expenses      Expense[]
+  payments      Payment[]
   cuttingLists  CuttingList[]
   quotes        Quote[]
   stockMovements StockMovement[]
@@ -416,6 +417,20 @@ model Expense {
   createdAt DateTime    @default(now())
 
   @@map("expenses")
+}
+
+// Müşteriden fiilen tahsil edilen ödemeler (kısmi ödemeler dahil, kalıcı liste). İşe bağlıdır -
+// hangi teklif kabul edilmiş olursa olsun, o iş için toplam tahsilat burada birikir.
+model Payment {
+  id        Int      @id @default(autoincrement())
+  projectId Int
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  amount    Float
+  date      DateTime @default(now())
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@map("payments")
 }
 
 enum QuoteStatus {

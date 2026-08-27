@@ -78,6 +78,7 @@ export default function Dashboard() {
         <StatCard label="Bu Ay Tamamlanan" value={String(veri.buAyYapilanIsler)} />
         <StatCard label="Bu Ay Toplam Satış" value={tl(veri.buAyToplamSatis)} />
         <StatCard label="Tahmini Kâr" value={tl(veri.tahminiKar)} />
+        <StatCard label="💰 Tahsil Edilecek" value={tl(veri.toplamAlacak)} sub={veri.toplamAlacak > 0 ? "Açık alacaklar" : undefined} />
         <StatCard label="Kritik Stok" value={String(veri.kritikStoklar.length)} sub={veri.kritikStoklar.length > 0 ? "Malzeme sipariş edin" : undefined} />
       </div>
 
