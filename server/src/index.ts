@@ -16,6 +16,7 @@ import settingsRouter from "./routes/settings";
 import aiRouter from "./routes/ai";
 import workersRouter from "./routes/workers";
 import notificationsRouter from "./routes/notifications";
+import publicRouter from "./routes/public";
 
 const app = express();
 app.use(cors());
@@ -36,6 +37,7 @@ app.use("/api/settings", settingsRouter);
 app.use("/api/ai", aiRouter);
 app.use("/api/workers", workersRouter);
 app.use("/api/notifications", notificationsRouter);
+app.use("/api/public", publicRouter);
 
 // Üretimde (Render vb.) client build'i backend'in kendisinden sun (tek servis, tek URL).
 // Yerel geliştirmede client/dist yoktur (Vite ayrı çalışır), bu blok o zaman devre dışı kalır.

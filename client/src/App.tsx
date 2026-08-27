@@ -15,10 +15,14 @@ import MusteriDetay from "./pages/MusteriDetay";
 import Ayarlar from "./pages/Ayarlar";
 import Takvim from "./pages/Takvim";
 import Isciler from "./pages/Isciler";
+import TeklifOnay from "./pages/TeklifOnay";
+import IsTakip from "./pages/IsTakip";
 
 export default function App() {
   return (
     <Routes>
+      <Route path="/teklif-onay/:token" element={<TeklifOnay />} />
+      <Route path="/takip/:token" element={<IsTakip />} />
       <Route element={<Layout />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/yeni-is" element={<YeniIs />} />

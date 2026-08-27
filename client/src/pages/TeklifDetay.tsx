@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import { Quote, QuoteStatus, TEKLIF_DURUM_ETIKET } from "../api/types";
 import { Spinner, Badge } from "../components/ui";
-import { tl, tarih } from "../lib/format";
+import { tl, tarih, telefonNormallestir } from "../lib/format";
 
 const KALEM_BOLUM_SIRASI: Array<"MATERIAL" | "LABOR" | "EXPENSE" | "PRODUCT"> = ["MATERIAL", "LABOR", "EXPENSE", "PRODUCT"];
 const KALEM_BOLUM_ETIKET: Record<string, string> = {
@@ -31,6 +31,16 @@ export default function TeklifDetay() {
     yukle();
   };
 
+  const whatsappLinki = () => {
+    const telefon = telefonNormallestir(teklif.project?.customer?.phone);
+    const onayLinki = `${window.location.origin}/teklif-onay/${teklif.publicToken}`;
+    const mesaj = `Merhaba ${teklif.project?.customer?.name ?? ""}, "${teklif.project?.title ?? ""}" işiniz için teklifimiz hazır: ${tl(
+      teklif.total
+    )}. Teklifi görüntülemek ve onaylamak için: ${onayLinki}`;
+    const q = `text=${encodeURIComponent(mesaj)}`;
+    return telefon ? `https://wa.me/${telefon}?${q}` : `https://wa.me/?${q}`;
+  };
+
   return (
     <div className="space-y-6">
       <Link to="/teklifler" className="text-sm text-brand-700 font-semibold">
@@ -54,6 +64,9 @@ export default function TeklifDetay() {
         <div className="flex gap-2 flex-wrap mt-4">
           <a className="btn-secondary" href={`/api/quotes/${teklif.id}/pdf`} target="_blank" rel="noreferrer">
             📄 PDF Görüntüle
+          </a>
+          <a className="btn-secondary" href={whatsappLinki()} target="_blank" rel="noreferrer">
+            📱 WhatsApp ile Gönder
           </a>
           {teklif.status === "DRAFT" && (
             <button className="btn-secondary" onClick={() => durumDegistir("SENT")}>

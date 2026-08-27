@@ -342,6 +342,7 @@ export interface Project {
   vatPercent: number;
   validityDays: number;
   stockDeducted: boolean;
+  publicToken: string;
   createdAt: string;
   updatedAt: string;
   items?: ProjectItem[];
@@ -477,6 +478,7 @@ export interface Quote {
   date: string;
   validUntil: string;
   status: QuoteStatus;
+  publicToken: string;
   materialCost: number;
   wasteCost: number;
   consumableCost: number;

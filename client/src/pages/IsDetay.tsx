@@ -38,7 +38,7 @@ import CuttingBarView from "../components/CuttingBarView";
 import SacLevhaGorunumu from "../components/SacLevhaGorunumu";
 import { UrunFormu, URUN_EMOJI } from "./YeniIs";
 import SemaGorunum from "../components/SemaGorunum";
-import { tl, mm, tarih, sayi } from "../lib/format";
+import { tl, mm, tarih, sayi, telefonNormallestir } from "../lib/format";
 
 const DURUMLAR: ProjectStatus[] = [
   "DRAFT",
@@ -562,9 +562,21 @@ function OzetKarti({ proje }: { proje: Project }) {
   const termin = terminDurumu(proje.dueDate);
   const fotoSayisi = (proje.photos ?? []).length;
 
+  const takipLinki = `${window.location.origin}/takip/${proje.publicToken}`;
+  const telefon = telefonNormallestir(proje.customer?.phone);
+  const mesaj = `Merhaba ${proje.customer?.name ?? ""}, "${proje.title}" işinizin güncel durumunu buradan takip edebilirsiniz: ${takipLinki}`;
+  const whatsappLinki = telefon
+    ? `https://wa.me/${telefon}?text=${encodeURIComponent(mesaj)}`
+    : `https://wa.me/?text=${encodeURIComponent(mesaj)}`;
+
   return (
     <div className="card space-y-3">
-      <h2 className="font-bold">📋 İş Özeti</h2>
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h2 className="font-bold">📋 İş Özeti</h2>
+        <a className="btn-secondary btn-sm" href={whatsappLinki} target="_blank" rel="noreferrer">
+          📱 Takip Linkini Gönder
+        </a>
+      </div>
       <div className="grid grid-cols-3 gap-3 text-center">
         <div>
           <div className={`text-lg font-bold ${termin?.renk ?? "text-neutral-400"}`}>{termin?.metin ?? "Termin yok"}</div>

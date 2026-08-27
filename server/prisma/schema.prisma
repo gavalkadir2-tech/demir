@@ -138,6 +138,10 @@ model Project {
 
   stockDeducted Boolean        @default(false)
 
+  // Müşterinin girişsiz erişebildiği "iş takip" sayfasının bağlantısında kullanılan, tahmin
+  // edilemez rastgele kimlik (sıralı Int id'yi doğrudan paylaşmamak için).
+  publicToken String @unique @default(cuid())
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -448,6 +452,9 @@ model Quote {
   date         DateTime    @default(now())
   validUntil   DateTime
   status       QuoteStatus @default(DRAFT)
+
+  // Müşterinin girişsiz erişip teklifi onaylayabildiği sayfanın bağlantısında kullanılır.
+  publicToken String @unique @default(cuid())
 
   materialCost    Float
   wasteCost       Float
