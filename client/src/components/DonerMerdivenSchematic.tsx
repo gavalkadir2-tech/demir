@@ -11,9 +11,6 @@ import {
   KesitOlcusu,
   GorunumSekmeleri,
   SemaGorunumTipi,
-  Izometrik3DSahne,
-  Kiris3D,
-  Yuzey3D,
 } from "./schematicShared";
 
 export interface DonerMerdivenSemaVeri {
@@ -103,37 +100,58 @@ const MARGIN_TOP = 30;
 const MARGIN_BOTTOM = 60;
 
 function YandanGorunum({ veri }: { veri: DonerMerdivenSemaVeri }) {
-  const { disCapMm, basamakSayisi, katYuksekligiMm = 0 } = veri;
+  const { disCapMm, basamakSayisi, toplamDonusDerecesi, katYuksekligiMm = 0 } = veri;
   if (!katYuksekligiMm) return null;
   const gercekBasamakYuksekligiMm = katYuksekligiMm / basamakSayisi;
+  const basamakAcisiRad = (toplamDonusDerecesi / basamakSayisi) * (Math.PI / 180);
+  const rDis = disCapMm / 2;
 
   const drawH = VIEW_H - MARGIN_TOP - MARGIN_BOTTOM;
-  const scale = drawH / katYuksekligiMm;
-  const x0 = MARGIN_LEFT;
+  const scaleY = drawH / katYuksekligiMm;
+  // Yatay salınım genişliği, gerçek çapa bakılmaksızın okunabilir bir genlikte sabitlenir - tıpkı
+  // bir mimari çizimde bir merdivenin döndüğünü göstermek için kullanılan sadeleştirilmiş gösterim gibi.
+  const genlikPx = 140;
+  const x0 = MARGIN_LEFT + genlikPx + 20;
   const groundY = MARGIN_TOP + drawH;
-  const topY = groundY - katYuksekligiMm * scale;
-  const scaledDis = disCapMm * scale;
+  const topY = groundY - katYuksekligiMm * scaleY;
+
+  const disKenarNoktalari = Array.from({ length: basamakSayisi + 1 }, (_, i) => {
+    const y = groundY - i * gercekBasamakYuksekligiMm * scaleY;
+    const x = x0 + rDis * Math.cos(i * basamakAcisiRad) * (genlikPx / rDis);
+    return { x, y };
+  });
+  const disKenarPolyline = disKenarNoktalari.map((p) => `${p.x},${p.y}`).join(" ");
 
   return (
     <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H + LEGEND_H}`} className="w-full h-auto" role="img" aria-label="Döner merdiven yandan görünüş şematik çizimi">
       <OkTanimlari />
-      <text x={x0} y={MARGIN_TOP - 12} fontSize={11} fill="#a3a3a3">
-        Yandan görünüş (yükselim)
+      <text x={x0 - genlikPx} y={MARGIN_TOP - 12} fontSize={11} fill="#a3a3a3">
+        Yandan görünüş (yükselim - dönüşü göstermek için basitleştirilmiş)
       </text>
-      <line x1={x0 - 15} y1={groundY} x2={x0 + Math.max(scaledDis, 200) + 15} y2={groundY} stroke="#a3a3a3" strokeWidth={2} />
+      <line x1={x0 - genlikPx - 15} y1={groundY} x2={x0 + genlikPx + 15} y2={groundY} stroke="#a3a3a3" strokeWidth={2} />
       <rect x={x0 - 8} y={topY} width={16} height={groundY - topY} fill={PALET.ana} />
-      {Array.from({ length: basamakSayisi + 1 }, (_, i) => groundY - i * gercekBasamakYuksekligiMm * scale).map((y, i) => (
-        <line key={i} x1={x0 + 10} y1={y} x2={x0 + Math.max(scaledDis, 200) / 2 + 30} y2={y} stroke={PALET.yatay} strokeWidth={2} />
+      <polyline points={disKenarPolyline} fill="none" stroke={PALET.yatay} strokeWidth={1.5} strokeDasharray="3 3" opacity={0.5} />
+      {disKenarNoktalari.slice(1).map((p, i) => (
+        <line key={i} x1={x0} y1={p.y} x2={p.x} y2={p.y} stroke={PALET.yatay} strokeWidth={2} />
       ))}
-      <DikeyOlcu y1={topY} y2={groundY} x={x0 - 30} etiket={mmEtiket(katYuksekligiMm)} />
-      <text x={x0 + 60} y={groundY + 30} fontSize={11} fill="#525252">
+      <DikeyOlcu y1={topY} y2={groundY} x={x0 - genlikPx - 30} etiket={mmEtiket(katYuksekligiMm)} />
+      <text x={x0 - genlikPx} y={groundY + 30} fontSize={11} fill="#525252">
         {basamakSayisi} basamak × {mmEtiket(Math.round(gercekBasamakYuksekligiMm))} rise
       </text>
-      <Lejant kalemler={[{ renk: PALET.ana, etiket: "Merkez Kolon" }, { renk: PALET.yatay, etiket: "Basamak" }]} y={VIEW_H + 6} />
+      <Lejant kalemler={[{ renk: PALET.ana, etiket: "Merkez Kolon" }, { renk: PALET.yatay, etiket: "Basamak (dış kenar)" }]} y={VIEW_H + 6} />
     </svg>
   );
 }
 
+const GORUNUM3D_H = 420;
+
+// Not: Paylaşılan Izometrik3DSahne motoru (x=uzunluk, y=yükseklik, z=derinlik) dikdörtgen
+// iskeletler için tasarlandı; standart 30° izometrik formülünde yatay dönüş bileşeni düşey
+// eksene de karışır (sy = (x+z)*sin30 - y). Tam turu bulan/aşan bir sarmal merdivende bu, dönüşün
+// "kapandığı" noktada yatay salınımın düşey ilerlemeyi neredeyse iptal etmesine, dolayısıyla
+// basamakların ekranda üst üste binmesine yol açıyor (gerçek bir matematiksel etkileşim, çizim
+// hatası değil). Bu yüzden sarmal merdiven için düşey konumu SADECE yüksekliğin belirlediği,
+// önden/arkadan basamak ayrımıyla derinlik hissi veren ayrı bir projeksiyon kullanılıyor.
 function Gorunum3D({ veri }: { veri: DonerMerdivenSemaVeri }) {
   const { icCapMm, disCapMm, basamakSayisi, toplamDonusDerecesi, katYuksekligiMm = 0, merkezKolonKesit } = veri;
   if (!katYuksekligiMm) return null;
@@ -143,29 +161,57 @@ function Gorunum3D({ veri }: { veri: DonerMerdivenSemaVeri }) {
   const basamakAcisi = (toplamDonusDerecesi / basamakSayisi) * (Math.PI / 180);
   const yukselim = katYuksekligiMm / basamakSayisi;
 
-  const kirisler: Kiris3D[] = [
-    { a: [0, 0, 0], b: [0, katYuksekligiMm, 0], enMm: merkezKolonKesit?.enMm ?? 60, renk: PALET.ana, etiket: mmEtiket(katYuksekligiMm) },
-  ];
-  const yuzeyler: Yuzey3D[] = [];
+  const drawH = GORUNUM3D_H - MARGIN_TOP - MARGIN_BOTTOM;
+  const scaleY = drawH / katYuksekligiMm;
+  const genlikPx = 150;
+  const scaleX = genlikPx / rDis;
+  const x0 = VIEW_W / 2;
+  const groundY = MARGIN_TOP + drawH;
+  const topY = groundY - katYuksekligiMm * scaleY;
+  const ellipseRy = genlikPx * 0.28;
 
-  for (let i = 0; i < basamakSayisi; i++) {
+  // x: yatay salınım (sağ/sol), y: SADECE yüksekliğe bağlı (derinlik ekseni düşey konuma hiç
+  // karışmaz - basamakların üst üste binmesine yol açan asıl etkileşim buydu). Derinlik (ön/arka)
+  // sadece çizgi kalınlığı/saydamlığıyla ifade edilir, konumu etkilemez.
+  const nokta = (aci: number, r: number, y: number) => ({
+    x: x0 + r * Math.cos(aci) * scaleX,
+    y: groundY - y * scaleY,
+    onde: Math.sin(aci) > 0,
+  });
+
+  const dilimler = Array.from({ length: basamakSayisi }, (_, i) => {
     const a1 = i * basamakAcisi;
     const a2 = (i + 1) * basamakAcisi;
     const y = (i + 1) * yukselim;
-    const p1: [number, number, number] = [rIc * Math.cos(a1), y, rIc * Math.sin(a1)];
-    const p2: [number, number, number] = [rDis * Math.cos(a1), y, rDis * Math.sin(a1)];
-    const p3: [number, number, number] = [rDis * Math.cos(a2), y, rDis * Math.sin(a2)];
-    const p4: [number, number, number] = [rIc * Math.cos(a2), y, rIc * Math.sin(a2)];
-    yuzeyler.push({ noktalar: [p1, p2, p3, p4], fill: PALET.yatay, fillOpacity: 0.45 });
-    kirisler.push({ a: p1, b: p2, enMm: 25, renk: PALET.yatay });
-  }
+    return { ic: nokta(a1, rIc, y), dis1: nokta(a1, rDis, y), dis2: nokta(a2, rDis, y) };
+  });
 
   const lejant = [
     { renk: PALET.ana, etiket: "Merkez Kolon" },
-    { renk: PALET.yatay, etiket: "Basamak" },
+    { renk: PALET.yatay, etiket: "Basamak (dış kenar)" },
   ];
 
-  return <Izometrik3DSahne kirisler={kirisler} yuzeyler={yuzeyler} lejant={lejant} ariaLabel="Döner merdiven 3D izometrik görünüm" viewH={380} />;
+  return (
+    <svg viewBox={`0 0 ${VIEW_W} ${GORUNUM3D_H + LEGEND_H}`} className="w-full h-auto" role="img" aria-label="Döner merdiven 3D izometrik görünüm">
+      <OkTanimlari />
+      {/* Taban izdüşümü - dairesel planı üstten-eğik bakışla ima eder */}
+      <ellipse cx={x0} cy={groundY} rx={genlikPx} ry={ellipseRy} fill="none" stroke="#d4d4d4" strokeDasharray="4 3" />
+      <rect x={x0 - Math.max(6, (merkezKolonKesit?.enMm ?? 60) * scaleY) / 2} y={topY} width={Math.max(6, (merkezKolonKesit?.enMm ?? 60) * scaleY)} height={groundY - topY} fill={PALET.ana} />
+      <text x={x0 + 8} y={(topY + groundY) / 2} fontSize={10} fill="#525252" transform={`rotate(-90 ${x0 + 8} ${(topY + groundY) / 2})`} textAnchor="middle">
+        {mmEtiket(katYuksekligiMm)}
+      </text>
+      {dilimler.map((d, i) => (
+        <g key={i} opacity={d.dis1.onde ? 1 : 0.45}>
+          <line x1={d.ic.x} y1={d.ic.y} x2={d.dis1.x} y2={d.dis1.y} stroke={PALET.yatay} strokeWidth={d.dis1.onde ? 2.5 : 1.5} strokeDasharray={d.dis1.onde ? undefined : "3 2"} />
+          <line x1={d.dis1.x} y1={d.dis1.y} x2={d.dis2.x} y2={d.dis2.y} stroke={PALET.yatay} strokeWidth={d.dis1.onde ? 2.5 : 1.5} strokeDasharray={d.dis1.onde ? undefined : "3 2"} />
+        </g>
+      ))}
+      <text x={x0} y={groundY + 26} textAnchor="middle" fontSize={11} fill="#525252">
+        {basamakSayisi} basamak × {mmEtiket(Math.round(yukselim))} yükselim
+      </text>
+      <Lejant kalemler={lejant} y={GORUNUM3D_H + 6} />
+    </svg>
+  );
 }
 
 /** Döner merdivenin üstten/yandan/3D görünüşlerini, seçilen merkez kolon profilinin gerçek
