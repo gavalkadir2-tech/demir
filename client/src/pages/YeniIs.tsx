@@ -1,24 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
-import {
-  Customer,
-  Material,
-  ProductTemplate,
-  ProjectCategory,
-  ProjectPriority,
-  ONCELIK_ETIKET,
-  KATEGORI_ETIKET,
-  UrunHesapSonucu,
-  YapiselKontrolSonucu,
-} from "../api/types";
+import { Customer, Material, ProductTemplate, ProjectCategory, UrunHesapSonucu, YapiselKontrolSonucu } from "../api/types";
 import { Spinner, HataKutusu, UyariKutusu, Badge } from "../components/ui";
 import MaterialSelect from "../components/MaterialSelect";
 import HesapSonucuGorunum from "../components/HesapSonucuGorunum";
 import YapiselKontrolGorunum from "../components/YapiselKontrolGorunum";
 import SemaGorunum from "../components/SemaGorunum";
 import { DuvarYatayAraProfilVeri } from "../components/WallSchematic";
-import { sayi } from "../lib/format";
 
 const TEMPLATE_KATEGORI: Record<string, ProjectCategory> = {
   railing: "RAILING",
@@ -74,8 +63,6 @@ const DUVAR_IC_KAPLAMA_SECENEKLERI = [
   { key: "yok", label: "Kaplama Yok" },
 ];
 
-const KATEGORILER = Object.keys(KATEGORI_ETIKET) as ProjectCategory[];
-
 interface AiDanismanSonucu {
   degerlendirme: string;
   malzemeUygunlugu: "yeterli" | "sinirda" | "yetersiz";
@@ -109,74 +96,55 @@ export default function YeniIs() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
 
+  // URL'den önceden bir şablon geldiyse (örn. Ürünler sayfasından "Yeni İş" ile), 2. adım
+  // (Ürün Seç) tamamen atlanır - kullanıcı zaten hangi ürünü yapacağını seçmiş demektir.
+  const oncedenSablon = params.get("template");
   const [adim, setAdim] = useState<1 | 2 | 3>(1);
   const [projectId, setProjectId] = useState<number | null>(null);
-  const [templateKey, setTemplateKey] = useState<string | null>(params.get("template"));
+  const [templateKey, setTemplateKey] = useState<string | null>(oncedenSablon);
   const [aiAlanlar, setAiAlanlar] = useState<Record<string, unknown> | null>(null);
 
-  const [sablonlar, setSablonlar] = useState<ProductTemplate[] | null>(null);
   const [materials, setMaterials] = useState<Material[] | null>(null);
   const [sacMalzemeler, setSacMalzemeler] = useState<Material[]>([]);
   const [baglantiMalzemeler, setBaglantiMalzemeler] = useState<Material[]>([]);
 
   useEffect(() => {
-    api.get<ProductTemplate[]>("/product-templates").then(setSablonlar);
     api.get<Material[]>("/materials?category=PROFILE").then(setMaterials);
     api.get<Material[]>("/materials?category=SHEET").then(setSacMalzemeler);
     api.get<Material[]>("/materials?category=FASTENER").then(setBaglantiMalzemeler);
   }, []);
 
-  const templateSecildi = (key: string) => {
-    setTemplateKey(key);
-    if (key === "custom" && projectId) {
-      navigate(`/isler/${projectId}`);
-      return;
-    }
-    setAdim(3);
-  };
-
   if (adim === 1) {
     return (
       <IsBilgisiAdimi
-        onDevam={(id) => {
+        onDevam={async (id) => {
           setProjectId(id);
           if (templateKey) {
-            if (templateKey === "custom") navigate(`/isler/${id}`);
-            else setAdim(3);
+            if (templateKey === "custom") {
+              navigate(`/isler/${id}`);
+              return;
+            }
+            await api.put(`/projects/${id}`, { category: TEMPLATE_KATEGORI[templateKey] ?? "OTHER" }).catch(() => {});
+            setAdim(3);
           } else {
             setAdim(2);
           }
-        }}
-        templateKey={templateKey}
-        onAiYorumu={(yorum) => {
-          setTemplateKey(yorum.templateKey);
-          setAiAlanlar({ ...yorum.alanlar, bosluklar: yorum.bosluklar ?? undefined });
         }}
       />
     );
   }
 
   if (adim === 2) {
-    if (!sablonlar) return <Spinner />;
+    if (!projectId) return <Spinner />;
     return (
-      <div className="space-y-6">
-        <StepHeader adim={2} baslik="Ürün Seçin" />
-        <div className="grid sm:grid-cols-2 gap-4">
-          {sablonlar.map((s) => (
-            <button
-              key={s.key}
-              onClick={() => templateSecildi(s.key)}
-              className="card flex items-center gap-4 hover:shadow-md hover:border-brand-300 text-left"
-            >
-              <div className="text-4xl">{EMOJI[s.key] ?? "🛠️"}</div>
-              <div>
-                <div className="font-bold text-lg">{s.name}</div>
-                {s.description && <div className="text-sm text-neutral-500">{s.description}</div>}
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
+      <UrunSecAdimi
+        projectId={projectId}
+        onSecildi={(key, alanlar) => {
+          setTemplateKey(key);
+          if (alanlar) setAiAlanlar(alanlar);
+          setAdim(3);
+        }}
+      />
     );
   }
 
@@ -206,104 +174,19 @@ function StepHeader({ adim, baslik }: { adim: number; baslik: string }) {
   );
 }
 
-function IsBilgisiAdimi({
-  onDevam,
-  templateKey,
-  onAiYorumu,
-}: {
-  onDevam: (projectId: number) => void;
-  templateKey: string | null;
-  onAiYorumu: (yorum: AiIsYorumu) => void;
-}) {
+function IsBilgisiAdimi({ onDevam }: { onDevam: (projectId: number) => void }) {
   const [musteriler, setMusteriler] = useState<Customer[] | null>(null);
   const [mod, setMod] = useState<"mevcut" | "yeni">("mevcut");
   const [customerId, setCustomerId] = useState<number | undefined>(undefined);
   const [yeniAd, setYeniAd] = useState("");
   const [yeniTelefon, setYeniTelefon] = useState("");
   const [title, setTitle] = useState("");
-  const [category, setCategory] = useState<ProjectCategory>(templateKey ? TEMPLATE_KATEGORI[templateKey] : "OTHER");
-  const [note, setNote] = useState("");
-  const [dueDate, setDueDate] = useState("");
-  const [priority, setPriority] = useState<ProjectPriority>("NORMAL");
   const [hata, setHata] = useState<string | null>(null);
   const [kaydediliyor, setKaydediliyor] = useState(false);
-  const [tahminiSureler, setTahminiSureler] = useState<{ kategori: string; ortalamaGun: number; ornekSayisi: number }[]>([]);
-
-  useEffect(() => {
-    api
-      .get<{ kategori: string; ortalamaGun: number; ornekSayisi: number }[]>("/reports/tahmini-sureler")
-      .then(setTahminiSureler)
-      .catch(() => {});
-  }, []);
-
-  const [aiMetin, setAiMetin] = useState("");
-  const [aiCalisiyor, setAiCalisiyor] = useState(false);
-  const [aiSonuc, setAiSonuc] = useState<AiIsYorumu | null>(null);
-
-  const [fotoOnizlemeUrl, setFotoOnizlemeUrl] = useState<string | null>(null);
-  const [fotoBase64, setFotoBase64] = useState<string | null>(null);
-  const [fotoMimeType, setFotoMimeType] = useState<string | null>(null);
-  const [fotoCalisiyor, setFotoCalisiyor] = useState(false);
 
   useEffect(() => {
     api.get<Customer[]>("/customers").then(setMusteriler);
   }, []);
-
-  const aiSonucuUygula = (yorum: AiIsYorumu) => {
-    setTitle(yorum.baslik);
-    setCategory(TEMPLATE_KATEGORI[yorum.templateKey] ?? "OTHER");
-    if (yorum.musteriAdiTahmini) {
-      setMod("yeni");
-      setYeniAd(yorum.musteriAdiTahmini);
-    }
-    setAiSonuc(yorum);
-    onAiYorumu(yorum);
-  };
-
-  const aiIleDoldur = async () => {
-    if (!aiMetin.trim()) return setHata("Önce yapılacak işi anlatın.");
-    setAiCalisiyor(true);
-    setHata(null);
-    setAiSonuc(null);
-    try {
-      const yorum = await api.post<AiIsYorumu>("/ai/is-yorumla", { metin: aiMetin });
-      aiSonucuUygula(yorum);
-    } catch (e: any) {
-      setHata(e.message);
-    } finally {
-      setAiCalisiyor(false);
-    }
-  };
-
-  const fotoSec = (dosya: File) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = String(reader.result);
-      setFotoOnizlemeUrl(dataUrl);
-      setFotoBase64(dataUrl.slice(dataUrl.indexOf(",") + 1));
-      setFotoMimeType(dosya.type);
-    };
-    reader.readAsDataURL(dosya);
-  };
-
-  const fotoIleDoldur = async () => {
-    if (!fotoBase64 || !fotoMimeType) return setHata("Önce bir fotoğraf seçin.");
-    setFotoCalisiyor(true);
-    setHata(null);
-    setAiSonuc(null);
-    try {
-      const yorum = await api.post<AiIsYorumu>("/ai/plan-yorumla", {
-        imageBase64: fotoBase64,
-        mimeType: fotoMimeType,
-        not: aiMetin.trim() || undefined,
-      });
-      aiSonucuUygula(yorum);
-    } catch (e: any) {
-      setHata(e.message);
-    } finally {
-      setFotoCalisiyor(false);
-    }
-  };
 
   const devam = async () => {
     if (!title.trim()) return setHata("İş adı zorunlu.");
@@ -318,14 +201,10 @@ function IsBilgisiAdimi({
         const musteri = await api.post<Customer>("/customers", { name: yeniAd, phone: yeniTelefon });
         cid = musteri.id;
       }
-      const proje = await api.post<{ id: number }>("/projects", {
-        customerId: cid,
-        title,
-        category,
-        note,
-        priority,
-        dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
-      });
+      // Kategori burada sorulmuyor; bir sonraki adımda seçilen/tanınan ürün türünden otomatik
+      // belirlenip projeye işlenecek. Teslim tarihi/öncelik de artık iş oluşturmada sorulmuyor -
+      // gerekirse iş detayından "✏️ Düzenle" ile sonradan girilebilir.
+      const proje = await api.post<{ id: number }>("/projects", { customerId: cid, title });
       onDevam(proje.id);
     } catch (e: any) {
       setHata(e.message);
@@ -337,60 +216,6 @@ function IsBilgisiAdimi({
   return (
     <div className="space-y-6 max-w-lg">
       <StepHeader adim={1} baslik="İş Bilgisi" />
-
-      <div className="card space-y-3 border-2 border-brand-200 bg-brand-50/40">
-        <label className="field-label">🤖 Yapay Zeka ile Hızlı Doldur (opsiyonel)</label>
-        <p className="text-xs text-neutral-500">
-          Yapılacak işi kendi cümlelerinizle anlatın, ürün tipini ve ölçüleri sizin için tahmin edip formu doldursun. Sonuçları
-          mutlaka kontrol edin.
-        </p>
-        <textarea
-          className="field-input"
-          rows={2}
-          placeholder="örn. Ahmet Bey için 3 metre uzunluğunda, 1 metre yüksekliğinde bahçe korkuluğu, ortasında bir ara kayıt olsun"
-          value={aiMetin}
-          onChange={(e) => setAiMetin(e.target.value)}
-        />
-        <button className="btn-secondary w-full" onClick={aiIleDoldur} disabled={aiCalisiyor}>
-          {aiCalisiyor ? "Analiz ediliyor..." : "🤖 AI ile Doldur"}
-        </button>
-
-        <div className="border-t border-brand-200 pt-3 space-y-2">
-          <label className="field-label">📷 Ya da elle çizilmiş bir plan/kroki fotoğrafı yükleyin</label>
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="field-input"
-            onChange={(e) => {
-              const dosya = e.target.files?.[0];
-              if (dosya) fotoSec(dosya);
-            }}
-          />
-          {fotoOnizlemeUrl && (
-            <div className="flex items-center gap-3">
-              <img src={fotoOnizlemeUrl} alt="Yüklenen plan önizlemesi" className="h-20 w-20 object-cover rounded-lg border border-neutral-200" />
-              <button className="btn-secondary btn-sm flex-1" onClick={fotoIleDoldur} disabled={fotoCalisiyor}>
-                {fotoCalisiyor ? "Fotoğraf okunuyor..." : "🤖 Fotoğraftan Doldur"}
-              </button>
-            </div>
-          )}
-          <p className="text-xs text-neutral-500">
-            Bu gerçek bir lazer ölçüm değildir — sadece fotoğraftaki yazılı ölçüleri/şekli okumaya çalışır. Net olmayan
-            fotoğraflarda sonuç düşük güvenilirlikte olabilir, mutlaka kontrol edin.
-          </p>
-        </div>
-
-        {aiSonuc && (
-          <div className="text-sm space-y-2">
-            <div className="font-semibold text-brand-700">
-              ✅ "{EMOJI[aiSonuc.templateKey] ?? "🛠️"} {aiSonuc.baslik}" olarak dolduruldu (güven: {aiSonuc.guven}). Aşağıdaki
-              bilgileri ve bir sonraki adımdaki ölçüleri kontrol edin.
-            </div>
-            <UyariKutusu mesajlar={aiSonuc.belirsizlikler} />
-          </div>
-        )}
-      </div>
 
       <div className="card space-y-4">
         <HataKutusu mesaj={hata} />
@@ -430,51 +255,190 @@ function IsBilgisiAdimi({
           <input className="field-input" placeholder="örn. Bahçe korkuluğu" value={title} onChange={(e) => setTitle(e.target.value)} />
         </div>
 
-        <div>
-          <label className="field-label">İş Kategorisi</label>
-          <select className="field-select" value={category} onChange={(e) => setCategory(e.target.value as ProjectCategory)}>
-            {KATEGORILER.map((k) => (
-              <option key={k} value={k}>
-                {KATEGORI_ETIKET[k]}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="field-label">Teslim Tarihi (opsiyonel)</label>
-            <input type="date" className="field-input" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-            {(() => {
-              const t = tahminiSureler.find((s) => s.kategori === category);
-              return t ? (
-                <div className="text-xs text-neutral-500 mt-1">
-                  ⏱️ Bu kategori geçmişte ortalama {sayi(t.ortalamaGun, 1)} gün sürdü ({t.ornekSayisi} iş)
-                </div>
-              ) : null;
-            })()}
-          </div>
-          <div>
-            <label className="field-label">Öncelik</label>
-            <select className="field-select" value={priority} onChange={(e) => setPriority(e.target.value as ProjectPriority)}>
-              {(Object.keys(ONCELIK_ETIKET) as ProjectPriority[]).map((p) => (
-                <option key={p} value={p}>
-                  {ONCELIK_ETIKET[p]}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div>
-          <label className="field-label">Not</label>
-          <textarea className="field-input" rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
-        </div>
-
         <button className="btn-primary w-full" onClick={devam} disabled={kaydediliyor}>
           {kaydediliyor ? "Kaydediliyor..." : "Devam Et →"}
         </button>
       </div>
+    </div>
+  );
+}
+
+function UrunSecAdimi({
+  projectId,
+  onSecildi,
+}: {
+  projectId: number;
+  onSecildi: (templateKey: string, aiAlanlar?: Record<string, unknown>) => void;
+}) {
+  const navigate = useNavigate();
+  const [sablonlar, setSablonlar] = useState<ProductTemplate[] | null>(null);
+  const [hata, setHata] = useState<string | null>(null);
+
+  const [aiMetin, setAiMetin] = useState("");
+  const [aiCalisiyor, setAiCalisiyor] = useState(false);
+  const [aiSonuc, setAiSonuc] = useState<AiIsYorumu | null>(null);
+
+  const [fotoOnizlemeUrl, setFotoOnizlemeUrl] = useState<string | null>(null);
+  const [fotoBase64, setFotoBase64] = useState<string | null>(null);
+  const [fotoMimeType, setFotoMimeType] = useState<string | null>(null);
+  const [fotoCalisiyor, setFotoCalisiyor] = useState(false);
+  const [devamEdiliyor, setDevamEdiliyor] = useState(false);
+
+  useEffect(() => {
+    api.get<ProductTemplate[]>("/product-templates").then(setSablonlar);
+  }, []);
+
+  const projeyiGuncelle = async (data: Record<string, unknown>) => {
+    try {
+      await api.put(`/projects/${projectId}`, data);
+    } catch {
+      // Kategori/başlık güncellemesi başarısız olsa bile akışı durdurmaya değmez; proje zaten var.
+    }
+  };
+
+  const aiSonucuUygula = async (yorum: AiIsYorumu) => {
+    setAiSonuc(yorum);
+    setDevamEdiliyor(true);
+    await projeyiGuncelle({ title: yorum.baslik, category: TEMPLATE_KATEGORI[yorum.templateKey] ?? "OTHER" });
+    onSecildi(yorum.templateKey, { ...yorum.alanlar, bosluklar: yorum.bosluklar ?? undefined });
+  };
+
+  const aiIleDoldur = async () => {
+    if (!aiMetin.trim()) return setHata("Önce yapılacak işi anlatın.");
+    setAiCalisiyor(true);
+    setHata(null);
+    setAiSonuc(null);
+    try {
+      const yorum = await api.post<AiIsYorumu>("/ai/is-yorumla", { metin: aiMetin });
+      await aiSonucuUygula(yorum);
+    } catch (e: any) {
+      setHata(e.message);
+    } finally {
+      setAiCalisiyor(false);
+    }
+  };
+
+  const fotoSec = (dosya: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result);
+      setFotoOnizlemeUrl(dataUrl);
+      setFotoBase64(dataUrl.slice(dataUrl.indexOf(",") + 1));
+      setFotoMimeType(dosya.type);
+    };
+    reader.readAsDataURL(dosya);
+  };
+
+  const fotoIleDoldur = async () => {
+    if (!fotoBase64 || !fotoMimeType) return setHata("Önce bir fotoğraf seçin.");
+    setFotoCalisiyor(true);
+    setHata(null);
+    setAiSonuc(null);
+    try {
+      const yorum = await api.post<AiIsYorumu>("/ai/plan-yorumla", {
+        imageBase64: fotoBase64,
+        mimeType: fotoMimeType,
+        not: aiMetin.trim() || undefined,
+      });
+      await aiSonucuUygula(yorum);
+    } catch (e: any) {
+      setHata(e.message);
+    } finally {
+      setFotoCalisiyor(false);
+    }
+  };
+
+  const urunTiklandi = async (key: string) => {
+    setDevamEdiliyor(true);
+    await projeyiGuncelle({ category: TEMPLATE_KATEGORI[key] ?? "OTHER" });
+    if (key === "custom") {
+      navigate(`/isler/${projectId}`);
+      return;
+    }
+    onSecildi(key);
+  };
+
+  return (
+    <div className="space-y-6">
+      <StepHeader adim={2} baslik="Ürün Seçin" />
+      <HataKutusu mesaj={hata} />
+
+      <div className="card space-y-3 border-2 border-brand-200 bg-brand-50/40">
+        <label className="field-label">🤖 Yapay Zeka ile Hızlı Doldur (opsiyonel)</label>
+        <p className="text-xs text-neutral-500">
+          Yapılacak işi kendi cümlelerinizle anlatın, ürün tipini ve ölçüleri sizin için tahmin edip formu doldursun. Sonuçları
+          mutlaka kontrol edin.
+        </p>
+        <textarea
+          className="field-input"
+          rows={2}
+          placeholder="örn. 3 metre uzunluğunda, 1 metre yüksekliğinde bahçe korkuluğu, ortasında bir ara kayıt olsun"
+          value={aiMetin}
+          onChange={(e) => setAiMetin(e.target.value)}
+        />
+        <button className="btn-secondary w-full" onClick={aiIleDoldur} disabled={aiCalisiyor || devamEdiliyor}>
+          {aiCalisiyor ? "Analiz ediliyor..." : "🤖 AI ile Doldur"}
+        </button>
+
+        <div className="border-t border-brand-200 pt-3 space-y-2">
+          <label className="field-label">📷 Ya da elle çizilmiş bir plan/kroki fotoğrafı yükleyin</label>
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="field-input"
+            onChange={(e) => {
+              const dosya = e.target.files?.[0];
+              if (dosya) fotoSec(dosya);
+            }}
+          />
+          {fotoOnizlemeUrl && (
+            <div className="flex items-center gap-3">
+              <img src={fotoOnizlemeUrl} alt="Yüklenen plan önizlemesi" className="h-20 w-20 object-cover rounded-lg border border-neutral-200" />
+              <button className="btn-secondary btn-sm flex-1" onClick={fotoIleDoldur} disabled={fotoCalisiyor || devamEdiliyor}>
+                {fotoCalisiyor ? "Fotoğraf okunuyor..." : "🤖 Fotoğraftan Doldur"}
+              </button>
+            </div>
+          )}
+          <p className="text-xs text-neutral-500">
+            Bu gerçek bir lazer ölçüm değildir — sadece fotoğraftaki yazılı ölçüleri/şekli okumaya çalışır. Net olmayan
+            fotoğraflarda sonuç düşük güvenilirlikte olabilir, mutlaka kontrol edin.
+          </p>
+        </div>
+
+        {aiSonuc && (
+          <div className="text-sm space-y-2">
+            <div className="font-semibold text-brand-700">
+              ✅ "{EMOJI[aiSonuc.templateKey] ?? "🛠️"} {aiSonuc.baslik}" olarak dolduruldu (güven: {aiSonuc.guven}). Aşağıdaki
+              adımdaki ölçüleri kontrol edin.
+            </div>
+            <UyariKutusu mesajlar={aiSonuc.belirsizlikler} />
+          </div>
+        )}
+      </div>
+
+      <div className="text-center text-sm text-neutral-400">— ya da bir ürün seçin —</div>
+
+      {!sablonlar ? (
+        <Spinner />
+      ) : (
+        <div className="grid sm:grid-cols-2 gap-4">
+          {sablonlar.map((s) => (
+            <button
+              key={s.key}
+              onClick={() => urunTiklandi(s.key)}
+              disabled={devamEdiliyor}
+              className="card flex items-center gap-4 hover:shadow-md hover:border-brand-300 text-left disabled:opacity-50"
+            >
+              <div className="text-4xl">{EMOJI[s.key] ?? "🛠️"}</div>
+              <div>
+                <div className="font-bold text-lg">{s.name}</div>
+                {s.description && <div className="text-sm text-neutral-500">{s.description}</div>}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
