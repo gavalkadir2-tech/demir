@@ -108,3 +108,40 @@ test("korkuluk: geçersiz girdilerde hata fırlatır", () => {
     HesaplamaHatasi
   );
 });
+
+test("korkuluk: elle düzenlenmiş dikme pozisyonları eşit olmayan gözlerde ayrı parça üretir", () => {
+  const sonuc = calculateRailing({
+    toplamUzunlukMm: 3000,
+    yukseklikMm: 1000,
+    dikmeAraligiHedefMm: 1000,
+    ustProfilKey: "40x40x2",
+    altProfilKey: "40x40x2",
+    dikmeProfilKey: "40x40x2",
+    dikmePozisyonlariMm: [0, 1000, 1500, 3000], // eşit olmayan 3 göz
+  });
+
+  assert.equal(sonuc.ozetDegerler.dikmeSayisi, 4);
+  const ustParcalari = sonuc.parcalar.filter((p) => p.label === "Üst profil");
+  assert.equal(ustParcalari.length, 3);
+  assert.deepEqual(
+    ustParcalari.map((p) => p.uzunlukMm).sort((a, b) => a - b),
+    [500, 1000, 1500]
+  );
+  assert.equal(sonuc.uyarilar.length, 0);
+});
+
+test("korkuluk: elle düzenlenmiş dikme listesinde eşit gözler yine tek gruplu parça üretir", () => {
+  const sonuc = calculateRailing({
+    toplamUzunlukMm: 3000,
+    yukseklikMm: 1000,
+    dikmeAraligiHedefMm: 1000,
+    ustProfilKey: "40x40x2",
+    altProfilKey: "40x40x2",
+    dikmeProfilKey: "40x40x2",
+    dikmePozisyonlariMm: [0, 1000, 2000, 3000], // otomatik yerleşimle aynı, eşit gözler
+  });
+
+  const ustParcalari = sonuc.parcalar.filter((p) => p.label === "Üst profil");
+  assert.equal(ustParcalari.length, 1);
+  assert.equal(ustParcalari[0].adet, 3);
+});

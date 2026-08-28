@@ -507,8 +507,9 @@ export function UrunFormu({
     }
   };
 
-  /** Duvar şematiğinde bir dikmeye tıklayarak kaldırma / boş alana tıklayarak ekleme yapıldığında
-   * çağrılır: yeni pozisyon listesiyle hemen yeniden hesaplar (null = otomatik yerleşime dön). */
+  /** Duvar veya korkuluk şematiğinde bir dikmeye tıklayarak kaldırma / boş alana tıklayarak ekleme
+   * yapıldığında çağrılır: yeni pozisyon listesiyle hemen yeniden hesaplar (null = otomatik yerleşime
+   * dön). Her iki şablon da aynı dikmePozisyonlariMm alanını kullandığından ortak kullanılabilir. */
   const dikmePozisyonlariGuncelle = (yeniListe: number[] | null) => {
     const yeniParams = { ...params };
     if (yeniListe) yeniParams.dikmePozisyonlariMm = yeniListe;
@@ -538,6 +539,20 @@ export function UrunFormu({
         ...yeni,
         ...(dikmeKorunabilir ? { dikmePozisyonlariMm: onceki.dikmePozisyonlariMm } : {}),
         ...(yatayKorunabilir ? { yatayAraProfilleri: onceki.yatayAraProfilleri } : {}),
+      };
+    });
+  };
+
+  /** KorkulukAlanlari'nın onChange'i params'ı baştan kurar; toplam uzunluk değişmediyse (elle
+   * ayarlanmış dikme pozisyonlarının hâlâ geçerli sınırlar içinde olduğu anlamına gelir) mevcut
+   * dikmePozisyonlariMm korunur, değiştiyse otomatik yerleşime dönülür. */
+  const korkulukParamsGuncelle = (yeni: Record<string, unknown>) => {
+    setParams((onceki) => {
+      const uzunlukSabit = yeni.toplamUzunlukMm === onceki.toplamUzunlukMm;
+      const dikmeKorunabilir = onceki.dikmePozisyonlariMm && uzunlukSabit;
+      return {
+        ...yeni,
+        ...(dikmeKorunabilir ? { dikmePozisyonlariMm: onceki.dikmePozisyonlariMm } : {}),
       };
     });
   };
@@ -588,7 +603,7 @@ export function UrunFormu({
             materials={materials}
             sacMalzemeler={sacMalzemeler ?? []}
             baglantiMalzemeler={baglantiMalzemeler ?? []}
-            onChange={setParams}
+            onChange={korkulukParamsGuncelle}
             baslangic={baslangic}
           />
         )}
@@ -682,8 +697,10 @@ export function UrunFormu({
             params={params}
             ozetDegerler={onizleme.sonuc.ozetDegerler}
             malzemeler={onizleme.malzemeler}
-            duzenlenebilir={templateKey === "wall"}
-            onDikmePozisyonlariDegisti={templateKey === "wall" ? dikmePozisyonlariGuncelle : undefined}
+            duzenlenebilir={templateKey === "wall" || templateKey === "railing"}
+            onDikmePozisyonlariDegisti={
+              templateKey === "wall" || templateKey === "railing" ? dikmePozisyonlariGuncelle : undefined
+            }
             onYatayAraProfilleriDegisti={templateKey === "wall" ? yatayAraProfilleriGuncelle : undefined}
           />
 

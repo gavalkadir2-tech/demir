@@ -29,6 +29,7 @@ const railingSchema = z.object({
   plakaMalzemeId: z.number().int().optional(),
   ankrajSayisiPerPlaka: z.number().int().optional(),
   ankrajMalzemeId: z.number().int().optional(),
+  dikmePozisyonlariMm: z.array(z.number()).optional(),
 });
 
 const stairsSchema = z.object({

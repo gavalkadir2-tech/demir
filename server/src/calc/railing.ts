@@ -33,6 +33,10 @@ export interface KorkulukGirdi {
   ankrajSayisiPerPlaka?: number;
   /** Ankrajın alınacağı Material id'si (opsiyonel, FASTENER kategorisi). */
   ankrajMalzemeKey?: string;
+  /** Kullanıcının şematik üzerinden elle düzenlediği dikme pozisyonları (mm, sol kenardan).
+   * Verilirse otomatik eşit-aralık yerleşimi yerine doğrudan bu liste kullanılır; gözler artık
+   * eşit olmayabileceğinden üst/alt profil ve ara kayıtlar her gözde ayrı parça olarak hesaplanır. */
+  dikmePozisyonlariMm?: number[];
 }
 
 const VARSAYILAN = {
@@ -72,16 +76,44 @@ export function calculateRailing(girdi: KorkulukGirdi): UrunHesapSonucu {
 
   const sonuc = bosSonuc();
 
-  // Dikmeleri toplam uzunluğa eşit aralıklarla, hedef aralığı aşmayacak şekilde dağıt.
-  const araliklarSayisi = Math.max(1, Math.ceil(toplamUzunlukMm / dikmeAraligiHedefMm));
-  const gercekAralikMm = toplamUzunlukMm / araliklarSayisi;
-  const dikmeSayisi = araliklarSayisi + 1;
+  let dikmePozisyonlari: number[];
+  let araliklarSayisi: number;
+  let gercekAralikMm: number;
+  let segmentUzunluklari: number[]; // her göz için ayrı uzunluk (override'da eşit olmayabilir)
 
-  if (gercekAralikMm > 2000) {
-    sonuc.uyarilar.push(
-      `Dikme aralığı ${gercekAralikMm.toFixed(0)} mm, önerilen taşıyıcılık sınırı olan 2000 mm'yi aşıyor. Dikme aralığını azaltmayı düşünün.`
-    );
+  if (girdi.dikmePozisyonlariMm && girdi.dikmePozisyonlariMm.length > 0) {
+    dikmePozisyonlari = Array.from(new Set(girdi.dikmePozisyonlariMm.map((x) => Math.round(x)))).sort((a, b) => a - b);
+    araliklarSayisi = Math.max(1, dikmePozisyonlari.length - 1);
+    gercekAralikMm = toplamUzunlukMm / araliklarSayisi;
+    segmentUzunluklari = [];
+    for (let i = 0; i < dikmePozisyonlari.length - 1; i++) {
+      segmentUzunluklari.push(dikmePozisyonlari[i + 1] - dikmePozisyonlari[i]);
+    }
+    if (dikmePozisyonlari[0] > 1) sonuc.uyarilar.push("Korkuluğun sol kenarında dikme yok - sahada kontrol edin.");
+    if (toplamUzunlukMm - dikmePozisyonlari[dikmePozisyonlari.length - 1] > 1) {
+      sonuc.uyarilar.push("Korkuluğun sağ kenarında dikme yok - sahada kontrol edin.");
+    }
+    const maksBosluk = Math.max(...segmentUzunluklari);
+    if (maksBosluk > 2000) {
+      sonuc.uyarilar.push(
+        `İki dikme arasında ${maksBosluk.toFixed(0)} mm boşluk var, önerilen taşıyıcılık sınırı olan 2000 mm'yi aşıyor.`
+      );
+    }
+  } else {
+    // Dikmeleri toplam uzunluğa eşit aralıklarla, hedef aralığı aşmayacak şekilde dağıt.
+    araliklarSayisi = Math.max(1, Math.ceil(toplamUzunlukMm / dikmeAraligiHedefMm));
+    gercekAralikMm = toplamUzunlukMm / araliklarSayisi;
+    dikmePozisyonlari = Array.from({ length: araliklarSayisi + 1 }, (_, i) => Math.round(i * gercekAralikMm));
+    segmentUzunluklari = Array.from({ length: araliklarSayisi }, () => gercekAralikMm);
+
+    if (gercekAralikMm > 2000) {
+      sonuc.uyarilar.push(
+        `Dikme aralığı ${gercekAralikMm.toFixed(0)} mm, önerilen taşıyıcılık sınırı olan 2000 mm'yi aşıyor. Dikme aralığını azaltmayı düşünün.`
+      );
+    }
   }
+
+  const dikmeSayisi = dikmePozisyonlari.length;
 
   const parcalar: HesaplananParca[] = [];
 
@@ -92,28 +124,26 @@ export function calculateRailing(girdi: KorkulukGirdi): UrunHesapSonucu {
     adet: dikmeSayisi,
   });
 
-  parcalar.push({
-    label: "Üst profil",
-    profilKey: ustProfilKey,
-    uzunlukMm: Math.round(gercekAralikMm),
-    adet: araliklarSayisi,
-  });
-
-  parcalar.push({
-    label: "Alt profil",
-    profilKey: altProfilKey,
-    uzunlukMm: Math.round(gercekAralikMm),
-    adet: araliklarSayisi,
-  });
-
-  if (araKayitSayisi > 0 && araKayitProfilKey) {
-    for (let i = 1; i <= araKayitSayisi; i++) {
-      parcalar.push({
-        label: `Ara kayıt ${i}`,
-        profilKey: araKayitProfilKey,
-        uzunlukMm: Math.round(gercekAralikMm),
-        adet: araliklarSayisi,
-      });
+  const gozlerEsitMi = new Set(segmentUzunluklari.map((s) => Math.round(s))).size <= 1;
+  if (gozlerEsitMi) {
+    // Tüm gözler eşit uzunlukta (varsayılan otomatik yerleşim) - tek, gruplu parça yeterli.
+    parcalar.push({ label: "Üst profil", profilKey: ustProfilKey, uzunlukMm: Math.round(gercekAralikMm), adet: araliklarSayisi });
+    parcalar.push({ label: "Alt profil", profilKey: altProfilKey, uzunlukMm: Math.round(gercekAralikMm), adet: araliklarSayisi });
+    if (araKayitSayisi > 0 && araKayitProfilKey) {
+      for (let i = 1; i <= araKayitSayisi; i++) {
+        parcalar.push({ label: `Ara kayıt ${i}`, profilKey: araKayitProfilKey, uzunlukMm: Math.round(gercekAralikMm), adet: araliklarSayisi });
+      }
+    }
+  } else {
+    // Elle düzenlenmiş, eşit olmayan gözler - her göz kendi uzunluğunda ayrı parça.
+    for (const segUzunluk of segmentUzunluklari) {
+      parcalar.push({ label: "Üst profil", profilKey: ustProfilKey, uzunlukMm: Math.round(segUzunluk), adet: 1 });
+      parcalar.push({ label: "Alt profil", profilKey: altProfilKey, uzunlukMm: Math.round(segUzunluk), adet: 1 });
+      if (araKayitSayisi > 0 && araKayitProfilKey) {
+        for (let i = 1; i <= araKayitSayisi; i++) {
+          parcalar.push({ label: `Ara kayıt ${i}`, profilKey: araKayitProfilKey, uzunlukMm: Math.round(segUzunluk), adet: 1 });
+        }
+      }
     }
   }
 

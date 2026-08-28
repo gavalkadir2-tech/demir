@@ -29,7 +29,7 @@ export default function SemaGorunum({
   ozetDegerler: Record<string, number>;
   /** materialId (string) -> Material sözlüğü; hesap önizlemesinden veya kayıtlı parçalardan gelir. */
   malzemeler: Record<string, Material>;
-  /** Şu an sadece "wall" şablonunda kullanılır: dikmelere tıklayarak kaldırma/ekleme yapılabilir. */
+  /** "wall" ve "railing" şablonlarında kullanılır: dikmelere tıklayarak kaldırma/ekleme yapılabilir. */
   duzenlenebilir?: boolean;
   onDikmePozisyonlariDegisti?: (yeniListe: number[] | null) => void;
   onYatayAraProfilleriDegisti?: (yeniListe: DuvarYatayAraProfilVeri[]) => void;
@@ -57,7 +57,10 @@ export default function SemaGorunum({
             ustProfilKesit: kesit("ustProfilId"),
             altProfilKesit: kesit("altProfilId"),
             araKayitKesit: kesit("araKayitProfilId"),
+            dikmePozisyonlariOverrideMm: params.dikmePozisyonlariMm as number[] | undefined,
           }}
+          duzenlenebilir={duzenlenebilir}
+          onDikmePozisyonlariDegisti={onDikmePozisyonlariDegisti}
         />
       );
     case "stairs":
