@@ -213,3 +213,38 @@ test("duvar paneli: çakışan boşluklarda hata verir", () => {
     HesaplamaHatasi
   );
 });
+
+test("duvar paneli: elle düzenlenmiş dikme pozisyonları otomatik yerleşimi geçersiz kılar", () => {
+  const sonuc = calculateWallPanel({
+    genislikMm: 3000,
+    yukseklikMm: 2500,
+    dikmeAraligiHedefMm: 600,
+    ustProfilKey: "ray",
+    altProfilKey: "ray",
+    dikmeProfilKey: "dikme",
+    dikmePozisyonlariMm: [0, 750, 1500, 2250, 3000], // ortadaki bir dikme kaldırılmış (5 yerine 5 pozisyon, farklı aralık)
+  });
+
+  assert.equal(sonuc.ozetDegerler.dikmeSayisi, 5);
+  const dikme = sonuc.parcalar.find((p) => p.label === "Dikme")!;
+  assert.equal(dikme.adet, 5);
+  assert.equal(sonuc.uyarilar.length, 0);
+});
+
+test("duvar paneli: elle düzenlenmiş dikme listesinde kenar/boşluk kenarı eksikse uyarı verir", () => {
+  const sonuc = calculateWallPanel({
+    genislikMm: 3000,
+    yukseklikMm: 2500,
+    dikmeAraligiHedefMm: 600,
+    ustProfilKey: "ray",
+    altProfilKey: "ray",
+    dikmeProfilKey: "dikme",
+    bosluklar: [{ etiket: "Kapı", konumMm: 1000, genislikMm: 900, yukseklikMm: 2100 }],
+    // Sol kenarda (0) ve kapının sağ kenarında (1900) dikme yok.
+    dikmePozisyonlariMm: [500, 1000, 3000],
+  });
+
+  assert.equal(sonuc.ozetDegerler.dikmeSayisi, 3);
+  assert.ok(sonuc.uyarilar.some((u) => u.includes("sol kenarında")));
+  assert.ok(sonuc.uyarilar.some((u) => u.includes("Kapı")));
+});

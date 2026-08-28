@@ -125,6 +125,9 @@ const wallSchema = z.object({
   lentoProfilId: z.number().int().optional(),
   lentoTasmaMm: z.number().optional(),
   bosluklar: bosluklarSchema.optional(),
+  // Kullanıcının şematik üzerinden elle düzenlediği dikme pozisyonları (mm) - verilirse otomatik
+  // eşit-aralık yerleşimi yerine doğrudan bu liste kullanılır.
+  dikmePozisyonlariMm: z.array(z.number()).optional(),
   disKaplamaTuru: disKaplamaTuruEnum.optional(),
   disKaplamaKalinlikMm: z.number().optional(),
   disKaplamaMalzemeId: z.number().int().optional(),

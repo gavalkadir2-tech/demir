@@ -20,12 +20,17 @@ export default function SemaGorunum({
   params,
   ozetDegerler,
   malzemeler,
+  duzenlenebilir,
+  onDikmePozisyonlariDegisti,
 }: {
   templateKey: string;
   params: Record<string, unknown>;
   ozetDegerler: Record<string, number>;
   /** materialId (string) -> Material sözlüğü; hesap önizlemesinden veya kayıtlı parçalardan gelir. */
   malzemeler: Record<string, Material>;
+  /** Şu an sadece "wall" şablonunda kullanılır: dikmelere tıklayarak kaldırma/ekleme yapılabilir. */
+  duzenlenebilir?: boolean;
+  onDikmePozisyonlariDegisti?: (yeniListe: number[] | null) => void;
 }) {
   const n = (k: string): number => Number(params[k] ?? 0);
   const b = (k: string): boolean => Boolean(params[k]);
@@ -113,7 +118,10 @@ export default function SemaGorunum({
             icKaplamaVar: Boolean(params.icKaplamaTuru && params.icKaplamaTuru !== "yok"),
             dikmeKesit: kesit("dikmeProfilId"),
             rayKesit: kesit("ustProfilId"),
+            dikmePozisyonlariOverrideMm: params.dikmePozisyonlariMm as number[] | undefined,
           }}
+          duzenlenebilir={duzenlenebilir}
+          onDikmePozisyonlariDegisti={onDikmePozisyonlariDegisti}
         />
       );
     case "truss":

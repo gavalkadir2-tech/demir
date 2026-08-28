@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, MouseEvent as ReactMouseEvent } from "react";
 import {
   OkTanimlari,
   YatayOlcu,
@@ -35,6 +35,9 @@ export interface DuvarPaneliSemaVeri {
   icKaplamaVar?: boolean;
   dikmeKesit?: KesitOlcusu;
   rayKesit?: KesitOlcusu;
+  /** Kullanıcının önceden elle düzenlediği dikme pozisyonları (mm) - verilirse otomatik eşit
+   * aralık yerleşimi yerine doğrudan bu liste kullanılır. */
+  dikmePozisyonlariOverrideMm?: number[];
 }
 
 const MARGIN_LEFT = 70;
@@ -44,7 +47,7 @@ const MARGIN_BOTTOM = 70;
 const EPSILON = 1;
 
 function dikmePozisyonHesapla(veri: DuvarPaneliSemaVeri) {
-  const { genislikMm, yukseklikMm, dikmeAraligiHedefMm, bosluklar = [] } = veri;
+  const { genislikMm, yukseklikMm, dikmeAraligiHedefMm, bosluklar = [], dikmePozisyonlariOverrideMm } = veri;
   const gecerliBosluklar = bosluklar
     .map((b) => ({ ...b, tabanYuksekligiMm: Math.max(0, b.tabanYuksekligiMm ?? 0) }))
     .filter(
@@ -56,6 +59,11 @@ function dikmePozisyonHesapla(veri: DuvarPaneliSemaVeri) {
         b.tabanYuksekligiMm + b.yukseklikMm <= yukseklikMm
     )
     .sort((a, b) => a.konumMm - b.konumMm);
+
+  if (dikmePozisyonlariOverrideMm && dikmePozisyonlariOverrideMm.length > 0) {
+    const dikmePozisyonlari = Array.from(new Set(dikmePozisyonlariOverrideMm.map((x) => Math.round(x)))).sort((a, b) => a - b);
+    return { gecerliBosluklar, dikmePozisyonlari };
+  }
 
   const araliklarSayisi = Math.max(1, Math.ceil(genislikMm / dikmeAraligiHedefMm));
   const gercekAralikMm = genislikMm / araliklarSayisi;
@@ -73,9 +81,31 @@ function dikmePozisyonHesapla(veri: DuvarPaneliSemaVeri) {
   return { gecerliBosluklar, dikmePozisyonlari };
 }
 
-function OndenGorunum({ veri }: { veri: DuvarPaneliSemaVeri }) {
+/** Tıklanan noktanın, SVG'nin responsive ölçeklemesinden bağımsız gerçek viewBox koordinatını
+ * verir - böylece ekran pikseli değil, çizimin kendi koordinat sistemi kullanılır. */
+function svgKoordDonustur(e: ReactMouseEvent<SVGElement>): { x: number; y: number } {
+  const svg = e.currentTarget.ownerSVGElement ?? (e.currentTarget as unknown as SVGSVGElement);
+  const pt = svg.createSVGPoint();
+  pt.x = e.clientX;
+  pt.y = e.clientY;
+  const ctm = svg.getScreenCTM();
+  if (!ctm) return { x: 0, y: 0 };
+  const loc = pt.matrixTransform(ctm.inverse());
+  return { x: loc.x, y: loc.y };
+}
+
+function OndenGorunum({
+  veri,
+  duzenlenebilir,
+  onDikmePozisyonlariDegisti,
+}: {
+  veri: DuvarPaneliSemaVeri;
+  duzenlenebilir?: boolean;
+  onDikmePozisyonlariDegisti?: (yeniListe: number[]) => void;
+}) {
   const { genislikMm, yukseklikMm, disKaplamaVar = false, icKaplamaVar = false, dikmeKesit, rayKesit } = veri;
   const { gecerliBosluklar, dikmePozisyonlari } = dikmePozisyonHesapla(veri);
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
   const drawW = VIEW_W - MARGIN_LEFT - MARGIN_RIGHT;
   const drawH = VIEW_H - MARGIN_TOP - MARGIN_BOTTOM;
@@ -121,6 +151,26 @@ function OndenGorunum({ veri }: { veri: DuvarPaneliSemaVeri }) {
       )}
       {icKaplamaVar && <rect x={x0} y={topY} width={scaledW} height={scaledH} fill={PALET.ikincil} opacity={0.12} />}
 
+      {duzenlenebilir && onDikmePozisyonlariDegisti && (
+        <rect
+          x={x0}
+          y={topY}
+          width={scaledW}
+          height={scaledH}
+          fill="transparent"
+          style={{ cursor: "copy" }}
+          onClick={(e) => {
+            const { x } = svgKoordDonustur(e);
+            const xMm = Math.round((x - x0) / scale);
+            if (xMm <= 0 || xMm >= genislikMm) return;
+            if (dikmePozisyonlari.some((p) => Math.abs(p - xMm) < 10)) return;
+            onDikmePozisyonlariDegisti([...dikmePozisyonlari, xMm].sort((a, b) => a - b));
+          }}
+        >
+          <title>Yeni dikme eklemek için tıkla</title>
+        </rect>
+      )}
+
       {gecerliBosluklar.map((bb, i) => {
         const bosAltY = groundY - bb.tabanYuksekligiMm * scale;
         const bosUstY = bosAltY - bb.yukseklikMm * scale;
@@ -138,9 +188,40 @@ function OndenGorunum({ veri }: { veri: DuvarPaneliSemaVeri }) {
         );
       })}
 
-      {dikmePozisyonlari.map((px, i) => (
-        <rect key={i} x={x0 + px * scale - dikmeGenislik / 2} y={topY} width={dikmeGenislik} height={scaledH} fill={PALET.ana} />
-      ))}
+      {dikmePozisyonlari.map((px, i) => {
+        const tiklanabilir = duzenlenebilir && onDikmePozisyonlariDegisti && dikmePozisyonlari.length > 2;
+        return (
+          <g key={i}>
+            <rect
+              x={x0 + px * scale - dikmeGenislik / 2}
+              y={topY}
+              width={dikmeGenislik}
+              height={scaledH}
+              fill={hoverIndex === i && tiklanabilir ? "#dc2626" : PALET.ana}
+              style={{ pointerEvents: "none" }}
+            />
+            {tiklanabilir && (
+              <rect
+                x={x0 + px * scale - Math.max(dikmeGenislik, 12) / 2}
+                y={topY}
+                width={Math.max(dikmeGenislik, 12)}
+                height={scaledH}
+                fill="transparent"
+                style={{ cursor: "pointer" }}
+                onMouseEnter={() => setHoverIndex(i)}
+                onMouseLeave={() => setHoverIndex(null)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDikmePozisyonlariDegisti!(dikmePozisyonlari.filter((p) => p !== px));
+                  setHoverIndex(null);
+                }}
+              >
+                <title>Bu dikmeyi kaldırmak için tıkla</title>
+              </rect>
+            )}
+          </g>
+        );
+      })}
 
       <rect x={x0} y={topY} width={scaledW} height={rayKalinlik} fill={PALET.yatay} />
       {altRaySegmentleri.map((s, i) => (
@@ -209,16 +290,43 @@ function Gorunum3D({ veri }: { veri: DuvarPaneliSemaVeri }) {
 }
 
 /** Duvar panelinin önden/üstten/3D görünüşlerini, seçilen dikme/ray profilinin gerçek
- * ölçüsüyle tutarlı, ölçekli bir çizim olarak gösterir. */
-export default function WallSchematic({ veri }: { veri: DuvarPaneliSemaVeri }) {
+ * ölçüsüyle tutarlı, ölçekli bir çizim olarak gösterir. `duzenlenebilir` verilirse önden
+ * görünüşte dikmelere tıklayarak kaldırma / boş alana tıklayarak ekleme yapılabilir. */
+export default function WallSchematic({
+  veri,
+  duzenlenebilir,
+  onDikmePozisyonlariDegisti,
+}: {
+  veri: DuvarPaneliSemaVeri;
+  duzenlenebilir?: boolean;
+  onDikmePozisyonlariDegisti?: (yeniListe: number[] | null) => void;
+}) {
   const [gorunum, setGorunum] = useState<SemaGorunumTipi>("on");
-  const { genislikMm, yukseklikMm, dikmeAraligiHedefMm } = veri;
+  const { genislikMm, yukseklikMm, dikmeAraligiHedefMm, dikmePozisyonlariOverrideMm } = veri;
   if (!genislikMm || !yukseklikMm || !dikmeAraligiHedefMm) return null;
+
+  const editable = Boolean(duzenlenebilir && onDikmePozisyonlariDegisti);
 
   return (
     <div>
       <GorunumSekmeleri aktif={gorunum} onSec={setGorunum} secenekler={["on", "ust", "3d"]} />
-      {gorunum === "on" && <OndenGorunum veri={veri} />}
+      {editable && gorunum === "on" && (
+        <div className="flex items-center justify-between gap-2 mb-2 text-xs text-neutral-500">
+          <span>💡 Bir dikmeye tıklayarak kaldırabilir, boş alana tıklayarak yeni dikme ekleyebilirsiniz.</span>
+          {dikmePozisyonlariOverrideMm && dikmePozisyonlariOverrideMm.length > 0 && (
+            <button type="button" className="text-brand-700 font-semibold whitespace-nowrap" onClick={() => onDikmePozisyonlariDegisti!(null)}>
+              ↺ Otomatik yerleşime dön
+            </button>
+          )}
+        </div>
+      )}
+      {gorunum === "on" && (
+        <OndenGorunum
+          veri={veri}
+          duzenlenebilir={editable}
+          onDikmePozisyonlariDegisti={editable ? onDikmePozisyonlariDegisti : undefined}
+        />
+      )}
       {gorunum === "ust" && <UstenGorunum veri={veri} />}
       {gorunum === "3d" && <Gorunum3D veri={veri} />}
     </div>

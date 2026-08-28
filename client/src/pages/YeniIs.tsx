@@ -513,29 +513,58 @@ export function UrunFormu({
   const [hata, setHata] = useState<string | null>(null);
   const [hesaplaniyor, setHesaplaniyor] = useState(false);
   const [kaydediliyor, setKaydediliyor] = useState(false);
-  const [params, setParams] = useState<Record<string, unknown>>({});
+  // baslangic ile başlatılır ki, ör. duvar panelinin daha önce şematik üzerinden elle düzenlenmiş
+  // dikmePozisyonlariMm'i gibi -template Alanları bileşenlerinin kendi state'inde takip etmediği
+  // alanlar da bir işi düzenlerken korunsun.
+  const [params, setParams] = useState<Record<string, unknown>>(() => baslangic ?? {});
   const [name, setName] = useState(baslangicAd ?? "");
   const [aiDanisman, setAiDanisman] = useState<AiDanismanSonucu | null>(null);
   const [aiDanismanYukleniyor, setAiDanismanYukleniyor] = useState(false);
   const [aiDanismanHata, setAiDanismanHata] = useState<string | null>(null);
 
-  const hesapla = async () => {
+  const hesapla = async (paramsOverride?: Record<string, unknown>) => {
+    const gonderilecek = paramsOverride ?? params;
     setHesaplaniyor(true);
     setHata(null);
-    setOnizleme(null);
     setAiDanisman(null);
     setAiDanismanHata(null);
     try {
       const r = await api.post<{ sonuc: UrunHesapSonucu; malzemeler: Record<string, Material>; yapiselKontrol?: YapiselKontrolSonucu }>(
         `/calc/${templateKey}`,
-        params
+        gonderilecek
       );
       setOnizleme(r);
+      if (paramsOverride) setParams(paramsOverride);
     } catch (e: any) {
       setHata(e.message);
     } finally {
       setHesaplaniyor(false);
     }
+  };
+
+  /** Duvar şematiğinde bir dikmeye tıklayarak kaldırma / boş alana tıklayarak ekleme yapıldığında
+   * çağrılır: yeni pozisyon listesiyle hemen yeniden hesaplar (null = otomatik yerleşime dön). */
+  const dikmePozisyonlariGuncelle = (yeniListe: number[] | null) => {
+    const yeniParams = { ...params };
+    if (yeniListe) yeniParams.dikmePozisyonlariMm = yeniListe;
+    else delete yeniParams.dikmePozisyonlariMm;
+    hesapla(yeniParams);
+  };
+
+  /** DuvarAlanlari'nın onChange'i kendi izlediği alanlarla params'ı baştan kurar; şematik
+   * üzerinden elle ayarlanmış dikmePozisyonlariMm bu nesnede hiç yer almaz. Genişlik/dikme
+   * aralığı/boşluklar hâlâ önceki haliyle aynıysa (yani kullanıcı sadece profil/kaplama gibi
+   * dikme yerleşimini etkilemeyen bir alanı değiştirdiyse) mevcut dikmePozisyonlariMm korunur;
+   * biri değiştiyse eski yerleşim artık geçersiz olabileceğinden otomatik hesaba dönülür. */
+  const duvarParamsGuncelle = (yeni: Record<string, unknown>) => {
+    setParams((onceki) => {
+      const korunabilir =
+        onceki.dikmePozisyonlariMm &&
+        yeni.genislikMm === onceki.genislikMm &&
+        yeni.dikmeAraligiHedefMm === onceki.dikmeAraligiHedefMm &&
+        JSON.stringify(yeni.bosluklar) === JSON.stringify(onceki.bosluklar);
+      return korunabilir ? { ...yeni, dikmePozisyonlariMm: onceki.dikmePozisyonlariMm } : yeni;
+    });
   };
 
   const aiDegerlendir = async () => {
@@ -629,7 +658,7 @@ export function UrunFormu({
             materials={materials}
             sacMalzemeler={sacMalzemeler ?? []}
             baglantiMalzemeler={baglantiMalzemeler ?? []}
-            onChange={setParams}
+            onChange={duvarParamsGuncelle}
             baslangic={baslangic}
           />
         )}
@@ -665,7 +694,7 @@ export function UrunFormu({
           />
         )}
 
-        <button className="btn-primary w-full" onClick={hesapla} disabled={hesaplaniyor}>
+        <button className="btn-primary w-full" onClick={() => hesapla()} disabled={hesaplaniyor}>
           {hesaplaniyor ? "Hesaplanıyor..." : "🧮 Hesapla"}
         </button>
       </div>
@@ -678,6 +707,8 @@ export function UrunFormu({
             params={params}
             ozetDegerler={onizleme.sonuc.ozetDegerler}
             malzemeler={onizleme.malzemeler}
+            duzenlenebilir={templateKey === "wall"}
+            onDikmePozisyonlariDegisti={templateKey === "wall" ? dikmePozisyonlariGuncelle : undefined}
           />
 
           <HesapSonucuGorunum sonuc={onizleme.sonuc} malzemeler={onizleme.malzemeler} />

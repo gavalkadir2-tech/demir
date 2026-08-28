@@ -54,6 +54,9 @@ export interface DuvarPaneliGirdi {
   icKaplamaMalzemeKey?: string;
   /** Ray dübelinin alınacağı Material id'si (opsiyonel, FASTENER kategorisi). */
   dubelMalzemeKey?: string;
+  /** Kullanıcının şematik üzerinden elle düzenlediği dikme pozisyonları (mm, sol kenardan).
+   * Verilirse otomatik eşit-aralık yerleşimi yerine doğrudan bu liste kullanılır. */
+  dikmePozisyonlariMm?: number[];
 }
 
 const VARSAYILAN = {
@@ -119,31 +122,66 @@ export function calculateWallPanel(girdi: DuvarPaneliGirdi): UrunHesapSonucu {
 
   const sonuc = bosSonuc();
 
-  const araliklarSayisi = Math.max(1, Math.ceil(genislikMm / dikmeAraligiHedefMm));
-  const gercekAralikMm = genislikMm / araliklarSayisi;
-
-  if (gercekAralikMm > 800) {
-    sonuc.uyarilar.push(
-      `Dikme aralığı ${gercekAralikMm.toFixed(0)} mm, LGS duvar karkası için önerilen 600 mm sınırını aşıyor. Aralığı azaltmayı düşünün.`
-    );
-  }
-
-  // Temel (eşit aralıklı) dikme pozisyonları.
-  const temelPozisyonlar = Array.from({ length: araliklarSayisi + 1 }, (_, i) => Math.round(i * gercekAralikMm));
-
-  // Boşluk aralığına denk gelen temel dikmeleri çıkar, kenarlara dikme ekle.
   const EPSILON = 1;
-  let dikmePozisyonlari = temelPozisyonlar.filter(
-    (x) => !siraliBosluklar.some((b) => x > b.konumMm + EPSILON && x < b.konumMm + b.genislikMm - EPSILON)
-  );
-  for (const b of siraliBosluklar) {
-    for (const kenar of [b.konumMm, b.konumMm + b.genislikMm]) {
-      if (!dikmePozisyonlari.some((x) => Math.abs(x - kenar) < EPSILON)) {
-        dikmePozisyonlari.push(Math.round(kenar));
+  let araliklarSayisi: number;
+  let gercekAralikMm: number;
+  let dikmePozisyonlari: number[];
+
+  if (girdi.dikmePozisyonlariMm && girdi.dikmePozisyonlariMm.length > 0) {
+    // Kullanıcı şematik üzerinden dikmeleri elle düzenlemiş - otomatik yerleşim yerine bu listeyi
+    // aynen kullan. Yapısal sağlamlık kullanıcının sorumluluğunda; sadece göze çarpan riskleri uyar.
+    dikmePozisyonlari = Array.from(new Set(girdi.dikmePozisyonlariMm.map((x) => Math.round(x)))).sort((a, b) => a - b);
+    araliklarSayisi = Math.max(1, dikmePozisyonlari.length - 1);
+    gercekAralikMm = genislikMm / araliklarSayisi;
+
+    if (dikmePozisyonlari[0] > EPSILON) {
+      sonuc.uyarilar.push("Duvarın sol kenarında dikme yok - sahada kontrol edin.");
+    }
+    if (genislikMm - dikmePozisyonlari[dikmePozisyonlari.length - 1] > EPSILON) {
+      sonuc.uyarilar.push("Duvarın sağ kenarında dikme yok - sahada kontrol edin.");
+    }
+    for (const b of siraliBosluklar) {
+      for (const kenar of [b.konumMm, b.konumMm + b.genislikMm]) {
+        if (!dikmePozisyonlari.some((x) => Math.abs(x - kenar) < EPSILON)) {
+          sonuc.uyarilar.push(`"${b.etiket}" boşluğunun kenarında dikme yok - lento/eşik desteksiz kalabilir, sahada kontrol edin.`);
+        }
       }
     }
+    let maksBoslukMm = 0;
+    for (let i = 1; i < dikmePozisyonlari.length; i++) {
+      maksBoslukMm = Math.max(maksBoslukMm, dikmePozisyonlari[i] - dikmePozisyonlari[i - 1]);
+    }
+    if (maksBoslukMm > 800) {
+      sonuc.uyarilar.push(
+        `İki dikme arasında ${maksBoslukMm.toFixed(0)} mm boşluk var, LGS duvar karkası için önerilen 600 mm sınırını aşıyor.`
+      );
+    }
+  } else {
+    araliklarSayisi = Math.max(1, Math.ceil(genislikMm / dikmeAraligiHedefMm));
+    gercekAralikMm = genislikMm / araliklarSayisi;
+
+    if (gercekAralikMm > 800) {
+      sonuc.uyarilar.push(
+        `Dikme aralığı ${gercekAralikMm.toFixed(0)} mm, LGS duvar karkası için önerilen 600 mm sınırını aşıyor. Aralığı azaltmayı düşünün.`
+      );
+    }
+
+    // Temel (eşit aralıklı) dikme pozisyonları.
+    const temelPozisyonlar = Array.from({ length: araliklarSayisi + 1 }, (_, i) => Math.round(i * gercekAralikMm));
+
+    // Boşluk aralığına denk gelen temel dikmeleri çıkar, kenarlara dikme ekle.
+    dikmePozisyonlari = temelPozisyonlar.filter(
+      (x) => !siraliBosluklar.some((b) => x > b.konumMm + EPSILON && x < b.konumMm + b.genislikMm - EPSILON)
+    );
+    for (const b of siraliBosluklar) {
+      for (const kenar of [b.konumMm, b.konumMm + b.genislikMm]) {
+        if (!dikmePozisyonlari.some((x) => Math.abs(x - kenar) < EPSILON)) {
+          dikmePozisyonlari.push(Math.round(kenar));
+        }
+      }
+    }
+    dikmePozisyonlari.sort((a, b) => a - b);
   }
-  dikmePozisyonlari.sort((a, b) => a - b);
 
   const parcalar: HesaplananParca[] = [];
 
