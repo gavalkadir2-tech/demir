@@ -105,8 +105,17 @@ function YandanGorunum({ veri }: { veri: SundurmaSemaVeri }) {
   );
 }
 
-function UstenGorunum({ veri }: { veri: SundurmaSemaVeri }) {
+function UstenGorunum({
+  veri,
+  duzenlenebilir,
+  onDikmeSayisiDegisti,
+}: {
+  veri: SundurmaSemaVeri;
+  duzenlenebilir?: boolean;
+  onDikmeSayisiDegisti?: (yeniSayi: number) => void;
+}) {
   const { boyMm, genislikMm = 3000, dikmeSayisi = 2 } = veri;
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
   const drawW = VIEW_W - MARGIN_LEFT - MARGIN_RIGHT;
   const drawH = VIEW_H - MARGIN_TOP - MARGIN_BOTTOM;
@@ -118,6 +127,7 @@ function UstenGorunum({ veri }: { veri: SundurmaSemaVeri }) {
   const scaledH = boyMm * scale;
 
   const dikmeXs = Array.from({ length: dikmeSayisi }, (_, i) => x0 + (i / (dikmeSayisi - 1)) * scaledW);
+  const tiklanabilir = Boolean(duzenlenebilir && onDikmeSayisiDegisti);
 
   return (
     <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H + LEGEND_H}`} className="w-full h-auto" role="img" aria-label="Sundurma üstten (plan) görünüş şematik çizimi">
@@ -126,8 +136,43 @@ function UstenGorunum({ veri }: { veri: SundurmaSemaVeri }) {
         Üstten görünüş (çatı izdüşümü)
       </text>
       <rect x={x0} y={y0} width={scaledW} height={scaledH} fill="#93c5fd" fillOpacity={0.2} stroke="#d4d4d4" />
+
+      {tiklanabilir && (
+        <rect
+          x={x0}
+          y={y0 + scaledH - 14}
+          width={scaledW}
+          height={28}
+          fill="transparent"
+          style={{ cursor: "copy" }}
+          onClick={() => onDikmeSayisiDegisti!(dikmeSayisi + 1)}
+        >
+          <title>Yeni dikme eklemek için tıkla</title>
+        </rect>
+      )}
+
       {dikmeXs.map((x, i) => (
-        <circle key={i} cx={x} cy={y0 + scaledH} r={5} fill={PALET.ana} />
+        <g key={i}>
+          <circle cx={x} cy={y0 + scaledH} r={5} fill={hoverIndex === i && tiklanabilir ? "#dc2626" : PALET.ana} style={{ pointerEvents: "none" }} />
+          {tiklanabilir && dikmeSayisi > 2 && (
+            <circle
+              cx={x}
+              cy={y0 + scaledH}
+              r={12}
+              fill="transparent"
+              style={{ cursor: "pointer" }}
+              onMouseEnter={() => setHoverIndex(i)}
+              onMouseLeave={() => setHoverIndex(null)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDikmeSayisiDegisti!(dikmeSayisi - 1);
+                setHoverIndex(null);
+              }}
+            >
+              <title>Bu dikmeyi kaldırmak için tıkla</title>
+            </circle>
+          )}
+        </g>
       ))}
       <line x1={x0} y1={y0} x2={x0 + scaledW} y2={y0} stroke={PALET.ikincil} strokeWidth={3} strokeDasharray="5 3" />
 
@@ -172,17 +217,34 @@ function Gorunum3D({ veri }: { veri: SundurmaSemaVeri }) {
 }
 
 /** Sundurmanın yandan/üstten/3D görünüşlerini, seçilen dikme/kiriş profilinin gerçek
- * ölçüsüyle tutarlı, ölçekli bir çizim olarak gösterir. */
-export default function CanopySchematic({ veri }: { veri: SundurmaSemaVeri }) {
+ * ölçüsüyle tutarlı, ölçekli bir çizim olarak gösterir. `duzenlenebilir` verilirse üstten
+ * görünüşte dikme sayısı, dikme işaretine tıklayarak azaltılabilir / boş alana tıklayarak
+ * artırılabilir (pozisyonlar her zaman eşit aralıklı kalır, sadece sayı değişir). */
+export default function CanopySchematic({
+  veri,
+  duzenlenebilir,
+  onDikmeSayisiDegisti,
+}: {
+  veri: SundurmaSemaVeri;
+  duzenlenebilir?: boolean;
+  onDikmeSayisiDegisti?: (yeniSayi: number) => void;
+}) {
   const [gorunum, setGorunum] = useState<SemaGorunumTipi>("yan");
   const { yukseklikMm, boyMm } = veri;
   if (!yukseklikMm || !boyMm) return null;
 
+  const editable = Boolean(duzenlenebilir && onDikmeSayisiDegisti);
+
   return (
     <div>
       <GorunumSekmeleri aktif={gorunum} onSec={setGorunum} secenekler={["yan", "ust", "3d"]} />
+      {editable && gorunum === "ust" && (
+        <div className="mb-2 text-xs text-neutral-500">
+          💡 Boş alana tıklayarak dikme ekleyebilir, bir dikmeye tıklayarak kaldırabilirsiniz.
+        </div>
+      )}
       {gorunum === "yan" && <YandanGorunum veri={veri} />}
-      {gorunum === "ust" && <UstenGorunum veri={veri} />}
+      {gorunum === "ust" && <UstenGorunum veri={veri} duzenlenebilir={editable} onDikmeSayisiDegisti={onDikmeSayisiDegisti} />}
       {gorunum === "3d" && <Gorunum3D veri={veri} />}
     </div>
   );

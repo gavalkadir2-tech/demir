@@ -35,9 +35,18 @@ const MARGIN_RIGHT = 20;
 const MARGIN_TOP = 20;
 const MARGIN_BOTTOM = 60;
 
-function OndenGorunum({ veri }: { veri: KolonKirisSemaVeri }) {
+function OndenGorunum({
+  veri,
+  duzenlenebilir,
+  onAcikSayisiDegisti,
+}: {
+  veri: KolonKirisSemaVeri;
+  duzenlenebilir?: boolean;
+  onAcikSayisiDegisti?: (yeniAcikSayisi: number) => void;
+}) {
   const { acikligMm, yukseklikMm, acikSayisi, cerceveSayisi, gercekAralikMm, baglantiKirisiVar = false, stabiliteVar = false, kolonKesit, kirisKesit } = veri;
   const toplamGenislikMm = acikligMm * acikSayisi;
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
   const drawW = VIEW_W - MARGIN_LEFT - MARGIN_RIGHT;
   const drawH = VIEW_H - MARGIN_TOP - MARGIN_BOTTOM;
@@ -53,6 +62,7 @@ function OndenGorunum({ veri }: { veri: KolonKirisSemaVeri }) {
   const kirisKalinlik = olcekliKalinlikPx(kirisKesit?.kalinlikMm ?? 100, scale, 3);
 
   const kolonXler = Array.from({ length: acikSayisi + 1 }, (_, i) => x0 + i * acikligMm * scale);
+  const tiklanabilir = Boolean(duzenlenebilir && onAcikSayisiDegisti);
 
   const dimGenislikY = groundY + 26;
   const dimYukseklikX = x0 - 30;
@@ -77,8 +87,50 @@ function OndenGorunum({ veri }: { veri: KolonKirisSemaVeri }) {
         </g>
       )}
 
+      {tiklanabilir && (
+        <rect
+          x={x0}
+          y={topY}
+          width={scaledW}
+          height={scaledH}
+          fill="transparent"
+          style={{ cursor: "copy" }}
+          onClick={() => onAcikSayisiDegisti!(acikSayisi + 1)}
+        >
+          <title>Yeni açıklık (kolon çifti) eklemek için tıkla</title>
+        </rect>
+      )}
+
       {kolonXler.map((cx, i) => (
-        <rect key={i} x={cx - kolonGenislik / 2} y={topY} width={kolonGenislik} height={scaledH} fill={PALET.ana} />
+        <g key={i}>
+          <rect
+            x={cx - kolonGenislik / 2}
+            y={topY}
+            width={kolonGenislik}
+            height={scaledH}
+            fill={hoverIndex === i && tiklanabilir ? "#dc2626" : PALET.ana}
+            style={{ pointerEvents: "none" }}
+          />
+          {tiklanabilir && acikSayisi > 1 && (
+            <rect
+              x={cx - Math.max(kolonGenislik, 14) / 2}
+              y={topY}
+              width={Math.max(kolonGenislik, 14)}
+              height={scaledH}
+              fill="transparent"
+              style={{ cursor: "pointer" }}
+              onMouseEnter={() => setHoverIndex(i)}
+              onMouseLeave={() => setHoverIndex(null)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onAcikSayisiDegisti!(acikSayisi - 1);
+                setHoverIndex(null);
+              }}
+            >
+              <title>Bitişik açıklığı kaldırmak için tıkla</title>
+            </rect>
+          )}
+        </g>
       ))}
 
       <rect x={x0} y={topY} width={scaledW} height={kirisKalinlik} fill={PALET.yatay} />
@@ -180,19 +232,35 @@ function Gorunum3D({ veri }: { veri: KolonKirisSemaVeri }) {
 }
 
 /** Kolon-kiriş iskeletin önden/üstten/3D görünüşlerini, seçilen kolon/kiriş profilinin gerçek
- * ölçüsüyle tutarlı, ölçekli bir çizim olarak gösterir. */
-export default function SteelFrameSchematic({ veri }: { veri: KolonKirisSemaVeri }) {
+ * ölçüsüyle tutarlı, ölçekli bir çizim olarak gösterir. `duzenlenebilir` verilirse önden
+ * görünüşte bir kolona tıklayarak bitişik açıklığı kaldırabilir / boş alana tıklayarak yeni bir
+ * açıklık ekleyebilirsiniz (pozisyonlar eşit aralıklı kalır, sadece açıklık sayısı değişir). */
+export default function SteelFrameSchematic({
+  veri,
+  duzenlenebilir,
+  onAcikSayisiDegisti,
+}: {
+  veri: KolonKirisSemaVeri;
+  duzenlenebilir?: boolean;
+  onAcikSayisiDegisti?: (yeniAcikSayisi: number) => void;
+}) {
   const [gorunum, setGorunum] = useState<SemaGorunumTipi>("on");
   const { acikligMm, yukseklikMm, acikSayisi, uzunlukMm } = veri;
   const toplamGenislikMm = acikligMm * acikSayisi;
   if (!toplamGenislikMm || !yukseklikMm || acikSayisi < 1) return null;
 
   const secenekler: SemaGorunumTipi[] = uzunlukMm ? ["on", "ust", "3d"] : ["on", "3d"];
+  const editable = Boolean(duzenlenebilir && onAcikSayisiDegisti);
 
   return (
     <div>
       <GorunumSekmeleri aktif={gorunum} onSec={setGorunum} secenekler={secenekler} />
-      {gorunum === "on" && <OndenGorunum veri={veri} />}
+      {editable && gorunum === "on" && (
+        <div className="mb-2 text-xs text-neutral-500">
+          💡 Boş alana tıklayarak açıklık ekleyebilir, bir kolona tıklayarak bitişik açıklığı kaldırabilirsiniz.
+        </div>
+      )}
+      {gorunum === "on" && <OndenGorunum veri={veri} duzenlenebilir={editable} onAcikSayisiDegisti={onAcikSayisiDegisti} />}
       {gorunum === "ust" && <UstenGorunum veri={veri} />}
       {gorunum === "3d" && <Gorunum3D veri={veri} />}
     </div>

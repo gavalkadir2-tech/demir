@@ -486,6 +486,10 @@ export function UrunFormu({
   const [aiDanisman, setAiDanisman] = useState<AiDanismanSonucu | null>(null);
   const [aiDanismanYukleniyor, setAiDanismanYukleniyor] = useState(false);
   const [aiDanismanHata, setAiDanismanHata] = useState<string | null>(null);
+  // Sundurma/Pergola/Kolon-Kiriş şematiklerinde tıklayarak sayı alanı değiştirildiğinde, ilgili
+  // Alanları bileşenini (kendi iç state'i güncel params'tan habersiz kalmasın diye) yeniden
+  // mount etmek için kullanılan sayaç - artınca key değişir, baslangic olarak güncel params okunur.
+  const [semaSayiSurumu, setSemaSayiSurumu] = useState(0);
 
   const hesapla = async (paramsOverride?: Record<string, unknown>) => {
     const gonderilecek = paramsOverride ?? params;
@@ -555,6 +559,36 @@ export function UrunFormu({
         ...(dikmeKorunabilir ? { dikmePozisyonlariMm: onceki.dikmePozisyonlariMm } : {}),
       };
     });
+  };
+
+  /** Sundurma şematiğinde dikme sayısına tıklanarak artırma/azaltma yapıldığında çağrılır.
+   * dikmeSayisi zaten düz bir alan olduğundan (pozisyonun parça hesabına etkisi yok), sadece bu
+   * alanı güncelleyip yeniden hesaplıyoruz; SundurmaAlanlari'nın kendi sayı kutusuyla senkron
+   * kalması için bileşeni semaSayiSurumu ile yeniden mount ediyoruz - hesapla()'nın setParams'ı
+   * gerçekten uygulamasını (await) bekledikten sonra mount ediyoruz, aksi halde yeni mount hâlâ
+   * eski params'ı okur ve sayı kutusu şemadan geride kalır. */
+  const dikmeSayisiGuncelle = async (yeniSayi: number) => {
+    if (yeniSayi < 2) return;
+    const yeniParams = { ...params, dikmeSayisi: yeniSayi };
+    await hesapla(yeniParams);
+    setSemaSayiSurumu((v) => v + 1);
+  };
+
+  /** Pergola şematiğinde bir kolon sırasına (ön+arka çifti) tıklanarak artırma/azaltma yapıldığında
+   * çağrılır; kolonSayisi = kolonSiraAdedi * 2 (backend çift sayı şartı korunur). */
+  const kolonSiraAdediGuncelle = async (yeniSiraAdedi: number) => {
+    if (yeniSiraAdedi < 2) return;
+    const yeniParams = { ...params, kolonSayisi: yeniSiraAdedi * 2 };
+    await hesapla(yeniParams);
+    setSemaSayiSurumu((v) => v + 1);
+  };
+
+  /** Kolon-Kiriş şematiğinde bir kolona tıklanarak bitişik açıklığın eklenip/kaldırılması. */
+  const acikSayisiGuncelle = async (yeniAcikSayisi: number) => {
+    if (yeniAcikSayisi < 1) return;
+    const yeniParams = { ...params, acikSayisi: yeniAcikSayisi };
+    await hesapla(yeniParams);
+    setSemaSayiSurumu((v) => v + 1);
   };
 
   const aiDegerlendir = async () => {
@@ -627,11 +661,12 @@ export function UrunFormu({
         )}
         {templateKey === "canopy" && (
           <SundurmaAlanlari
+            key={`sundurma-${semaSayiSurumu}`}
             materials={materials}
             sacMalzemeler={sacMalzemeler ?? []}
             baglantiMalzemeler={baglantiMalzemeler ?? []}
             onChange={setParams}
-            baslangic={baslangic}
+            baslangic={semaSayiSurumu > 0 ? params : baslangic}
           />
         )}
         {templateKey === "door" && (
@@ -666,21 +701,23 @@ export function UrunFormu({
         )}
         {templateKey === "pergola" && (
           <PergolaAlanlari
+            key={`pergola-${semaSayiSurumu}`}
             materials={materials}
             sacMalzemeler={sacMalzemeler ?? []}
             baglantiMalzemeler={baglantiMalzemeler ?? []}
             onChange={setParams}
-            baslangic={baslangic}
+            baslangic={semaSayiSurumu > 0 ? params : baslangic}
           />
         )}
         {templateKey === "ferforje_panel" && <FerforjePanelAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
         {templateKey === "steel_frame" && (
           <KolonKirisAlanlari
+            key={`steel-frame-${semaSayiSurumu}`}
             materials={materials}
             sacMalzemeler={sacMalzemeler ?? []}
             baglantiMalzemeler={baglantiMalzemeler ?? []}
             onChange={setParams}
-            baslangic={baslangic}
+            baslangic={semaSayiSurumu > 0 ? params : baslangic}
           />
         )}
 
@@ -697,11 +734,20 @@ export function UrunFormu({
             params={params}
             ozetDegerler={onizleme.sonuc.ozetDegerler}
             malzemeler={onizleme.malzemeler}
-            duzenlenebilir={templateKey === "wall" || templateKey === "railing"}
+            duzenlenebilir={
+              templateKey === "wall" ||
+              templateKey === "railing" ||
+              templateKey === "canopy" ||
+              templateKey === "pergola" ||
+              templateKey === "steel_frame"
+            }
             onDikmePozisyonlariDegisti={
               templateKey === "wall" || templateKey === "railing" ? dikmePozisyonlariGuncelle : undefined
             }
             onYatayAraProfilleriDegisti={templateKey === "wall" ? yatayAraProfilleriGuncelle : undefined}
+            onDikmeSayisiDegisti={templateKey === "canopy" ? dikmeSayisiGuncelle : undefined}
+            onKolonSiraAdediDegisti={templateKey === "pergola" ? kolonSiraAdediGuncelle : undefined}
+            onAcikSayisiDegisti={templateKey === "steel_frame" ? acikSayisiGuncelle : undefined}
           />
 
           <HesapSonucuGorunum sonuc={onizleme.sonuc} malzemeler={onizleme.malzemeler} />

@@ -23,6 +23,9 @@ export default function SemaGorunum({
   duzenlenebilir,
   onDikmePozisyonlariDegisti,
   onYatayAraProfilleriDegisti,
+  onDikmeSayisiDegisti,
+  onKolonSiraAdediDegisti,
+  onAcikSayisiDegisti,
 }: {
   templateKey: string;
   params: Record<string, unknown>;
@@ -33,6 +36,12 @@ export default function SemaGorunum({
   duzenlenebilir?: boolean;
   onDikmePozisyonlariDegisti?: (yeniListe: number[] | null) => void;
   onYatayAraProfilleriDegisti?: (yeniListe: DuvarYatayAraProfilVeri[]) => void;
+  /** "canopy" şablonunda kullanılır: dikme sayısını tıklayarak artırma/azaltma. */
+  onDikmeSayisiDegisti?: (yeniSayi: number) => void;
+  /** "pergola" şablonunda kullanılır: kolon sıra adedini (ön+arka çifti) tıklayarak artırma/azaltma. */
+  onKolonSiraAdediDegisti?: (yeniSiraAdedi: number) => void;
+  /** "steel_frame" şablonunda kullanılır: açıklık sayısını tıklayarak artırma/azaltma. */
+  onAcikSayisiDegisti?: (yeniAcikSayisi: number) => void;
 }) {
   const n = (k: string): number => Number(params[k] ?? 0);
   const b = (k: string): boolean => Boolean(params[k]);
@@ -94,6 +103,8 @@ export default function SemaGorunum({
             dikmeKesit: kesit("dikmeProfilId"),
             anaTasiyiciKesit: kesit("anaTasiyiciProfilId"),
           }}
+          duzenlenebilir={duzenlenebilir}
+          onDikmeSayisiDegisti={onDikmeSayisiDegisti}
         />
       );
     case "door":
@@ -197,6 +208,8 @@ export default function SemaGorunum({
             kolonKesit: kesit("kolonProfilId"),
             kirisKesit: kesit("kirisProfilId"),
           }}
+          duzenlenebilir={duzenlenebilir}
+          onKolonSiraAdediDegisti={onKolonSiraAdediDegisti}
         />
       );
     case "ferforje_panel":
@@ -229,6 +242,8 @@ export default function SemaGorunum({
             kolonKesit: kesit("kolonProfilId"),
             kirisKesit: kesit("kirisProfilId"),
           }}
+          duzenlenebilir={duzenlenebilir}
+          onAcikSayisiDegisti={onAcikSayisiDegisti}
         />
       );
     default:
