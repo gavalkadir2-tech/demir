@@ -4,7 +4,7 @@ import RailingSchematic from "./RailingSchematic";
 import StairsSchematic from "./StairsSchematic";
 import CanopySchematic from "./CanopySchematic";
 import DoorSchematic from "./DoorSchematic";
-import WallSchematic, { DuvarBoslukVeri } from "./WallSchematic";
+import WallSchematic, { DuvarBoslukVeri, DuvarYatayAraProfilVeri } from "./WallSchematic";
 import TrussSchematic from "./TrussSchematic";
 import RafSchematic from "./RafSchematic";
 import DonerMerdivenSchematic from "./DonerMerdivenSchematic";
@@ -22,6 +22,7 @@ export default function SemaGorunum({
   malzemeler,
   duzenlenebilir,
   onDikmePozisyonlariDegisti,
+  onYatayAraProfilleriDegisti,
 }: {
   templateKey: string;
   params: Record<string, unknown>;
@@ -31,6 +32,7 @@ export default function SemaGorunum({
   /** Şu an sadece "wall" şablonunda kullanılır: dikmelere tıklayarak kaldırma/ekleme yapılabilir. */
   duzenlenebilir?: boolean;
   onDikmePozisyonlariDegisti?: (yeniListe: number[] | null) => void;
+  onYatayAraProfilleriDegisti?: (yeniListe: DuvarYatayAraProfilVeri[]) => void;
 }) {
   const n = (k: string): number => Number(params[k] ?? 0);
   const b = (k: string): boolean => Boolean(params[k]);
@@ -119,9 +121,11 @@ export default function SemaGorunum({
             dikmeKesit: kesit("dikmeProfilId"),
             rayKesit: kesit("ustProfilId"),
             dikmePozisyonlariOverrideMm: params.dikmePozisyonlariMm as number[] | undefined,
+            yatayAraProfilleriMm: (params.yatayAraProfilleri as DuvarYatayAraProfilVeri[] | undefined) ?? [],
           }}
           duzenlenebilir={duzenlenebilir}
           onDikmePozisyonlariDegisti={onDikmePozisyonlariDegisti}
+          onYatayAraProfilleriDegisti={onYatayAraProfilleriDegisti}
         />
       );
     case "truss":

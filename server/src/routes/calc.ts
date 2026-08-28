@@ -128,6 +128,10 @@ const wallSchema = z.object({
   // Kullanıcının şematik üzerinden elle düzenlediği dikme pozisyonları (mm) - verilirse otomatik
   // eşit-aralık yerleşimi yerine doğrudan bu liste kullanılır.
   dikmePozisyonlariMm: z.array(z.number()).optional(),
+  // Kullanıcının şematik üzerinden elle eklediği yatay ara profiller (tek gözde kısa segment).
+  yatayAraProfilleri: z
+    .array(z.object({ yMm: z.number(), xBaslangicMm: z.number(), xBitisMm: z.number() }))
+    .optional(),
   disKaplamaTuru: disKaplamaTuruEnum.optional(),
   disKaplamaKalinlikMm: z.number().optional(),
   disKaplamaMalzemeId: z.number().int().optional(),

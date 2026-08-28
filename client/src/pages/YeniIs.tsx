@@ -17,6 +17,7 @@ import MaterialSelect from "../components/MaterialSelect";
 import HesapSonucuGorunum from "../components/HesapSonucuGorunum";
 import YapiselKontrolGorunum from "../components/YapiselKontrolGorunum";
 import SemaGorunum from "../components/SemaGorunum";
+import { DuvarYatayAraProfilVeri } from "../components/WallSchematic";
 import { sayi } from "../lib/format";
 
 const TEMPLATE_KATEGORI: Record<string, ProjectCategory> = {
@@ -551,19 +552,29 @@ export function UrunFormu({
     hesapla(yeniParams);
   };
 
+  /** Yatay ara profil eklendiğinde/kaldırıldığında/düzenlendiğinde çağrılır. */
+  const yatayAraProfilleriGuncelle = (yeniListe: DuvarYatayAraProfilVeri[]) => {
+    hesapla({ ...params, yatayAraProfilleri: yeniListe });
+  };
+
   /** DuvarAlanlari'nın onChange'i kendi izlediği alanlarla params'ı baştan kurar; şematik
-   * üzerinden elle ayarlanmış dikmePozisyonlariMm bu nesnede hiç yer almaz. Genişlik/dikme
-   * aralığı/boşluklar hâlâ önceki haliyle aynıysa (yani kullanıcı sadece profil/kaplama gibi
-   * dikme yerleşimini etkilemeyen bir alanı değiştirdiyse) mevcut dikmePozisyonlariMm korunur;
-   * biri değiştiyse eski yerleşim artık geçersiz olabileceğinden otomatik hesaba dönülür. */
+   * üzerinden elle ayarlanmış dikmePozisyonlariMm/yatayAraProfilleri bu nesnede hiç yer almaz.
+   * Genişlik/dikme aralığı/boşluklar hâlâ önceki haliyle aynıysa (yani kullanıcı sadece profil/
+   * kaplama gibi yerleşimi etkilemeyen bir alanı değiştirdiyse) dikme yerleşimi korunur; yükseklik
+   * de değişmediyse yatay ara profiller de korunur (onların y konumu yüksekliğe bağlı). Genişlik/
+   * aralık/boşluk/yükseklikten biri değiştiyse eski yerleşim artık geçersiz olabileceğinden
+   * otomatik hesaba dönülür. */
   const duvarParamsGuncelle = (yeni: Record<string, unknown>) => {
     setParams((onceki) => {
-      const korunabilir =
-        onceki.dikmePozisyonlariMm &&
-        yeni.genislikMm === onceki.genislikMm &&
-        yeni.dikmeAraligiHedefMm === onceki.dikmeAraligiHedefMm &&
+      const genislikSabit = yeni.genislikMm === onceki.genislikMm && yeni.dikmeAraligiHedefMm === onceki.dikmeAraligiHedefMm &&
         JSON.stringify(yeni.bosluklar) === JSON.stringify(onceki.bosluklar);
-      return korunabilir ? { ...yeni, dikmePozisyonlariMm: onceki.dikmePozisyonlariMm } : yeni;
+      const dikmeKorunabilir = onceki.dikmePozisyonlariMm && genislikSabit;
+      const yatayKorunabilir = onceki.yatayAraProfilleri && genislikSabit && yeni.yukseklikMm === onceki.yukseklikMm;
+      return {
+        ...yeni,
+        ...(dikmeKorunabilir ? { dikmePozisyonlariMm: onceki.dikmePozisyonlariMm } : {}),
+        ...(yatayKorunabilir ? { yatayAraProfilleri: onceki.yatayAraProfilleri } : {}),
+      };
     });
   };
 
@@ -709,6 +720,7 @@ export function UrunFormu({
             malzemeler={onizleme.malzemeler}
             duzenlenebilir={templateKey === "wall"}
             onDikmePozisyonlariDegisti={templateKey === "wall" ? dikmePozisyonlariGuncelle : undefined}
+            onYatayAraProfilleriDegisti={templateKey === "wall" ? yatayAraProfilleriGuncelle : undefined}
           />
 
           <HesapSonucuGorunum sonuc={onizleme.sonuc} malzemeler={onizleme.malzemeler} />

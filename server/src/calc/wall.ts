@@ -57,6 +57,18 @@ export interface DuvarPaneliGirdi {
   /** Kullanıcının şematik üzerinden elle düzenlediği dikme pozisyonları (mm, sol kenardan).
    * Verilirse otomatik eşit-aralık yerleşimi yerine doğrudan bu liste kullanılır. */
   dikmePozisyonlariMm?: number[];
+  /** Kullanıcının şematik üzerinden elle eklediği yatay ara profiller (blokaj) - her biri tek bir
+   * gözde (iki dikme arası), belirli bir yükseklikte, kısa bir yatay segment. */
+  yatayAraProfilleri?: DuvarYatayAraProfil[];
+}
+
+export interface DuvarYatayAraProfil {
+  /** Tabandan yüksekliği (mm) */
+  yMm: number;
+  /** Segmentin sol ucu (mm, duvarın sol kenarından) */
+  xBaslangicMm: number;
+  /** Segmentin sağ ucu (mm, duvarın sol kenarından) */
+  xBitisMm: number;
 }
 
 const VARSAYILAN = {
@@ -233,6 +245,25 @@ export function calculateWallPanel(girdi: DuvarPaneliGirdi): UrunHesapSonucu {
         not: `${b.etiket} boşluğu altı, taban seviyesinden ${Math.round(b.tabanYuksekligiMm)} mm yükseklikte.`,
       });
     }
+  }
+
+  const yatayAraProfilleri = girdi.yatayAraProfilleri ?? [];
+  for (const p of yatayAraProfilleri) {
+    if (p.xBitisMm <= p.xBaslangicMm || p.xBaslangicMm < -EPSILON || p.xBitisMm > genislikMm + EPSILON) {
+      sonuc.uyarilar.push(`Geçersiz yatay ara profil (${Math.round(p.xBaslangicMm)}-${Math.round(p.xBitisMm)} mm) yok sayıldı.`);
+      continue;
+    }
+    if (p.yMm < -EPSILON || p.yMm > yukseklikMm + EPSILON) {
+      sonuc.uyarilar.push(`Yatay ara profil (${Math.round(p.yMm)} mm yükseklik) duvar sınırlarının dışında, yok sayıldı.`);
+      continue;
+    }
+    parcalar.push({
+      label: "Yatay ara profil",
+      profilKey: dikmeProfilKey,
+      uzunlukMm: Math.round(p.xBitisMm - p.xBaslangicMm),
+      adet: 1,
+      not: `Taban seviyesinden ${Math.round(p.yMm)} mm yükseklikte, ${Math.round(p.xBaslangicMm)}-${Math.round(p.xBitisMm)} mm arası.`,
+    });
   }
 
   sonuc.parcalar = parcalar;

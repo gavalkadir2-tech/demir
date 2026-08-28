@@ -248,3 +248,39 @@ test("duvar paneli: elle düzenlenmiş dikme listesinde kenar/boşluk kenarı ek
   assert.ok(sonuc.uyarilar.some((u) => u.includes("sol kenarında")));
   assert.ok(sonuc.uyarilar.some((u) => u.includes("Kapı")));
 });
+
+test("duvar paneli: elle eklenen yatay ara profil doğru uzunlukta parça olarak eklenir", () => {
+  const sonuc = calculateWallPanel({
+    genislikMm: 3000,
+    yukseklikMm: 2500,
+    dikmeAraligiHedefMm: 600,
+    ustProfilKey: "ray",
+    altProfilKey: "ray",
+    dikmeProfilKey: "dikme",
+    yatayAraProfilleri: [{ yMm: 1000, xBaslangicMm: 600, xBitisMm: 1200 }],
+  });
+
+  const yatay = sonuc.parcalar.filter((p) => p.label === "Yatay ara profil");
+  assert.equal(yatay.length, 1);
+  assert.equal(yatay[0].uzunlukMm, 600);
+  assert.equal(yatay[0].profilKey, "dikme");
+  assert.equal(sonuc.uyarilar.length, 0);
+});
+
+test("duvar paneli: sınırların dışına taşan yatay ara profil yok sayılır ve uyarı verir", () => {
+  const sonuc = calculateWallPanel({
+    genislikMm: 3000,
+    yukseklikMm: 2500,
+    dikmeAraligiHedefMm: 600,
+    ustProfilKey: "ray",
+    altProfilKey: "ray",
+    dikmeProfilKey: "dikme",
+    yatayAraProfilleri: [
+      { yMm: 1000, xBaslangicMm: 2800, xBitisMm: 3400 }, // duvar dışına taşıyor
+      { yMm: 3000, xBaslangicMm: 0, xBitisMm: 600 }, // yükseklik dışında
+    ],
+  });
+
+  assert.equal(sonuc.parcalar.filter((p) => p.label === "Yatay ara profil").length, 0);
+  assert.equal(sonuc.uyarilar.length, 2);
+});
