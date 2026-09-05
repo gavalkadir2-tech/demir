@@ -36,8 +36,17 @@ const MARGIN_RIGHT = 20;
 const MARGIN_TOP = 20;
 const MARGIN_BOTTOM = 60;
 
-function OndenGorunum({ veri }: { veri: RafSemaVeri }) {
+function OndenGorunum({
+  veri,
+  duzenlenebilir,
+  onRafSayisiDegisti,
+}: {
+  veri: RafSemaVeri;
+  duzenlenebilir?: boolean;
+  onRafSayisiDegisti?: (yeniSayi: number) => void;
+}) {
   const { genislikMm, yukseklikMm, rafSayisi, sacVar = false, caprazVar = false, ayakKesit, rafCercevesiKesit } = veri;
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
   const drawW = VIEW_W - MARGIN_LEFT - MARGIN_RIGHT;
   const drawH = VIEW_H - MARGIN_TOP - MARGIN_BOTTOM;
@@ -53,6 +62,7 @@ function OndenGorunum({ veri }: { veri: RafSemaVeri }) {
   const rafKalinlik = olcekliKalinlikPx(rafCercevesiKesit?.kalinlikMm ?? 25, scale, 2);
 
   const rafYlar = Array.from({ length: rafSayisi }, (_, i) => groundY - (i / (rafSayisi - 1)) * scaledH);
+  const tiklanabilir = Boolean(duzenlenebilir && onRafSayisiDegisti);
 
   const dimGenislikY = groundY + 30;
   const dimYukseklikX = x0 - 30;
@@ -80,10 +90,50 @@ function OndenGorunum({ veri }: { veri: RafSemaVeri }) {
       <rect x={x0 - ayakGenislik / 2} y={topY} width={ayakGenislik} height={scaledH} fill={PALET.ana} />
       <rect x={x0 + scaledW - ayakGenislik / 2} y={topY} width={ayakGenislik} height={scaledH} fill={PALET.ana} />
 
+      {tiklanabilir && (
+        <rect
+          x={x0}
+          y={topY}
+          width={scaledW}
+          height={scaledH}
+          fill="transparent"
+          style={{ cursor: "copy" }}
+          onClick={() => onRafSayisiDegisti!(rafSayisi + 1)}
+        >
+          <title>Yeni raf eklemek için tıkla</title>
+        </rect>
+      )}
+
       {rafYlar.map((y, i) => (
         <g key={i}>
-          {sacVar && <rect x={x0} y={y - rafKalinlik} width={scaledW} height={rafKalinlik} fill={PALET.vurgu} opacity={0.6} />}
-          <rect x={x0} y={y - rafKalinlik / 2} width={scaledW} height={rafKalinlik} fill={PALET.yatay} />
+          {sacVar && <rect x={x0} y={y - rafKalinlik} width={scaledW} height={rafKalinlik} fill={PALET.vurgu} opacity={0.6} style={{ pointerEvents: "none" }} />}
+          <rect
+            x={x0}
+            y={y - rafKalinlik / 2}
+            width={scaledW}
+            height={rafKalinlik}
+            fill={hoverIndex === i && tiklanabilir ? "#dc2626" : PALET.yatay}
+            style={{ pointerEvents: "none" }}
+          />
+          {tiklanabilir && rafSayisi > 2 && (
+            <rect
+              x={x0}
+              y={y - Math.max(rafKalinlik, 10) / 2}
+              width={scaledW}
+              height={Math.max(rafKalinlik, 10)}
+              fill="transparent"
+              style={{ cursor: "pointer" }}
+              onMouseEnter={() => setHoverIndex(i)}
+              onMouseLeave={() => setHoverIndex(null)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onRafSayisiDegisti!(rafSayisi - 1);
+                setHoverIndex(null);
+              }}
+            >
+              <title>Bu rafı kaldırmak için tıkla</title>
+            </rect>
+          )}
         </g>
       ))}
 
@@ -185,16 +235,33 @@ function Gorunum3D({ veri }: { veri: RafSemaVeri }) {
 }
 
 /** Rafın önden/yandan/3D görünüşlerini, seçilen ayak/çerçeve profilinin gerçek ölçüsüyle
- * tutarlı, ölçekli bir çizim olarak gösterir. */
-export default function RafSchematic({ veri }: { veri: RafSemaVeri }) {
+ * tutarlı, ölçekli bir çizim olarak gösterir. `duzenlenebilir` verilirse önden görünüşte boş
+ * alana tıklayarak raf ekleyebilir / bir rafa tıklayarak kaldırabilirsiniz (pozisyonlar eşit
+ * aralıklı kalır, sadece raf sayısı değişir). */
+export default function RafSchematic({
+  veri,
+  duzenlenebilir,
+  onRafSayisiDegisti,
+}: {
+  veri: RafSemaVeri;
+  duzenlenebilir?: boolean;
+  onRafSayisiDegisti?: (yeniSayi: number) => void;
+}) {
   const [gorunum, setGorunum] = useState<SemaGorunumTipi>("on");
   const { genislikMm, yukseklikMm, rafSayisi } = veri;
   if (!genislikMm || !yukseklikMm || rafSayisi < 2) return null;
 
+  const editable = Boolean(duzenlenebilir && onRafSayisiDegisti);
+
   return (
     <div>
       <GorunumSekmeleri aktif={gorunum} onSec={setGorunum} secenekler={["on", "yan", "3d"]} />
-      {gorunum === "on" && <OndenGorunum veri={veri} />}
+      {editable && gorunum === "on" && (
+        <div className="mb-2 text-xs text-neutral-500">
+          💡 Boş alana tıklayarak raf ekleyebilir, bir rafa tıklayarak kaldırabilirsiniz.
+        </div>
+      )}
+      {gorunum === "on" && <OndenGorunum veri={veri} duzenlenebilir={editable} onRafSayisiDegisti={onRafSayisiDegisti} />}
       {gorunum === "yan" && <YandanGorunum veri={veri} />}
       {gorunum === "3d" && <Gorunum3D veri={veri} />}
     </div>

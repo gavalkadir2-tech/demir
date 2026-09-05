@@ -366,3 +366,22 @@ test("çatı kafesi: çatı uzunluğu panel genişliğine tam bölünmezse ekstr
   assert.equal(kaplama.adet, 20); // 10 panel x 2 yamaç
   assert.ok(sonuc.ozetDegerler.kaplamaFireYuzde > 8); // yuvarlama firesi, tipik %8'in üzerinde
 });
+
+test("çatı kafesi: elle ayarlanmış kafesSayisiOverride otomatik hedef aralığı yerine geçer", () => {
+  const sonuc = calculateRoofTruss({
+    acikligMm: 6000,
+    egimYuzde: 30,
+    catiUzunluguMm: 9000,
+    kafesAraligiHedefMm: 900, // otomatik hesapla 11 kafes verirdi
+    ustBaslikProfilKey: "ust",
+    altBaslikProfilKey: "alt",
+    kafesSayisiOverride: 7,
+  });
+
+  assert.equal(sonuc.ozetDegerler.kafesSayisi, 7);
+  assert.equal(sonuc.ozetDegerler.araliklarSayisi, 6);
+  assert.equal(sonuc.ozetDegerler.gercekAralikMm, 1500); // 9000/6
+
+  const altBaslik = sonuc.parcalar.find((p) => p.label === "Alt başlık")!;
+  assert.equal(altBaslik.adet, 7);
+});

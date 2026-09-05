@@ -58,6 +58,10 @@ export interface CatiKafesiGirdi {
   stabiliteBaglantisiVar?: boolean;
   /** Stabilite çaprazı profil kesiti (genellikle L profil) - stabiliteBaglantisiVar true ise zorunlu. */
   stabiliteProfilKey?: string;
+  /** Kullanıcının şematik üzerinden elle ayarladığı kafes sayısı. Verilirse kafesAraligiHedefMm'den
+   * otomatik hesap yerine doğrudan bu sayı kullanılır (kafesler yine eşit aralıklı dağıtılır,
+   * sadece sayı değişir). */
+  kafesSayisiOverride?: number;
 }
 
 const VARSAYILAN = {
@@ -113,9 +117,16 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
   const ustBaslikUzunlukMm = olukluMu ? temelUstBaslikUzunlukMm - olukMesafesiMm : temelUstBaslikUzunlukMm + cikmaPayiMm;
   if (ustBaslikUzunlukMm <= 0) throw new HesaplamaHatasi("Oluk mesafesi üst başlık uzunluğuna göre çok büyük.");
 
-  const araliklarSayisi = Math.max(1, Math.ceil(catiUzunluguMm / kafesAraligiHedefMm));
+  let araliklarSayisi: number;
+  let kafesSayisi: number;
+  if (girdi.kafesSayisiOverride && girdi.kafesSayisiOverride >= 2) {
+    kafesSayisi = Math.round(girdi.kafesSayisiOverride);
+    araliklarSayisi = kafesSayisi - 1;
+  } else {
+    araliklarSayisi = Math.max(1, Math.ceil(catiUzunluguMm / kafesAraligiHedefMm));
+    kafesSayisi = araliklarSayisi + 1;
+  }
   const gercekAralikMm = catiUzunluguMm / araliklarSayisi;
-  const kafesSayisi = araliklarSayisi + 1;
 
   const parcalar: HesaplananParca[] = [];
 

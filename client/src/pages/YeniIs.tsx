@@ -591,6 +591,55 @@ export function UrunFormu({
     setSemaSayiSurumu((v) => v + 1);
   };
 
+  /** Raf şematiğinde bir rafa tıklanarak artırma/azaltma yapıldığında çağrılır. */
+  const rafSayisiGuncelle = async (yeniSayi: number) => {
+    if (yeniSayi < 2) return;
+    const yeniParams = { ...params, rafSayisi: yeniSayi };
+    await hesapla(yeniParams);
+    setSemaSayiSurumu((v) => v + 1);
+  };
+
+  /** Çatı kafesi şematiğinde bir kafese tıklanarak artırma/azaltma yapıldığında çağrılır;
+   * kafesSayisiOverride backend'de kafesAraligiHedefMm'den otomatik hesabın yerine geçer. */
+  const kafesSayisiGuncelle = async (yeniSayi: number) => {
+    if (yeniSayi < 2) return;
+    const yeniParams = { ...params, kafesSayisiOverride: yeniSayi };
+    await hesapla(yeniParams);
+    setSemaSayiSurumu((v) => v + 1);
+  };
+
+  /** Ferforje panel şematiğinde bir dikey çubuğa tıklanarak artırma/azaltma yapıldığında çağrılır;
+   * dikeyCubukSayisiOverride backend'de dikeyCubukAraligiHedefMm'den otomatik hesabın yerine geçer. */
+  const dikeyCubukSayisiGuncelle = async (yeniSayi: number) => {
+    if (yeniSayi < 2) return;
+    const yeniParams = { ...params, dikeyCubukSayisiOverride: yeniSayi };
+    await hesapla(yeniParams);
+    setSemaSayiSurumu((v) => v + 1);
+  };
+
+  /** CatiKafesiAlanlari'nın onChange'i kendi izlediği alanlarla params'ı baştan kurar ve
+   * kafesSayisiOverride'ı hiç içermez; çatı uzunluğu değişmediyse (override'ın hâlâ geçerli
+   * olduğu anlamına gelir) mevcut override korunur - bu hem sonraki alan değişikliklerinde hem de
+   * şematik tıklamasının kendi tetiklediği yeniden-mount'ta (semaSayiSurumu) override'ın silinmesini
+   * önler. */
+  const catiKafesiParamsGuncelle = (yeni: Record<string, unknown>) => {
+    setParams((onceki) => {
+      const uzunlukSabit = yeni.catiUzunluguMm === onceki.catiUzunluguMm;
+      const korunabilir = onceki.kafesSayisiOverride && uzunlukSabit;
+      return { ...yeni, ...(korunabilir ? { kafesSayisiOverride: onceki.kafesSayisiOverride } : {}) };
+    });
+  };
+
+  /** FerforjePanelAlanlari'nın onChange'i için aynı koruma; genişlik değişmediyse
+   * dikeyCubukSayisiOverride korunur. */
+  const ferforjeParamsGuncelle = (yeni: Record<string, unknown>) => {
+    setParams((onceki) => {
+      const genislikSabit = yeni.genislikMm === onceki.genislikMm;
+      const korunabilir = onceki.dikeyCubukSayisiOverride && genislikSabit;
+      return { ...yeni, ...(korunabilir ? { dikeyCubukSayisiOverride: onceki.dikeyCubukSayisiOverride } : {}) };
+    });
+  };
+
   const aiDegerlendir = async () => {
     setAiDanismanYukleniyor(true);
     setAiDanismanHata(null);
@@ -689,15 +738,22 @@ export function UrunFormu({
         )}
         {templateKey === "truss" && (
           <CatiKafesiAlanlari
+            key={`truss-${semaSayiSurumu}`}
             materials={materials}
             sacMalzemeler={sacMalzemeler ?? []}
             baglantiMalzemeler={baglantiMalzemeler ?? []}
-            onChange={setParams}
-            baslangic={baslangic}
+            onChange={catiKafesiParamsGuncelle}
+            baslangic={semaSayiSurumu > 0 ? params : baslangic}
           />
         )}
         {templateKey === "shelf" && (
-          <RafAlanlari materials={materials} sacMalzemeler={sacMalzemeler ?? []} onChange={setParams} baslangic={baslangic} />
+          <RafAlanlari
+            key={`raf-${semaSayiSurumu}`}
+            materials={materials}
+            sacMalzemeler={sacMalzemeler ?? []}
+            onChange={setParams}
+            baslangic={semaSayiSurumu > 0 ? params : baslangic}
+          />
         )}
         {templateKey === "pergola" && (
           <PergolaAlanlari
@@ -709,7 +765,14 @@ export function UrunFormu({
             baslangic={semaSayiSurumu > 0 ? params : baslangic}
           />
         )}
-        {templateKey === "ferforje_panel" && <FerforjePanelAlanlari materials={materials} onChange={setParams} baslangic={baslangic} />}
+        {templateKey === "ferforje_panel" && (
+          <FerforjePanelAlanlari
+            key={`ferforje-${semaSayiSurumu}`}
+            materials={materials}
+            onChange={ferforjeParamsGuncelle}
+            baslangic={semaSayiSurumu > 0 ? params : baslangic}
+          />
+        )}
         {templateKey === "steel_frame" && (
           <KolonKirisAlanlari
             key={`steel-frame-${semaSayiSurumu}`}
@@ -739,7 +802,10 @@ export function UrunFormu({
               templateKey === "railing" ||
               templateKey === "canopy" ||
               templateKey === "pergola" ||
-              templateKey === "steel_frame"
+              templateKey === "steel_frame" ||
+              templateKey === "shelf" ||
+              templateKey === "truss" ||
+              templateKey === "ferforje_panel"
             }
             onDikmePozisyonlariDegisti={
               templateKey === "wall" || templateKey === "railing" ? dikmePozisyonlariGuncelle : undefined
@@ -748,6 +814,9 @@ export function UrunFormu({
             onDikmeSayisiDegisti={templateKey === "canopy" ? dikmeSayisiGuncelle : undefined}
             onKolonSiraAdediDegisti={templateKey === "pergola" ? kolonSiraAdediGuncelle : undefined}
             onAcikSayisiDegisti={templateKey === "steel_frame" ? acikSayisiGuncelle : undefined}
+            onRafSayisiDegisti={templateKey === "shelf" ? rafSayisiGuncelle : undefined}
+            onKafesSayisiDegisti={templateKey === "truss" ? kafesSayisiGuncelle : undefined}
+            onDikeyCubukSayisiDegisti={templateKey === "ferforje_panel" ? dikeyCubukSayisiGuncelle : undefined}
           />
 
           <HesapSonucuGorunum sonuc={onizleme.sonuc} malzemeler={onizleme.malzemeler} />

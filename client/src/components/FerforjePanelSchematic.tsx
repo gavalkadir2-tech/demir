@@ -33,8 +33,17 @@ const MARGIN_RIGHT = 20;
 const MARGIN_TOP = 20;
 const MARGIN_BOTTOM = 40;
 
-function OndenGorunum({ veri }: { veri: FerforjePanelSemaVeri }) {
+function OndenGorunum({
+  veri,
+  duzenlenebilir,
+  onDikeyCubukSayisiDegisti,
+}: {
+  veri: FerforjePanelSemaVeri;
+  duzenlenebilir?: boolean;
+  onDikeyCubukSayisiDegisti?: (yeniSayi: number) => void;
+}) {
   const { genislikMm, yukseklikMm, dikeyCubukSayisi, gercekAralikMm, yatayAraKayitSayisi = 0, susVar = false, cerceveKesit, cubukKesit } = veri;
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
   const drawW = VIEW_W - MARGIN_LEFT - MARGIN_RIGHT;
   const drawH = VIEW_H - MARGIN_TOP - MARGIN_BOTTOM;
@@ -57,6 +66,7 @@ function OndenGorunum({ veri }: { veri: FerforjePanelSemaVeri }) {
           return topY + oran * scaledH;
         })
       : [];
+  const tiklanabilir = Boolean(duzenlenebilir && onDikeyCubukSayisiDegisti);
 
   const lejant = [
     { renk: PALET.ana, etiket: "Çerçeve" },
@@ -74,16 +84,51 @@ function OndenGorunum({ veri }: { veri: FerforjePanelSemaVeri }) {
       <rect x={x0} y={topY} width={cerceveKalinlik} height={scaledH} fill={PALET.ana} />
       <rect x={x0 + scaledW - cerceveKalinlik} y={topY} width={cerceveKalinlik} height={scaledH} fill={PALET.ana} />
 
+      {tiklanabilir && (
+        <rect
+          x={x0}
+          y={topY}
+          width={scaledW}
+          height={scaledH}
+          fill="transparent"
+          style={{ cursor: "copy" }}
+          onClick={() => onDikeyCubukSayisiDegisti!(dikeyCubukSayisi + 1)}
+        >
+          <title>Yeni dikey çubuk eklemek için tıkla</title>
+        </rect>
+      )}
+
       {cubukXler.map((cx, i) => (
-        <rect key={i} x={cx - cubukGenislik / 2} y={topY} width={cubukGenislik} height={scaledH} fill={PALET.yatay} />
+        <g key={i}>
+          <rect x={cx - cubukGenislik / 2} y={topY} width={cubukGenislik} height={scaledH} fill={hoverIndex === i && tiklanabilir ? "#dc2626" : PALET.yatay} style={{ pointerEvents: "none" }} />
+          {tiklanabilir && dikeyCubukSayisi > 2 && (
+            <rect
+              x={cx - Math.max(cubukGenislik, 12) / 2}
+              y={topY}
+              width={Math.max(cubukGenislik, 12)}
+              height={scaledH}
+              fill="transparent"
+              style={{ cursor: "pointer" }}
+              onMouseEnter={() => setHoverIndex(i)}
+              onMouseLeave={() => setHoverIndex(null)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDikeyCubukSayisiDegisti!(dikeyCubukSayisi - 1);
+                setHoverIndex(null);
+              }}
+            >
+              <title>Bu çubuğu kaldırmak için tıkla</title>
+            </rect>
+          )}
+        </g>
       ))}
 
       {araKayitYler.map((y, i) => (
-        <rect key={i} x={x0} y={y - cubukGenislik / 2} width={scaledW} height={cubukGenislik} fill={PALET.vurgu} />
+        <rect key={i} x={x0} y={y - cubukGenislik / 2} width={scaledW} height={cubukGenislik} fill={PALET.vurgu} style={{ pointerEvents: "none" }} />
       ))}
 
       {susVar && (
-        <circle cx={x0 + scaledW / 2} cy={topY + scaledH / 2} r={Math.min(scaledW, scaledH) * 0.18} fill="none" stroke={PALET.ikincil} strokeWidth={3} />
+        <circle cx={x0 + scaledW / 2} cy={topY + scaledH / 2} r={Math.min(scaledW, scaledH) * 0.18} fill="none" stroke={PALET.ikincil} strokeWidth={3} style={{ pointerEvents: "none" }} />
       )}
 
       <YatayOlcu x1={x0} x2={x0 + scaledW} y={bottomY + 24} etiket={mmEtiket(genislikMm)} />
@@ -147,16 +192,33 @@ function Gorunum3D({ veri }: { veri: FerforjePanelSemaVeri }) {
 }
 
 /** Ferforje panelin önden/yandan/3D görünüşlerini, seçilen çerçeve/çubuk profilinin gerçek
- * ölçüsüyle tutarlı, ölçekli bir çizim olarak gösterir. */
-export default function FerforjePanelSchematic({ veri }: { veri: FerforjePanelSemaVeri }) {
+ * ölçüsüyle tutarlı, ölçekli bir çizim olarak gösterir. `duzenlenebilir` verilirse önden
+ * görünüşte boş alana tıklayarak dikey çubuk eklenebilir / bir çubuğa tıklayarak kaldırılabilir
+ * (pozisyonlar eşit aralıklı kalır, sadece çubuk sayısı değişir). */
+export default function FerforjePanelSchematic({
+  veri,
+  duzenlenebilir,
+  onDikeyCubukSayisiDegisti,
+}: {
+  veri: FerforjePanelSemaVeri;
+  duzenlenebilir?: boolean;
+  onDikeyCubukSayisiDegisti?: (yeniSayi: number) => void;
+}) {
   const [gorunum, setGorunum] = useState<SemaGorunumTipi>("on");
   const { genislikMm, yukseklikMm, dikeyCubukSayisi } = veri;
   if (!genislikMm || !yukseklikMm || dikeyCubukSayisi < 2) return null;
 
+  const editable = Boolean(duzenlenebilir && onDikeyCubukSayisiDegisti);
+
   return (
     <div>
       <GorunumSekmeleri aktif={gorunum} onSec={setGorunum} secenekler={["on", "yan", "3d"]} />
-      {gorunum === "on" && <OndenGorunum veri={veri} />}
+      {editable && gorunum === "on" && (
+        <div className="mb-2 text-xs text-neutral-500">
+          💡 Boş alana tıklayarak dikey çubuk ekleyebilir, bir çubuğa tıklayarak kaldırabilirsiniz.
+        </div>
+      )}
+      {gorunum === "on" && <OndenGorunum veri={veri} duzenlenebilir={editable} onDikeyCubukSayisiDegisti={onDikeyCubukSayisiDegisti} />}
       {gorunum === "yan" && <YandanGorunum veri={veri} />}
       {gorunum === "3d" && <Gorunum3D veri={veri} />}
     </div>

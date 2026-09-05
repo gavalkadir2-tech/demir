@@ -26,6 +26,9 @@ export default function SemaGorunum({
   onDikmeSayisiDegisti,
   onKolonSiraAdediDegisti,
   onAcikSayisiDegisti,
+  onRafSayisiDegisti,
+  onKafesSayisiDegisti,
+  onDikeyCubukSayisiDegisti,
 }: {
   templateKey: string;
   params: Record<string, unknown>;
@@ -42,6 +45,12 @@ export default function SemaGorunum({
   onKolonSiraAdediDegisti?: (yeniSiraAdedi: number) => void;
   /** "steel_frame" şablonunda kullanılır: açıklık sayısını tıklayarak artırma/azaltma. */
   onAcikSayisiDegisti?: (yeniAcikSayisi: number) => void;
+  /** "shelf" şablonunda kullanılır: raf sayısını tıklayarak artırma/azaltma. */
+  onRafSayisiDegisti?: (yeniSayi: number) => void;
+  /** "truss" şablonunda kullanılır: kafes sayısını tıklayarak artırma/azaltma. */
+  onKafesSayisiDegisti?: (yeniSayi: number) => void;
+  /** "ferforje_panel" şablonunda kullanılır: dikey çubuk sayısını tıklayarak artırma/azaltma. */
+  onDikeyCubukSayisiDegisti?: (yeniSayi: number) => void;
 }) {
   const n = (k: string): number => Number(params[k] ?? 0);
   const b = (k: string): boolean => Boolean(params[k]);
@@ -161,6 +170,8 @@ export default function SemaGorunum({
             kralKirisiKesit: kesit("kralKirisiProfilId"),
             asikKesit: kesit("asikProfilId"),
           }}
+          duzenlenebilir={duzenlenebilir}
+          onKafesSayisiDegisti={onKafesSayisiDegisti}
         />
       );
     case "spiral_stairs":
@@ -192,6 +203,8 @@ export default function SemaGorunum({
             rafCercevesiKesit: kesit("rafCercevesiProfilId"),
             sacKalinlikMm: n("sacKalinlikMm") || 1.5,
           }}
+          duzenlenebilir={duzenlenebilir}
+          onRafSayisiDegisti={onRafSayisiDegisti}
         />
       );
     case "pergola":
@@ -225,6 +238,8 @@ export default function SemaGorunum({
             cerceveKesit: kesit("cerceveProfilId"),
             cubukKesit: kesit("dikeyCubukProfilId"),
           }}
+          duzenlenebilir={duzenlenebilir}
+          onDikeyCubukSayisiDegisti={onDikeyCubukSayisiDegisti}
         />
       );
     case "steel_frame":

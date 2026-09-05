@@ -178,8 +178,17 @@ function KesitGorunumu({ veri }: { veri: CatiKafesiSemaVeri }) {
 }
 
 /** Aşık yerleşim planı (bir yamaç, açılmış görünüş - üstten bakış). */
-function AsikPlaniGorunumu({ veri }: { veri: CatiKafesiSemaVeri }) {
+function AsikPlaniGorunumu({
+  veri,
+  duzenlenebilir,
+  onKafesSayisiDegisti,
+}: {
+  veri: CatiKafesiSemaVeri;
+  duzenlenebilir?: boolean;
+  onKafesSayisiDegisti?: (yeniSayi: number) => void;
+}) {
   const { acikligMm, egimYuzde, catiUzunluguMm, asikVar = false, asikAraligiHedefMm = 1000, kafesSayisi = 2, gercekAralikMm = catiUzunluguMm, stabiliteVar = false } = veri;
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
   const yariAciklikMm = acikligMm / 2;
   const mahyaYuksekligiMm = yariAciklikMm * (egimYuzde / 100);
@@ -199,6 +208,7 @@ function AsikPlaniGorunumu({ veri }: { veri: CatiKafesiSemaVeri }) {
     ? Array.from({ length: asikSatirSayisiPerSide }, (_, i) => by0 + (i / (asikSatirSayisiPerSide - 1)) * scaledRafter)
     : [];
   const stabiliteCizilecek = stabiliteVar && kafesSayisi >= 2;
+  const tiklanabilir = Boolean(duzenlenebilir && onKafesSayisiDegisti);
 
   const lejant = [
     { renk: PALET.ana, etiket: "Kafes" },
@@ -213,11 +223,47 @@ function AsikPlaniGorunumu({ veri }: { veri: CatiKafesiSemaVeri }) {
         Üstten görünüş (bir yamaç, açılmış plan)
       </text>
       <rect x={bx0} y={by0} width={scaledUzunluk} height={scaledRafter} fill="#f5f5f5" stroke="#d4d4d4" />
+
+      {tiklanabilir && (
+        <rect
+          x={bx0}
+          y={by0}
+          width={scaledUzunluk}
+          height={scaledRafter}
+          fill="transparent"
+          style={{ cursor: "copy" }}
+          onClick={() => onKafesSayisiDegisti!(kafesSayisi + 1)}
+        >
+          <title>Yeni kafes eklemek için tıkla</title>
+        </rect>
+      )}
+
       {kafesXPozisyonlari.map((px, i) => (
-        <line key={i} x1={px} y1={by0} x2={px} y2={by0 + scaledRafter} stroke={PALET.ana} strokeWidth={2.5} />
+        <g key={i}>
+          <line x1={px} y1={by0} x2={px} y2={by0 + scaledRafter} stroke={hoverIndex === i && tiklanabilir ? "#dc2626" : PALET.ana} strokeWidth={2.5} style={{ pointerEvents: "none" }} />
+          {tiklanabilir && kafesSayisi > 2 && (
+            <rect
+              x={px - 7}
+              y={by0}
+              width={14}
+              height={scaledRafter}
+              fill="transparent"
+              style={{ cursor: "pointer" }}
+              onMouseEnter={() => setHoverIndex(i)}
+              onMouseLeave={() => setHoverIndex(null)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onKafesSayisiDegisti!(kafesSayisi - 1);
+                setHoverIndex(null);
+              }}
+            >
+              <title>Bu kafesi kaldırmak için tıkla</title>
+            </rect>
+          )}
+        </g>
       ))}
       {asikYPozisyonlari.map((py, i) => (
-        <line key={i} x1={bx0} y1={py} x2={bx0 + scaledUzunluk} y2={py} stroke={PALET.vurgu} strokeWidth={2} />
+        <line key={i} x1={bx0} y1={py} x2={bx0 + scaledUzunluk} y2={py} stroke={PALET.vurgu} strokeWidth={2} style={{ pointerEvents: "none" }} />
       ))}
       {stabiliteCizilecek && (
         <g>
@@ -238,17 +284,34 @@ function AsikPlaniGorunumu({ veri }: { veri: CatiKafesiSemaVeri }) {
 }
 
 /** Çatı kafesinin kesit/aşık planı/3D görünüşlerini, seçilen başlık/aşık profilinin gerçek
- * ölçüsüyle tutarlı, ölçekli bir çizim olarak gösterir. */
-export default function TrussSchematic({ veri }: { veri: CatiKafesiSemaVeri }) {
+ * ölçüsüyle tutarlı, ölçekli bir çizim olarak gösterir. `duzenlenebilir` verilirse üstten
+ * görünüşte boş alana tıklayarak kafes eklenebilir / bir kafese tıklayarak kaldırılabilir
+ * (pozisyonlar eşit aralıklı kalır, sadece kafes sayısı değişir). */
+export default function TrussSchematic({
+  veri,
+  duzenlenebilir,
+  onKafesSayisiDegisti,
+}: {
+  veri: CatiKafesiSemaVeri;
+  duzenlenebilir?: boolean;
+  onKafesSayisiDegisti?: (yeniSayi: number) => void;
+}) {
   const [gorunum, setGorunum] = useState<SemaGorunumTipi>("on");
   const { acikligMm, catiUzunluguMm, kafesSayisi = 2, gercekAralikMm } = veri;
   if (!acikligMm) return null;
 
+  const editable = Boolean(duzenlenebilir && onKafesSayisiDegisti);
+
   return (
     <div>
       <GorunumSekmeleri aktif={gorunum} onSec={setGorunum} secenekler={["on", "ust", "3d"]} />
+      {editable && gorunum === "ust" && (
+        <div className="mb-2 text-xs text-neutral-500">
+          💡 Boş alana tıklayarak kafes ekleyebilir, bir kafese tıklayarak kaldırabilirsiniz.
+        </div>
+      )}
       {gorunum === "on" && <KesitGorunumu veri={veri} />}
-      {gorunum === "ust" && <AsikPlaniGorunumu veri={veri} />}
+      {gorunum === "ust" && <AsikPlaniGorunumu veri={veri} duzenlenebilir={editable} onKafesSayisiDegisti={onKafesSayisiDegisti} />}
       {gorunum === "3d" && catiUzunluguMm > 0 && (
         <TrussIsometricView
           veri={{

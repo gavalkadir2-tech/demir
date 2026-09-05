@@ -25,6 +25,10 @@ export interface FerforjePanelGirdi {
   susSayisi?: number;
   /** Bir süsleme motifi için tahmini malzeme uzunluğu (mm), varsayılan 300 */
   susBirimUzunlukMm?: number;
+  /** Kullanıcının şematik üzerinden elle ayarladığı dikey çubuk sayısı. Verilirse
+   * dikeyCubukAraligiHedefMm'den otomatik hesap yerine doğrudan bu sayı kullanılır (çubuklar yine
+   * eşit aralıklı dağıtılır, sadece sayı değişir). */
+  dikeyCubukSayisiOverride?: number;
 }
 
 const VARSAYILAN = {
@@ -52,9 +56,16 @@ export function calculateFerforjePanel(girdi: FerforjePanelGirdi): UrunHesapSonu
 
   const sonuc = bosSonuc();
 
-  const araliklarSayisi = Math.max(1, Math.ceil(genislikMm / dikeyCubukAraligiHedefMm));
+  let araliklarSayisi: number;
+  let dikeyCubukSayisi: number;
+  if (girdi.dikeyCubukSayisiOverride && girdi.dikeyCubukSayisiOverride >= 2) {
+    dikeyCubukSayisi = Math.round(girdi.dikeyCubukSayisiOverride);
+    araliklarSayisi = dikeyCubukSayisi - 1;
+  } else {
+    araliklarSayisi = Math.max(1, Math.ceil(genislikMm / dikeyCubukAraligiHedefMm));
+    dikeyCubukSayisi = araliklarSayisi + 1;
+  }
   const gercekAralikMm = genislikMm / araliklarSayisi;
-  const dikeyCubukSayisi = araliklarSayisi + 1;
 
   if (gercekAralikMm > 150) {
     sonuc.uyarilar.push(

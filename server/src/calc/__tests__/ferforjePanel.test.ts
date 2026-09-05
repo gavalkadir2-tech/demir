@@ -95,6 +95,22 @@ test("ferforje panel: süsleme var ama profil/sayı eksikse hata verir", () => {
   );
 });
 
+test("ferforje panel: elle ayarlanmış dikeyCubukSayisiOverride otomatik hedef aralığı yerine geçer", () => {
+  const sonuc = calculateFerforjePanel({
+    genislikMm: 1200,
+    yukseklikMm: 1500,
+    cerceveProfilKey: "cerceve",
+    dikeyCubukProfilKey: "cubuk",
+    dikeyCubukSayisiOverride: 5,
+  });
+
+  assert.equal(sonuc.ozetDegerler.dikeyCubukSayisi, 5);
+  const dikeyCubuk = sonuc.parcalar.find((p) => p.label === "Dikey çubuk")!;
+  assert.equal(dikeyCubuk.adet, 5);
+  assert.equal(sonuc.ozetDegerler.gercekAralikMm, 300); // 1200/4 aralık
+  assert.ok(sonuc.uyarilar.some((u) => u.includes("güvenlik"))); // 300mm > 150mm eşiği
+});
+
 test("ferforje panel: geçersiz girdilerde hata fırlatır", () => {
   assert.throws(
     () =>

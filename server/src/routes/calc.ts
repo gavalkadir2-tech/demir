@@ -170,6 +170,7 @@ const trussSchema = z.object({
   cikmaPayiMm: z.number().optional(),
   direkSayisi: z.number().int().optional(),
   direkProfilId: z.number().int().optional(),
+  kafesSayisiOverride: z.number().int().optional(),
 });
 
 const shelfSchema = z.object({
@@ -216,6 +217,7 @@ const ferforjePanelSchema = z.object({
   susProfilId: z.number().int().optional(),
   susSayisi: z.number().int().optional(),
   susBirimUzunlukMm: z.number().optional(),
+  dikeyCubukSayisiOverride: z.number().int().optional(),
 });
 
 const steelFrameSchema = z.object({
