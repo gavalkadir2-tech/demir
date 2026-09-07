@@ -9,6 +9,7 @@ const EMOJI: Record<string, string> = {
   stairs: "🪜",
   canopy: "⛺",
   door: "🚪",
+  container: "📦",
   custom: "🔩",
 };
 

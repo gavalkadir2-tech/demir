@@ -239,6 +239,61 @@ const steelFrameSchema = z.object({
   ankrajMalzemeId: z.number().int().optional(),
 });
 
+const konteynerBosluklarSchema = z.array(
+  z.object({
+    etiket: z.string().min(1),
+    tipi: z.enum(["pencere", "kapi"]),
+    katNo: z.union([z.literal(1), z.literal(2)]),
+    konumMm: z.number(),
+    genislikMm: z.number(),
+    yukseklikMm: z.number(),
+    tabanYuksekligiMm: z.number().optional(),
+  })
+);
+
+const containerSchema = z.object({
+  genislikMm: z.number(),
+  uzunlukMm: z.number(),
+  katYuksekligiMm: z.number(),
+  katSayisi: z.union([z.literal(1), z.literal(2)]),
+  bosluklar: konteynerBosluklarSchema.optional(),
+  cerceveProfilId: z.number().int().optional(),
+  cerceveTasmaMm: z.number().optional(),
+  kaplamaTuru: kaplamaTuruEnum.optional(),
+  kaplamaKalinlikMm: z.number().optional(),
+  kaplamaMalzemeId: z.number().int().optional(),
+  merdivenVar: z.boolean().optional(),
+  merdivenGenislikMm: z.number().optional(),
+  merdivenBasamakYuksekligiHedefMm: z.number().optional(),
+  merdivenDerinlikMm: z.number().optional(),
+  merdivenTasiyiciProfilId: z.number().int().optional(),
+  merdivenTasiyiciAdet: z.number().int().optional(),
+  merdivenBasamakKalinlikMm: z.number().optional(),
+  merdivenBasamakSacMalzemeId: z.number().int().optional(),
+  merdivenKorkulukYuksekligiMm: z.number().optional(),
+  merdivenKorkulukDikmeProfilId: z.number().int().optional(),
+  merdivenKorkulukUstProfilId: z.number().int().optional(),
+  merdivenKorkulukDikmeAraligiHedefMm: z.number().optional(),
+  merdivenKorkulukBaglantiMalzemeId: z.number().int().optional(),
+  platformKorkulukVar: z.boolean().optional(),
+  platformKorkulukUzunlukMm: z.number().optional(),
+  platformKorkulukYuksekligiMm: z.number().optional(),
+  platformKorkulukDikmeAraligiHedefMm: z.number().optional(),
+  platformUstProfilId: z.number().int().optional(),
+  platformAltProfilId: z.number().int().optional(),
+  platformDikmeProfilId: z.number().int().optional(),
+  platformAraKayitSayisi: z.number().int().optional(),
+  platformAraKayitProfilId: z.number().int().optional(),
+  ikinciKatIskeletVar: z.boolean().optional(),
+  iskeletAcikSayisi: z.number().int().optional(),
+  iskeletKolonProfilId: z.number().int().optional(),
+  iskeletKirisProfilId: z.number().int().optional(),
+  iskeletCerceveAraligiHedefMm: z.number().optional(),
+  iskeletBaglantiKirisiProfilId: z.number().int().optional(),
+  iskeletStabiliteBaglantisiVar: z.boolean().optional(),
+  iskeletStabiliteProfilId: z.number().int().optional(),
+});
+
 const customSchema = z.object({
   parcalar: z.array(
     z.object({
@@ -277,6 +332,7 @@ export const TEMPLATE_SCHEMAS: Record<string, z.ZodTypeAny> = {
   pergola: pergolaSchema,
   ferforje_panel: ferforjePanelSchema,
   steel_frame: steelFrameSchema,
+  container: containerSchema,
 };
 
 export const CUSTOM_SCHEMA = customSchema;

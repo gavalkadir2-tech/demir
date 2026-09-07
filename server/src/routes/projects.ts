@@ -27,6 +27,7 @@ const PROJECT_CATEGORIES = [
   "DOOR",
   "FORGE",
   "STEEL_STRUCTURE",
+  "CONTAINER",
   "CHASSIS",
   "SHELF",
   "TABLE",

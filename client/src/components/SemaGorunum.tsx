@@ -11,6 +11,7 @@ import DonerMerdivenSchematic from "./DonerMerdivenSchematic";
 import PergolaSchematic from "./PergolaSchematic";
 import FerforjePanelSchematic from "./FerforjePanelSchematic";
 import SteelFrameSchematic from "./SteelFrameSchematic";
+import ContainerSchematic, { KonteynerBoslukVeri } from "./ContainerSchematic";
 
 /** Ürün şablonuna göre uygun şematik çizimi seçip render eder. Seçilen malzemelerin gerçek
  * kesit ölçülerini (widthMm/heightMm) çözüp her şemaya iletir; böylece çizimdeki profil
@@ -259,6 +260,21 @@ export default function SemaGorunum({
           }}
           duzenlenebilir={duzenlenebilir}
           onAcikSayisiDegisti={onAcikSayisiDegisti}
+        />
+      );
+    case "container":
+      return (
+        <ContainerSchematic
+          veri={{
+            genislikMm: n("genislikMm"),
+            uzunlukMm: n("uzunlukMm"),
+            katYuksekligiMm: n("katYuksekligiMm"),
+            katSayisi: (n("katSayisi") === 2 ? 2 : 1) as 1 | 2,
+            bosluklarMm: (params.bosluklar as KonteynerBoslukVeri[] | undefined) ?? [],
+            merdivenVar: b("merdivenVar"),
+            merdivenDerinlikMm: n("merdivenDerinlikMm") || undefined,
+            platformKorkulukVar: b("platformKorkulukVar"),
+          }}
         />
       );
     default:

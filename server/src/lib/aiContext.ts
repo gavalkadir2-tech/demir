@@ -9,6 +9,7 @@ const KATEGORI_TR: Record<string, string> = {
   DOOR: "Kapı",
   FORGE: "Demirci İşi",
   STEEL_STRUCTURE: "Çelik Konstrüksiyon",
+  CONTAINER: "Konteyner",
   CHASSIS: "Şasi",
   SHELF: "Raf",
   TABLE: "Masa",

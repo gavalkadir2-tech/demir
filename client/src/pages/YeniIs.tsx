@@ -21,6 +21,7 @@ const TEMPLATE_KATEGORI: Record<string, ProjectCategory> = {
   pergola: "CANOPY",
   ferforje_panel: "FORGE",
   steel_frame: "STEEL_STRUCTURE",
+  container: "CONTAINER",
   custom: "OTHER",
 };
 
@@ -36,6 +37,7 @@ export const URUN_EMOJI: Record<string, string> = {
   pergola: "🌴",
   ferforje_panel: "🌿",
   steel_frame: "🏭",
+  container: "📦",
   custom: "🔩",
 };
 const EMOJI = URUN_EMOJI;
@@ -781,6 +783,15 @@ export function UrunFormu({
             baglantiMalzemeler={baglantiMalzemeler ?? []}
             onChange={setParams}
             baslangic={semaSayiSurumu > 0 ? params : baslangic}
+          />
+        )}
+        {templateKey === "container" && (
+          <KonteynerAlanlari
+            materials={materials}
+            sacMalzemeler={sacMalzemeler ?? []}
+            baglantiMalzemeler={baglantiMalzemeler ?? []}
+            onChange={setParams}
+            baslangic={baslangic}
           />
         )}
 
@@ -2345,6 +2356,442 @@ function KolonKirisAlanlari({
           )}
         </div>
       </details>
+    </div>
+  );
+}
+
+interface KonteynerBoslukTaslak {
+  etiket: string;
+  tipi: "pencere" | "kapi";
+  katNo: 1 | 2;
+  konumMm: number;
+  tabanYuksekligiMm: number;
+  genislikMm: number;
+  yukseklikMm: number;
+}
+
+function KonteynerAlanlari({
+  materials,
+  sacMalzemeler,
+  baglantiMalzemeler,
+  onChange,
+  baslangic,
+}: {
+  materials: Material[];
+  sacMalzemeler: Material[];
+  baglantiMalzemeler: Material[];
+  onChange: (p: Record<string, unknown>) => void;
+  baslangic?: Record<string, unknown>;
+}) {
+  const [genislikMm, setGenislikMm] = useState<number>(() => (baslangic?.genislikMm as number) ?? 2438);
+  const [uzunlukMm, setUzunlukMm] = useState<number>(() => (baslangic?.uzunlukMm as number) ?? 6058);
+  const [katYuksekligiMm, setKatYuksekligiMm] = useState<number>(() => (baslangic?.katYuksekligiMm as number) ?? 2591);
+  const [katSayisi, setKatSayisi] = useState<1 | 2>(() => ((baslangic?.katSayisi as number) === 2 ? 2 : 1));
+
+  const [bosluklar, setBosluklar] = useState<KonteynerBoslukTaslak[]>(
+    () => (baslangic?.bosluklar as KonteynerBoslukTaslak[] | undefined) ?? []
+  );
+  const [cerceveProfilId, setCerceveProfilId] = useState<number | undefined>(() => baslangic?.cerceveProfilId as number | undefined);
+  const [cerceveTasmaMm, setCerceveTasmaMm] = useState<number>(() => (baslangic?.cerceveTasmaMm as number) ?? 40);
+
+  const [kaplamaTuru, setKaplamaTuru] = useState<string>(() => (baslangic?.kaplamaTuru as string) ?? "yok");
+  const [kaplamaMalzemeId, setKaplamaMalzemeId] = useState<number | undefined>(() => baslangic?.kaplamaMalzemeId as number | undefined);
+
+  const [merdivenVar, setMerdivenVar] = useState<boolean>(() => (baslangic?.merdivenVar as boolean) ?? false);
+  const [merdivenGenislikMm, setMerdivenGenislikMm] = useState<number>(() => (baslangic?.merdivenGenislikMm as number) ?? 900);
+  const [merdivenBasamakYuksekligiHedefMm, setMerdivenBasamakYuksekligiHedefMm] = useState<number>(
+    () => (baslangic?.merdivenBasamakYuksekligiHedefMm as number) ?? 180
+  );
+  const [merdivenDerinlikMm, setMerdivenDerinlikMm] = useState<number>(() => (baslangic?.merdivenDerinlikMm as number) ?? 3000);
+  const [merdivenTasiyiciProfilId, setMerdivenTasiyiciProfilId] = useState<number | undefined>(
+    () => baslangic?.merdivenTasiyiciProfilId as number | undefined
+  );
+  const [merdivenTasiyiciAdet, setMerdivenTasiyiciAdet] = useState<number>(() => (baslangic?.merdivenTasiyiciAdet as number) ?? 2);
+  const [merdivenBasamakKalinlikMm, setMerdivenBasamakKalinlikMm] = useState<number>(
+    () => (baslangic?.merdivenBasamakKalinlikMm as number) ?? 3
+  );
+  const [merdivenBasamakSacMalzemeId, setMerdivenBasamakSacMalzemeId] = useState<number | undefined>(
+    () => baslangic?.merdivenBasamakSacMalzemeId as number | undefined
+  );
+  const [merdivenKorkulukYuksekligiMm, setMerdivenKorkulukYuksekligiMm] = useState<number | undefined>(
+    () => baslangic?.merdivenKorkulukYuksekligiMm as number | undefined
+  );
+  const [merdivenKorkulukDikmeProfilId, setMerdivenKorkulukDikmeProfilId] = useState<number | undefined>(
+    () => baslangic?.merdivenKorkulukDikmeProfilId as number | undefined
+  );
+  const [merdivenKorkulukUstProfilId, setMerdivenKorkulukUstProfilId] = useState<number | undefined>(
+    () => baslangic?.merdivenKorkulukUstProfilId as number | undefined
+  );
+  const [merdivenKorkulukDikmeAraligiHedefMm, setMerdivenKorkulukDikmeAraligiHedefMm] = useState<number>(
+    () => (baslangic?.merdivenKorkulukDikmeAraligiHedefMm as number) ?? 1000
+  );
+  const [merdivenKorkulukBaglantiMalzemeId, setMerdivenKorkulukBaglantiMalzemeId] = useState<number | undefined>(
+    () => baslangic?.merdivenKorkulukBaglantiMalzemeId as number | undefined
+  );
+
+  const [platformKorkulukVar, setPlatformKorkulukVar] = useState<boolean>(() => (baslangic?.platformKorkulukVar as boolean) ?? false);
+  const [platformKorkulukUzunlukMm, setPlatformKorkulukUzunlukMm] = useState<number>(
+    () => (baslangic?.platformKorkulukUzunlukMm as number) ?? 6058
+  );
+  const [platformKorkulukYuksekligiMm, setPlatformKorkulukYuksekligiMm] = useState<number>(
+    () => (baslangic?.platformKorkulukYuksekligiMm as number) ?? 1000
+  );
+  const [platformKorkulukDikmeAraligiHedefMm, setPlatformKorkulukDikmeAraligiHedefMm] = useState<number>(
+    () => (baslangic?.platformKorkulukDikmeAraligiHedefMm as number) ?? 1200
+  );
+  const [platformUstProfilId, setPlatformUstProfilId] = useState<number | undefined>(() => baslangic?.platformUstProfilId as number | undefined);
+  const [platformAltProfilId, setPlatformAltProfilId] = useState<number | undefined>(() => baslangic?.platformAltProfilId as number | undefined);
+  const [platformDikmeProfilId, setPlatformDikmeProfilId] = useState<number | undefined>(
+    () => baslangic?.platformDikmeProfilId as number | undefined
+  );
+  const [platformAraKayitSayisi, setPlatformAraKayitSayisi] = useState<number>(() => (baslangic?.platformAraKayitSayisi as number) ?? 0);
+  const [platformAraKayitProfilId, setPlatformAraKayitProfilId] = useState<number | undefined>(
+    () => baslangic?.platformAraKayitProfilId as number | undefined
+  );
+
+  const [ikinciKatIskeletVar, setIkinciKatIskeletVar] = useState<boolean>(() => (baslangic?.ikinciKatIskeletVar as boolean) ?? false);
+  const [iskeletAcikSayisi, setIskeletAcikSayisi] = useState<number>(() => (baslangic?.iskeletAcikSayisi as number) ?? 1);
+  const [iskeletKolonProfilId, setIskeletKolonProfilId] = useState<number | undefined>(() => baslangic?.iskeletKolonProfilId as number | undefined);
+  const [iskeletKirisProfilId, setIskeletKirisProfilId] = useState<number | undefined>(() => baslangic?.iskeletKirisProfilId as number | undefined);
+  const [iskeletCerceveAraligiHedefMm, setIskeletCerceveAraligiHedefMm] = useState<number>(
+    () => (baslangic?.iskeletCerceveAraligiHedefMm as number) ?? 3000
+  );
+  const [iskeletBaglantiKirisiProfilId, setIskeletBaglantiKirisiProfilId] = useState<number | undefined>(
+    () => baslangic?.iskeletBaglantiKirisiProfilId as number | undefined
+  );
+  const [iskeletStabiliteBaglantisiVar, setIskeletStabiliteBaglantisiVar] = useState<boolean>(
+    () => (baslangic?.iskeletStabiliteBaglantisiVar as boolean) ?? false
+  );
+  const [iskeletStabiliteProfilId, setIskeletStabiliteProfilId] = useState<number | undefined>(
+    () => baslangic?.iskeletStabiliteProfilId as number | undefined
+  );
+
+  useEffect(() => {
+    onChange({
+      genislikMm,
+      uzunlukMm,
+      katYuksekligiMm,
+      katSayisi,
+      bosluklar,
+      cerceveProfilId: bosluklar.length > 0 ? cerceveProfilId : undefined,
+      cerceveTasmaMm,
+      kaplamaTuru: kaplamaTuru === "yok" ? undefined : kaplamaTuru,
+      kaplamaMalzemeId: kaplamaTuru !== "yok" ? kaplamaMalzemeId : undefined,
+      merdivenVar: katSayisi === 2 ? merdivenVar : false,
+      merdivenGenislikMm,
+      merdivenBasamakYuksekligiHedefMm,
+      merdivenDerinlikMm,
+      merdivenTasiyiciProfilId,
+      merdivenTasiyiciAdet,
+      merdivenBasamakKalinlikMm,
+      merdivenBasamakSacMalzemeId,
+      merdivenKorkulukYuksekligiMm,
+      merdivenKorkulukDikmeProfilId,
+      merdivenKorkulukUstProfilId,
+      merdivenKorkulukDikmeAraligiHedefMm,
+      merdivenKorkulukBaglantiMalzemeId,
+      platformKorkulukVar: katSayisi === 2 ? platformKorkulukVar : false,
+      platformKorkulukUzunlukMm,
+      platformKorkulukYuksekligiMm,
+      platformKorkulukDikmeAraligiHedefMm,
+      platformUstProfilId,
+      platformAltProfilId,
+      platformDikmeProfilId,
+      platformAraKayitSayisi,
+      platformAraKayitProfilId,
+      ikinciKatIskeletVar: katSayisi === 2 ? ikinciKatIskeletVar : false,
+      iskeletAcikSayisi,
+      iskeletKolonProfilId,
+      iskeletKirisProfilId,
+      iskeletCerceveAraligiHedefMm,
+      iskeletBaglantiKirisiProfilId,
+      iskeletStabiliteBaglantisiVar,
+      iskeletStabiliteProfilId: iskeletStabiliteBaglantisiVar ? iskeletStabiliteProfilId : undefined,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    genislikMm,
+    uzunlukMm,
+    katYuksekligiMm,
+    katSayisi,
+    bosluklar,
+    cerceveProfilId,
+    cerceveTasmaMm,
+    kaplamaTuru,
+    kaplamaMalzemeId,
+    merdivenVar,
+    merdivenGenislikMm,
+    merdivenBasamakYuksekligiHedefMm,
+    merdivenDerinlikMm,
+    merdivenTasiyiciProfilId,
+    merdivenTasiyiciAdet,
+    merdivenBasamakKalinlikMm,
+    merdivenBasamakSacMalzemeId,
+    merdivenKorkulukYuksekligiMm,
+    merdivenKorkulukDikmeProfilId,
+    merdivenKorkulukUstProfilId,
+    merdivenKorkulukDikmeAraligiHedefMm,
+    merdivenKorkulukBaglantiMalzemeId,
+    platformKorkulukVar,
+    platformKorkulukUzunlukMm,
+    platformKorkulukYuksekligiMm,
+    platformKorkulukDikmeAraligiHedefMm,
+    platformUstProfilId,
+    platformAltProfilId,
+    platformDikmeProfilId,
+    platformAraKayitSayisi,
+    platformAraKayitProfilId,
+    ikinciKatIskeletVar,
+    iskeletAcikSayisi,
+    iskeletKolonProfilId,
+    iskeletKirisProfilId,
+    iskeletCerceveAraligiHedefMm,
+    iskeletBaglantiKirisiProfilId,
+    iskeletStabiliteBaglantisiVar,
+    iskeletStabiliteProfilId,
+  ]);
+
+  const bosluklariGuncelle = (i: number, alan: keyof KonteynerBoslukTaslak, deger: string | number) => {
+    setBosluklar((liste) => liste.map((b, idx) => (idx === i ? { ...b, [alan]: deger } : b)));
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <Sayi label="Konteyner Eni (mm)" value={genislikMm} onChange={setGenislikMm} />
+        <Sayi label="Konteyner Boyu (mm)" value={uzunlukMm} onChange={setUzunlukMm} />
+        <Sayi label="Kat Yüksekliği (mm)" value={katYuksekligiMm} onChange={setKatYuksekligiMm} />
+        <div>
+          <label className="field-label">Kat Sayısı</label>
+          <select className="field-select" value={katSayisi} onChange={(e) => setKatSayisi(Number(e.target.value) === 2 ? 2 : 1)}>
+            <option value={1}>1 Kat</option>
+            <option value={2}>2 Kat</option>
+          </select>
+        </div>
+      </div>
+      <p className="text-xs text-neutral-500 -mt-1">
+        Standart 20/40ft konteyner: en 2438mm, kat yüksekliği 2591mm (standart) / 2896mm (yüksek küp). Konteynerin kendi
+        gövdesi bu hesaba dahil değildir; sadece takviye/kaplama/merdiven/iskelet hesaplanır.
+      </p>
+
+      <div className="rounded-xl border border-neutral-200 p-3 space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <span className="font-semibold text-sm">Pencere / Kapı Boşlukları (opsiyonel)</span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="btn-secondary btn-sm"
+              onClick={() =>
+                setBosluklar((l) => [
+                  ...l,
+                  { etiket: `Kapı ${l.filter((b) => b.tipi === "kapi").length + 1}`, tipi: "kapi", katNo: 1, konumMm: 0, tabanYuksekligiMm: 0, genislikMm: 900, yukseklikMm: 2000 },
+                ])
+              }
+            >
+              ➕ Kapı Ekle
+            </button>
+            <button
+              type="button"
+              className="btn-secondary btn-sm"
+              onClick={() =>
+                setBosluklar((l) => [
+                  ...l,
+                  { etiket: `Pencere ${l.filter((b) => b.tipi === "pencere").length + 1}`, tipi: "pencere", katNo: 1, konumMm: 0, tabanYuksekligiMm: 900, genislikMm: 1200, yukseklikMm: 1200 },
+                ])
+              }
+            >
+              ➕ Pencere Ekle
+            </button>
+          </div>
+        </div>
+        <p className="text-xs text-neutral-500">Konum: konteynerin uzun kenarı boyunca, sol köşeden. Taban yüksekliği: o katın tabanından.</p>
+        {bosluklar.length > 0 && (
+          <MaterialSelect label="Boşluk Çerçevesi Profili" materials={materials} value={cerceveProfilId} onChange={setCerceveProfilId} />
+        )}
+        {bosluklar.map((b, i) => (
+          <div key={i} className="grid grid-cols-4 md:grid-cols-8 gap-2 items-end border-t border-neutral-100 pt-3">
+            <div className="col-span-2">
+              <label className="field-label">Ad</label>
+              <input className="field-input" value={b.etiket} onChange={(e) => bosluklariGuncelle(i, "etiket", e.target.value)} />
+            </div>
+            <div>
+              <label className="field-label">Tip</label>
+              <select className="field-select" value={b.tipi} onChange={(e) => bosluklariGuncelle(i, "tipi", e.target.value)}>
+                <option value="pencere">Pencere</option>
+                <option value="kapi">Kapı</option>
+              </select>
+            </div>
+            {katSayisi === 2 && (
+              <div>
+                <label className="field-label">Kat</label>
+                <select className="field-select" value={b.katNo} onChange={(e) => bosluklariGuncelle(i, "katNo", Number(e.target.value))}>
+                  <option value={1}>1. Kat</option>
+                  <option value={2}>2. Kat</option>
+                </select>
+              </div>
+            )}
+            <Sayi label="Konum (mm)" value={b.konumMm} onChange={(v) => bosluklariGuncelle(i, "konumMm", v)} />
+            <Sayi label="Taban Yük. (mm)" value={b.tabanYuksekligiMm} onChange={(v) => bosluklariGuncelle(i, "tabanYuksekligiMm", v)} />
+            <Sayi label="Genişlik (mm)" value={b.genislikMm} onChange={(v) => bosluklariGuncelle(i, "genislikMm", v)} />
+            <Sayi label="Yükseklik (mm)" value={b.yukseklikMm} onChange={(v) => bosluklariGuncelle(i, "yukseklikMm", v)} />
+            <button type="button" className="btn-danger btn-sm" onClick={() => setBosluklar((l) => l.filter((_, idx) => idx !== i))}>
+              Sil
+            </button>
+          </div>
+        ))}
+        {bosluklar.length === 0 && <div className="text-sm text-neutral-500">Boşluk eklenmedi.</div>}
+        <Sayi label="Çerçeve Taşma Payı (mm)" value={cerceveTasmaMm} onChange={setCerceveTasmaMm} />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="field-label">Dış Kaplama (opsiyonel ek giydirme)</label>
+          <select className="field-select" value={kaplamaTuru} onChange={(e) => setKaplamaTuru(e.target.value)}>
+            {DUVAR_DIS_KAPLAMA_SECENEKLERI.map((s) => (
+              <option key={s.key} value={s.key}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        {kaplamaTuru !== "yok" && (
+          <MaterialSelect
+            label="Kaplama Sac Malzemesi (opsiyonel, stok/maliyet için)"
+            materials={sacMalzemeler}
+            value={kaplamaMalzemeId}
+            onChange={setKaplamaMalzemeId}
+            allowEmpty
+          />
+        )}
+      </div>
+
+      {katSayisi === 2 && (
+        <div className="rounded-xl border border-neutral-200 p-3 space-y-3">
+          <label className="flex items-center gap-2 text-sm font-medium">
+            <input type="checkbox" checked={merdivenVar} onChange={(e) => setMerdivenVar(e.target.checked)} />
+            Kat arası merdiven ekle
+          </label>
+          {merdivenVar && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-3">
+                <Sayi label="Merdiven Genişliği (mm)" value={merdivenGenislikMm} onChange={setMerdivenGenislikMm} />
+                <Sayi label="Basamak Yüksekliği Hedefi (mm)" value={merdivenBasamakYuksekligiHedefMm} onChange={setMerdivenBasamakYuksekligiHedefMm} />
+                <Sayi label="Merdiven Derinliği (mm)" value={merdivenDerinlikMm} onChange={setMerdivenDerinlikMm} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <MaterialSelect label="Taşıyıcı (Kiriş) Profili" materials={materials} value={merdivenTasiyiciProfilId} onChange={setMerdivenTasiyiciProfilId} />
+                <Sayi label="Taşıyıcı Adedi" value={merdivenTasiyiciAdet} onChange={setMerdivenTasiyiciAdet} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Sayi label="Basamak Kalınlığı (mm)" value={merdivenBasamakKalinlikMm} onChange={setMerdivenBasamakKalinlikMm} />
+                <MaterialSelect
+                  label="Basamak Sac Malzemesi (opsiyonel, stok/maliyet için)"
+                  materials={sacMalzemeler}
+                  value={merdivenBasamakSacMalzemeId}
+                  onChange={setMerdivenBasamakSacMalzemeId}
+                  allowEmpty
+                />
+              </div>
+              <details className="rounded-xl border border-neutral-200 p-3">
+                <summary className="font-semibold cursor-pointer">Gelişmiş: Merdiven Korkuluğu (opsiyonel)</summary>
+                <div className="mt-3 space-y-3">
+                  <Sayi
+                    label="Korkuluk Yüksekliği (mm, 0 = yok)"
+                    value={merdivenKorkulukYuksekligiMm ?? 0}
+                    onChange={(v) => setMerdivenKorkulukYuksekligiMm(v > 0 ? v : undefined)}
+                  />
+                  {merdivenKorkulukYuksekligiMm && merdivenKorkulukYuksekligiMm > 0 && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <MaterialSelect label="Korkuluk Dikme Profili" materials={materials} value={merdivenKorkulukDikmeProfilId} onChange={setMerdivenKorkulukDikmeProfilId} />
+                      <MaterialSelect label="Korkuluk Üst Profili" materials={materials} value={merdivenKorkulukUstProfilId} onChange={setMerdivenKorkulukUstProfilId} />
+                      <Sayi label="Korkuluk Dikme Aralığı (mm)" value={merdivenKorkulukDikmeAraligiHedefMm} onChange={setMerdivenKorkulukDikmeAraligiHedefMm} />
+                      <MaterialSelect
+                        label="Dikme Bağlantı Plakası Malzemesi (opsiyonel)"
+                        materials={baglantiMalzemeler}
+                        value={merdivenKorkulukBaglantiMalzemeId}
+                        onChange={setMerdivenKorkulukBaglantiMalzemeId}
+                        allowEmpty
+                      />
+                    </div>
+                  )}
+                </div>
+              </details>
+            </div>
+          )}
+        </div>
+      )}
+
+      {katSayisi === 2 && (
+        <div className="rounded-xl border border-neutral-200 p-3 space-y-3">
+          <label className="flex items-center gap-2 text-sm font-medium">
+            <input type="checkbox" checked={platformKorkulukVar} onChange={(e) => setPlatformKorkulukVar(e.target.checked)} />
+            2. kat / balkon açık kenarına korkuluk ekle
+          </label>
+          {platformKorkulukVar && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-3">
+                <Sayi label="Toplam Uzunluk (mm)" value={platformKorkulukUzunlukMm} onChange={setPlatformKorkulukUzunlukMm} />
+                <Sayi label="Yükseklik (mm)" value={platformKorkulukYuksekligiMm} onChange={setPlatformKorkulukYuksekligiMm} />
+                <Sayi label="Dikme Aralığı (mm)" value={platformKorkulukDikmeAraligiHedefMm} onChange={setPlatformKorkulukDikmeAraligiHedefMm} />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <MaterialSelect label="Üst Profil" materials={materials} value={platformUstProfilId} onChange={setPlatformUstProfilId} />
+                <MaterialSelect label="Alt Profil" materials={materials} value={platformAltProfilId} onChange={setPlatformAltProfilId} />
+                <MaterialSelect label="Dikme Profili" materials={materials} value={platformDikmeProfilId} onChange={setPlatformDikmeProfilId} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Sayi label="Ara Kayıt Sayısı" value={platformAraKayitSayisi} onChange={setPlatformAraKayitSayisi} />
+                <MaterialSelect
+                  label="Ara Kayıt Profili"
+                  materials={materials}
+                  value={platformAraKayitProfilId}
+                  onChange={setPlatformAraKayitProfilId}
+                  allowEmpty
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {katSayisi === 2 && (
+        <div className="rounded-xl border border-neutral-200 p-3 space-y-3">
+          <label className="flex items-center gap-2 text-sm font-medium">
+            <input type="checkbox" checked={ikinciKatIskeletVar} onChange={(e) => setIkinciKatIskeletVar(e.target.checked)} />
+            2. katı taşıyan ek çelik iskelet ekle
+          </label>
+          {ikinciKatIskeletVar && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <MaterialSelect label="Kolon Profili" materials={materials} value={iskeletKolonProfilId} onChange={setIskeletKolonProfilId} />
+                <MaterialSelect label="Kiriş Profili" materials={materials} value={iskeletKirisProfilId} onChange={setIskeletKirisProfilId} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Sayi label="Açıklık (Bay) Sayısı" value={iskeletAcikSayisi} onChange={setIskeletAcikSayisi} />
+                <Sayi label="Çerçeve Aralığı (mm)" value={iskeletCerceveAraligiHedefMm} onChange={setIskeletCerceveAraligiHedefMm} />
+              </div>
+              <MaterialSelect
+                label="Bağlantı Kirişi Profili (boy yönü, opsiyonel)"
+                materials={materials}
+                value={iskeletBaglantiKirisiProfilId}
+                onChange={setIskeletBaglantiKirisiProfilId}
+                allowEmpty
+              />
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <input
+                  type="checkbox"
+                  checked={iskeletStabiliteBaglantisiVar}
+                  onChange={(e) => setIskeletStabiliteBaglantisiVar(e.target.checked)}
+                />
+                İlk açıklığa stabilite çaprazı (rüzgar/deprem) ekle
+              </label>
+              {iskeletStabiliteBaglantisiVar && (
+                <MaterialSelect label="Stabilite Çaprazı Profili (genelde L profil)" materials={materials} value={iskeletStabiliteProfilId} onChange={setIskeletStabiliteProfilId} />
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

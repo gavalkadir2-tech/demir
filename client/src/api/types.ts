@@ -6,6 +6,7 @@ export type ProjectCategory =
   | "DOOR"
   | "FORGE"
   | "STEEL_STRUCTURE"
+  | "CONTAINER"
   | "CHASSIS"
   | "SHELF"
   | "TABLE"
@@ -32,6 +33,7 @@ export const KATEGORI_ETIKET: Record<ProjectCategory, string> = {
   DOOR: "Kapı",
   FORGE: "Ferforje",
   STEEL_STRUCTURE: "Çelik Konstrüksiyon",
+  CONTAINER: "Konteyner",
   CHASSIS: "Şase",
   SHELF: "Raf",
   TABLE: "Masa",

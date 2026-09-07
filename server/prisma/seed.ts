@@ -54,6 +54,11 @@ async function main() {
       { key: "pergola", name: "Pergola", description: "Serbest duran, açık latalı gölgelik yapısı" },
       { key: "ferforje_panel", name: "Ferforje Panel", description: "Dekoratif demir panel / pencere korkuluğu" },
       { key: "steel_frame", name: "Kolon-Kiriş İskelet", description: "Genel amaçlı çelik taşıyıcı iskelet (kolon + kiriş, tek/çok açıklıklı)" },
+      {
+        key: "container",
+        name: "Konteyner Ev/Ofis",
+        description: "2 katlı konteyner dönüşümü: pencere/kapı boşluk çerçevesi, dış kaplama, kat arası merdiven + korkuluk, 2. kat çelik iskeleti",
+      },
       { key: "custom", name: "Manuel / Çelik Konstrüksiyon", description: "Elle parça girişi, hazır şablona bağlı değil" },
     ],
     skipDuplicates: true,
