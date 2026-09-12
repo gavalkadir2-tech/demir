@@ -619,6 +619,36 @@ export function UrunFormu({
     setSemaSayiSurumu((v) => v + 1);
   };
 
+  /** Konteyner şematiğinde aktif kat+yön duvarına tıklanarak dikme pozisyonu düzenlendiğinde
+   * çağrılır. 2. kat henüz 1. kattan ayrılmamışsa (duvarlar2 yok), düzenlenen kat 2 ise burada
+   * 1. kat duvarları kopyalanarak duvarlar2 "çatallanır" - böylece düzenleme sadece o katı etkiler.
+   * duvarlar/duvarlar2 zaten KonteynerAlanlari'nın tek parça izlediği state olduğundan (ayrı
+   * dikmePozisyonlariMm alanı değil, duvar nesnesinin bir parçası), ayrı bir "korunabilir" sarmalayıcı
+   * gerekmez - şematik tıklamasının tetiklediği yeniden-mount (semaSayiSurumu) yeterlidir. */
+  const konteynerDuvarDikmeGuncelle = async (kat: 1 | 2, yon: "on" | "arka" | "sol" | "sag", yeniListe: number[] | null) => {
+    const hedefAlan = kat === 2 ? "duvarlar2" : "duvarlar";
+    const temelSet = (params[hedefAlan] as Record<string, Record<string, unknown>> | undefined) ?? (params.duvarlar as Record<string, Record<string, unknown>>);
+    const yeniDuvar = { ...(temelSet?.[yon] ?? {}) };
+    if (yeniListe) yeniDuvar.dikmePozisyonlariMm = yeniListe;
+    else delete yeniDuvar.dikmePozisyonlariMm;
+    const yeniSet = { ...temelSet, [yon]: yeniDuvar };
+    await hesapla({ ...params, [hedefAlan]: yeniSet });
+    setSemaSayiSurumu((v) => v + 1);
+  };
+
+  /** Konteyner şematiğinde aktif kat+yön duvarına yatay ara profil eklenip/kaldırıldığında çağrılır. */
+  const konteynerDuvarYatayGuncelle = async (
+    kat: 1 | 2,
+    yon: "on" | "arka" | "sol" | "sag",
+    yeniListe: DuvarYatayAraProfilVeri[]
+  ) => {
+    const hedefAlan = kat === 2 ? "duvarlar2" : "duvarlar";
+    const temelSet = (params[hedefAlan] as Record<string, Record<string, unknown>> | undefined) ?? (params.duvarlar as Record<string, Record<string, unknown>>);
+    const yeniSet = { ...temelSet, [yon]: { ...(temelSet?.[yon] ?? {}), yatayAraProfilleri: yeniListe } };
+    await hesapla({ ...params, [hedefAlan]: yeniSet });
+    setSemaSayiSurumu((v) => v + 1);
+  };
+
   /** CatiKafesiAlanlari'nın onChange'i kendi izlediği alanlarla params'ı baştan kurar ve
    * kafesSayisiOverride'ı hiç içermez; çatı uzunluğu değişmediyse (override'ın hâlâ geçerli
    * olduğu anlamına gelir) mevcut override korunur - bu hem sonraki alan değişikliklerinde hem de
@@ -787,11 +817,12 @@ export function UrunFormu({
         )}
         {templateKey === "container" && (
           <KonteynerAlanlari
+            key={`konteyner-${semaSayiSurumu}`}
             materials={materials}
             sacMalzemeler={sacMalzemeler ?? []}
             baglantiMalzemeler={baglantiMalzemeler ?? []}
             onChange={setParams}
-            baslangic={baslangic}
+            baslangic={semaSayiSurumu > 0 ? params : baslangic}
           />
         )}
 
@@ -816,7 +847,8 @@ export function UrunFormu({
               templateKey === "steel_frame" ||
               templateKey === "shelf" ||
               templateKey === "truss" ||
-              templateKey === "ferforje_panel"
+              templateKey === "ferforje_panel" ||
+              templateKey === "container"
             }
             onDikmePozisyonlariDegisti={
               templateKey === "wall" || templateKey === "railing" ? dikmePozisyonlariGuncelle : undefined
@@ -828,6 +860,8 @@ export function UrunFormu({
             onRafSayisiDegisti={templateKey === "shelf" ? rafSayisiGuncelle : undefined}
             onKafesSayisiDegisti={templateKey === "truss" ? kafesSayisiGuncelle : undefined}
             onDikeyCubukSayisiDegisti={templateKey === "ferforje_panel" ? dikeyCubukSayisiGuncelle : undefined}
+            onKonteynerDuvarDikmeDegisti={templateKey === "container" ? konteynerDuvarDikmeGuncelle : undefined}
+            onKonteynerDuvarYatayDegisti={templateKey === "container" ? konteynerDuvarYatayGuncelle : undefined}
           />
 
           <HesapSonucuGorunum sonuc={onizleme.sonuc} malzemeler={onizleme.malzemeler} />
@@ -2360,14 +2394,164 @@ function KolonKirisAlanlari({
   );
 }
 
-interface KonteynerBoslukTaslak {
-  etiket: string;
-  tipi: "pencere" | "kapi";
-  katNo: 1 | 2;
-  konumMm: number;
-  tabanYuksekligiMm: number;
-  genislikMm: number;
-  yukseklikMm: number;
+type KonteynerYon = "on" | "arka" | "sol" | "sag";
+
+const KONTEYNER_YON_ETIKET: Record<KonteynerYon, string> = {
+  on: "Ön Duvar",
+  arka: "Arka Duvar",
+  sol: "Sol Duvar",
+  sag: "Sağ Duvar",
+};
+const KONTEYNER_YON_SIRASI: KonteynerYon[] = ["on", "arka", "sol", "sag"];
+
+interface KonteynerDuvarDegerleri {
+  dikmeAraligiHedefMm: number;
+  ustProfilId?: number;
+  altProfilId?: number;
+  dikmeProfilId?: number;
+  lentoProfilId?: number;
+  bosluklar: DuvarBoslukTaslak[];
+  disKaplamaTuru: string;
+  disKaplamaMalzemeId?: number;
+  icKaplamaTuru: string;
+  icKaplamaMalzemeId?: number;
+  dubelMalzemeId?: number;
+  dikmePozisyonlariMm?: number[];
+  yatayAraProfilleri?: DuvarYatayAraProfilVeri[];
+}
+
+function konteynerDuvarVarsayilan(): KonteynerDuvarDegerleri {
+  return { dikmeAraligiHedefMm: 600, bosluklar: [], disKaplamaTuru: "yok", icKaplamaTuru: "yok" };
+}
+
+function konteynerDuvarSetiVarsayilan(): Record<KonteynerYon, KonteynerDuvarDegerleri> {
+  return {
+    on: konteynerDuvarVarsayilan(),
+    arka: konteynerDuvarVarsayilan(),
+    sol: konteynerDuvarVarsayilan(),
+    sag: konteynerDuvarVarsayilan(),
+  };
+}
+
+/** Konteynerin bir duvarının ayarları - Çelik Duvar Paneli'ndeki (DuvarAlanlari) genişlik/yükseklik
+ * dışındaki tüm alanlar (bunlar konteynerin genel ölçülerinden otomatik atanır, 4 duvarın bir kutu
+ * oluşturması için). Tam kontrollü bileşendir (kendi state'i yok) - şematik üzerinden yapılan
+ * dikme/yatay-ara-profil düzenlemeleri de aynı `deger` nesnesi üzerinden akar. */
+function KonteynerDuvarFormu({
+  baslik,
+  materials,
+  sacMalzemeler,
+  deger,
+  onDegis,
+}: {
+  baslik: string;
+  materials: Material[];
+  sacMalzemeler: Material[];
+  deger: KonteynerDuvarDegerleri;
+  onDegis: (yeni: KonteynerDuvarDegerleri) => void;
+}) {
+  const bosluklariGuncelle = (i: number, alan: keyof DuvarBoslukTaslak, v: string | number) => {
+    onDegis({ ...deger, bosluklar: deger.bosluklar.map((b, idx) => (idx === i ? { ...b, [alan]: v } : b)) });
+  };
+
+  return (
+    <details className="rounded-xl border border-neutral-200 p-3" open>
+      <summary className="font-semibold cursor-pointer">{baslik}</summary>
+      <div className="mt-3 space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <Sayi label="Dikme Aralığı (mm)" value={deger.dikmeAraligiHedefMm} onChange={(v) => onDegis({ ...deger, dikmeAraligiHedefMm: v })} />
+          <MaterialSelect label="Dikme Profili" materials={materials} value={deger.dikmeProfilId} onChange={(v) => onDegis({ ...deger, dikmeProfilId: v })} />
+          <MaterialSelect label="Üst Ray" materials={materials} value={deger.ustProfilId} onChange={(v) => onDegis({ ...deger, ustProfilId: v })} />
+          <MaterialSelect label="Alt Ray" materials={materials} value={deger.altProfilId} onChange={(v) => onDegis({ ...deger, altProfilId: v })} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="field-label">Dış Cephe Kaplaması</label>
+            <select className="field-select" value={deger.disKaplamaTuru} onChange={(e) => onDegis({ ...deger, disKaplamaTuru: e.target.value })}>
+              {DUVAR_DIS_KAPLAMA_SECENEKLERI.map((s) => (
+                <option key={s.key} value={s.key}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="field-label">İç Cephe Kaplaması</label>
+            <select className="field-select" value={deger.icKaplamaTuru} onChange={(e) => onDegis({ ...deger, icKaplamaTuru: e.target.value })}>
+              {DUVAR_IC_KAPLAMA_SECENEKLERI.map((s) => (
+                <option key={s.key} value={s.key}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          {deger.disKaplamaTuru !== "yok" && (
+            <MaterialSelect
+              label="Dış Kaplama Sac Malzemesi (opsiyonel)"
+              materials={sacMalzemeler}
+              value={deger.disKaplamaMalzemeId}
+              onChange={(v) => onDegis({ ...deger, disKaplamaMalzemeId: v })}
+              allowEmpty
+            />
+          )}
+          {deger.icKaplamaTuru !== "yok" && (
+            <MaterialSelect
+              label="İç Kaplama Sac Malzemesi (opsiyonel)"
+              materials={sacMalzemeler}
+              value={deger.icKaplamaMalzemeId}
+              onChange={(v) => onDegis({ ...deger, icKaplamaMalzemeId: v })}
+              allowEmpty
+            />
+          )}
+        </div>
+        <div className="rounded-xl border border-neutral-100 p-3 space-y-2">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <span className="text-xs font-semibold">Kapı / Pencere Boşlukları</span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="btn-secondary btn-sm"
+                onClick={() =>
+                  onDegis({ ...deger, bosluklar: [...deger.bosluklar, { etiket: "Kapı", konumMm: 0, tabanYuksekligiMm: 0, genislikMm: 900, yukseklikMm: 2100 }] })
+                }
+              >
+                ➕ Kapı
+              </button>
+              <button
+                type="button"
+                className="btn-secondary btn-sm"
+                onClick={() =>
+                  onDegis({ ...deger, bosluklar: [...deger.bosluklar, { etiket: "Pencere", konumMm: 0, tabanYuksekligiMm: 900, genislikMm: 1200, yukseklikMm: 1200 }] })
+                }
+              >
+                ➕ Pencere
+              </button>
+            </div>
+          </div>
+          {deger.bosluklar.map((b, i) => (
+            <div key={i} className="grid grid-cols-3 md:grid-cols-6 gap-2 items-end border-t border-neutral-100 pt-2">
+              <div className="col-span-2">
+                <label className="field-label">Ad</label>
+                <input className="field-input" value={b.etiket} onChange={(e) => bosluklariGuncelle(i, "etiket", e.target.value)} />
+              </div>
+              <Sayi label="Konum (mm)" value={b.konumMm} onChange={(v) => bosluklariGuncelle(i, "konumMm", v)} />
+              <Sayi label="Taban Yük. (mm)" value={b.tabanYuksekligiMm} onChange={(v) => bosluklariGuncelle(i, "tabanYuksekligiMm", v)} />
+              <Sayi label="Genişlik (mm)" value={b.genislikMm} onChange={(v) => bosluklariGuncelle(i, "genislikMm", v)} />
+              <Sayi label="Yükseklik (mm)" value={b.yukseklikMm} onChange={(v) => bosluklariGuncelle(i, "yukseklikMm", v)} />
+              <button
+                type="button"
+                className="btn-danger btn-sm"
+                onClick={() => onDegis({ ...deger, bosluklar: deger.bosluklar.filter((_, idx) => idx !== i) })}
+              >
+                Sil
+              </button>
+            </div>
+          ))}
+          {deger.bosluklar.length === 0 && <div className="text-xs text-neutral-500">Boşluk eklenmedi, duvar tam dolu hesaplanacak.</div>}
+        </div>
+      </div>
+    </details>
+  );
 }
 
 function KonteynerAlanlari({
@@ -2388,14 +2572,13 @@ function KonteynerAlanlari({
   const [katYuksekligiMm, setKatYuksekligiMm] = useState<number>(() => (baslangic?.katYuksekligiMm as number) ?? 2591);
   const [katSayisi, setKatSayisi] = useState<1 | 2>(() => ((baslangic?.katSayisi as number) === 2 ? 2 : 1));
 
-  const [bosluklar, setBosluklar] = useState<KonteynerBoslukTaslak[]>(
-    () => (baslangic?.bosluklar as KonteynerBoslukTaslak[] | undefined) ?? []
+  const [duvarlar, setDuvarlar] = useState<Record<KonteynerYon, KonteynerDuvarDegerleri>>(
+    () => (baslangic?.duvarlar as Record<KonteynerYon, KonteynerDuvarDegerleri> | undefined) ?? konteynerDuvarSetiVarsayilan()
   );
-  const [cerceveProfilId, setCerceveProfilId] = useState<number | undefined>(() => baslangic?.cerceveProfilId as number | undefined);
-  const [cerceveTasmaMm, setCerceveTasmaMm] = useState<number>(() => (baslangic?.cerceveTasmaMm as number) ?? 40);
-
-  const [kaplamaTuru, setKaplamaTuru] = useState<string>(() => (baslangic?.kaplamaTuru as string) ?? "yok");
-  const [kaplamaMalzemeId, setKaplamaMalzemeId] = useState<number | undefined>(() => baslangic?.kaplamaMalzemeId as number | undefined);
+  const [kat2Farkli, setKat2Farkli] = useState<boolean>(() => Boolean(baslangic?.duvarlar2));
+  const [duvarlar2, setDuvarlar2] = useState<Record<KonteynerYon, KonteynerDuvarDegerleri>>(
+    () => (baslangic?.duvarlar2 as Record<KonteynerYon, KonteynerDuvarDegerleri> | undefined) ?? konteynerDuvarSetiVarsayilan()
+  );
 
   const [merdivenVar, setMerdivenVar] = useState<boolean>(() => (baslangic?.merdivenVar as boolean) ?? false);
   const [merdivenGenislikMm, setMerdivenGenislikMm] = useState<number>(() => (baslangic?.merdivenGenislikMm as number) ?? 900);
@@ -2472,11 +2655,8 @@ function KonteynerAlanlari({
       uzunlukMm,
       katYuksekligiMm,
       katSayisi,
-      bosluklar,
-      cerceveProfilId: bosluklar.length > 0 ? cerceveProfilId : undefined,
-      cerceveTasmaMm,
-      kaplamaTuru: kaplamaTuru === "yok" ? undefined : kaplamaTuru,
-      kaplamaMalzemeId: kaplamaTuru !== "yok" ? kaplamaMalzemeId : undefined,
+      duvarlar,
+      duvarlar2: katSayisi === 2 && kat2Farkli ? duvarlar2 : undefined,
       merdivenVar: katSayisi === 2 ? merdivenVar : false,
       merdivenGenislikMm,
       merdivenBasamakYuksekligiHedefMm,
@@ -2514,11 +2694,9 @@ function KonteynerAlanlari({
     uzunlukMm,
     katYuksekligiMm,
     katSayisi,
-    bosluklar,
-    cerceveProfilId,
-    cerceveTasmaMm,
-    kaplamaTuru,
-    kaplamaMalzemeId,
+    duvarlar,
+    duvarlar2,
+    kat2Farkli,
     merdivenVar,
     merdivenGenislikMm,
     merdivenBasamakYuksekligiHedefMm,
@@ -2551,9 +2729,8 @@ function KonteynerAlanlari({
     iskeletStabiliteProfilId,
   ]);
 
-  const bosluklariGuncelle = (i: number, alan: keyof KonteynerBoslukTaslak, deger: string | number) => {
-    setBosluklar((liste) => liste.map((b, idx) => (idx === i ? { ...b, [alan]: deger } : b)));
-  };
+  const duvarGuncelle = (yon: KonteynerYon, yeni: KonteynerDuvarDegerleri) => setDuvarlar((s) => ({ ...s, [yon]: yeni }));
+  const duvar2Guncelle = (yon: KonteynerYon, yeni: KonteynerDuvarDegerleri) => setDuvarlar2((s) => ({ ...s, [yon]: yeni }));
 
   return (
     <div className="space-y-3">
@@ -2574,96 +2751,50 @@ function KonteynerAlanlari({
         gövdesi bu hesaba dahil değildir; sadece takviye/kaplama/merdiven/iskelet hesaplanır.
       </p>
 
-      <div className="rounded-xl border border-neutral-200 p-3 space-y-3">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <span className="font-semibold text-sm">Pencere / Kapı Boşlukları (opsiyonel)</span>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className="btn-secondary btn-sm"
-              onClick={() =>
-                setBosluklar((l) => [
-                  ...l,
-                  { etiket: `Kapı ${l.filter((b) => b.tipi === "kapi").length + 1}`, tipi: "kapi", katNo: 1, konumMm: 0, tabanYuksekligiMm: 0, genislikMm: 900, yukseklikMm: 2000 },
-                ])
-              }
-            >
-              ➕ Kapı Ekle
-            </button>
-            <button
-              type="button"
-              className="btn-secondary btn-sm"
-              onClick={() =>
-                setBosluklar((l) => [
-                  ...l,
-                  { etiket: `Pencere ${l.filter((b) => b.tipi === "pencere").length + 1}`, tipi: "pencere", katNo: 1, konumMm: 0, tabanYuksekligiMm: 900, genislikMm: 1200, yukseklikMm: 1200 },
-                ])
-              }
-            >
-              ➕ Pencere Ekle
-            </button>
-          </div>
+      <div className="space-y-3">
+        <div className="font-semibold text-sm">
+          {katSayisi === 2 ? "1. Kat Duvarları (4 köşe)" : "Duvarlar (4 köşe)"}
         </div>
-        <p className="text-xs text-neutral-500">Konum: konteynerin uzun kenarı boyunca, sol köşeden. Taban yüksekliği: o katın tabanından.</p>
-        {bosluklar.length > 0 && (
-          <MaterialSelect label="Boşluk Çerçevesi Profili" materials={materials} value={cerceveProfilId} onChange={setCerceveProfilId} />
-        )}
-        {bosluklar.map((b, i) => (
-          <div key={i} className="grid grid-cols-4 md:grid-cols-8 gap-2 items-end border-t border-neutral-100 pt-3">
-            <div className="col-span-2">
-              <label className="field-label">Ad</label>
-              <input className="field-input" value={b.etiket} onChange={(e) => bosluklariGuncelle(i, "etiket", e.target.value)} />
-            </div>
-            <div>
-              <label className="field-label">Tip</label>
-              <select className="field-select" value={b.tipi} onChange={(e) => bosluklariGuncelle(i, "tipi", e.target.value)}>
-                <option value="pencere">Pencere</option>
-                <option value="kapi">Kapı</option>
-              </select>
-            </div>
-            {katSayisi === 2 && (
-              <div>
-                <label className="field-label">Kat</label>
-                <select className="field-select" value={b.katNo} onChange={(e) => bosluklariGuncelle(i, "katNo", Number(e.target.value))}>
-                  <option value={1}>1. Kat</option>
-                  <option value={2}>2. Kat</option>
-                </select>
-              </div>
-            )}
-            <Sayi label="Konum (mm)" value={b.konumMm} onChange={(v) => bosluklariGuncelle(i, "konumMm", v)} />
-            <Sayi label="Taban Yük. (mm)" value={b.tabanYuksekligiMm} onChange={(v) => bosluklariGuncelle(i, "tabanYuksekligiMm", v)} />
-            <Sayi label="Genişlik (mm)" value={b.genislikMm} onChange={(v) => bosluklariGuncelle(i, "genislikMm", v)} />
-            <Sayi label="Yükseklik (mm)" value={b.yukseklikMm} onChange={(v) => bosluklariGuncelle(i, "yukseklikMm", v)} />
-            <button type="button" className="btn-danger btn-sm" onClick={() => setBosluklar((l) => l.filter((_, idx) => idx !== i))}>
-              Sil
-            </button>
-          </div>
+        <p className="text-xs text-neutral-500 -mt-2">
+          Ön/arka duvar genişliği konteyner eniyle, sol/sağ duvar genişliği konteyner boyuyla otomatik eşleşir; her
+          duvar tam bir Çelik Duvar Paneli gibi (dikme aralığı, boşluklar, iç/dış kaplama, dikme pozisyonlarını elle
+          düzenleme) ayrı ayrı yapılandırılır. Boşluk konumu, o duvarın sol kenarından ölçülür.
+        </p>
+        {KONTEYNER_YON_SIRASI.map((yon) => (
+          <KonteynerDuvarFormu
+            key={yon}
+            baslik={KONTEYNER_YON_ETIKET[yon]}
+            materials={materials}
+            sacMalzemeler={sacMalzemeler}
+            deger={duvarlar[yon]}
+            onDegis={(yeni) => duvarGuncelle(yon, yeni)}
+          />
         ))}
-        {bosluklar.length === 0 && <div className="text-sm text-neutral-500">Boşluk eklenmedi.</div>}
-        <Sayi label="Çerçeve Taşma Payı (mm)" value={cerceveTasmaMm} onChange={setCerceveTasmaMm} />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="field-label">Dış Kaplama (opsiyonel ek giydirme)</label>
-          <select className="field-select" value={kaplamaTuru} onChange={(e) => setKaplamaTuru(e.target.value)}>
-            {DUVAR_DIS_KAPLAMA_SECENEKLERI.map((s) => (
-              <option key={s.key} value={s.key}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+      {katSayisi === 2 && (
+        <div className="space-y-3">
+          <label className="flex items-center gap-2 text-sm font-medium">
+            <input type="checkbox" checked={kat2Farkli} onChange={(e) => setKat2Farkli(e.target.checked)} />
+            2. kat duvarları 1. kattan farklı olsun (verilmezse 1. kat duvarları 2. kat için de aynen kullanılır)
+          </label>
+          {kat2Farkli && (
+            <div className="space-y-3">
+              <div className="font-semibold text-sm">2. Kat Duvarları (4 köşe)</div>
+              {KONTEYNER_YON_SIRASI.map((yon) => (
+                <KonteynerDuvarFormu
+                  key={yon}
+                  baslik={`2. Kat ${KONTEYNER_YON_ETIKET[yon]}`}
+                  materials={materials}
+                  sacMalzemeler={sacMalzemeler}
+                  deger={duvarlar2[yon]}
+                  onDegis={(yeni) => duvar2Guncelle(yon, yeni)}
+                />
+              ))}
+            </div>
+          )}
         </div>
-        {kaplamaTuru !== "yok" && (
-          <MaterialSelect
-            label="Kaplama Sac Malzemesi (opsiyonel, stok/maliyet için)"
-            materials={sacMalzemeler}
-            value={kaplamaMalzemeId}
-            onChange={setKaplamaMalzemeId}
-            allowEmpty
-          />
-        )}
-      </div>
+      )}
 
       {katSayisi === 2 && (
         <div className="rounded-xl border border-neutral-200 p-3 space-y-3">

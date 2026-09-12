@@ -4,14 +4,14 @@ import RailingSchematic from "./RailingSchematic";
 import StairsSchematic from "./StairsSchematic";
 import CanopySchematic from "./CanopySchematic";
 import DoorSchematic from "./DoorSchematic";
-import WallSchematic, { DuvarBoslukVeri, DuvarYatayAraProfilVeri } from "./WallSchematic";
+import WallSchematic, { DuvarBoslukVeri, DuvarYatayAraProfilVeri, DuvarPaneliSemaVeri } from "./WallSchematic";
 import TrussSchematic from "./TrussSchematic";
 import RafSchematic from "./RafSchematic";
 import DonerMerdivenSchematic from "./DonerMerdivenSchematic";
 import PergolaSchematic from "./PergolaSchematic";
 import FerforjePanelSchematic from "./FerforjePanelSchematic";
 import SteelFrameSchematic from "./SteelFrameSchematic";
-import ContainerSchematic, { KonteynerBoslukVeri } from "./ContainerSchematic";
+import ContainerSchematic, { KonteynerYon } from "./ContainerSchematic";
 
 /** Ürün şablonuna göre uygun şematik çizimi seçip render eder. Seçilen malzemelerin gerçek
  * kesit ölçülerini (widthMm/heightMm) çözüp her şemaya iletir; böylece çizimdeki profil
@@ -30,6 +30,8 @@ export default function SemaGorunum({
   onRafSayisiDegisti,
   onKafesSayisiDegisti,
   onDikeyCubukSayisiDegisti,
+  onKonteynerDuvarDikmeDegisti,
+  onKonteynerDuvarYatayDegisti,
 }: {
   templateKey: string;
   params: Record<string, unknown>;
@@ -52,6 +54,10 @@ export default function SemaGorunum({
   onKafesSayisiDegisti?: (yeniSayi: number) => void;
   /** "ferforje_panel" şablonunda kullanılır: dikey çubuk sayısını tıklayarak artırma/azaltma. */
   onDikeyCubukSayisiDegisti?: (yeniSayi: number) => void;
+  /** "container" şablonunda kullanılır: aktif kat+yön duvarının dikme pozisyonlarını düzenleme. */
+  onKonteynerDuvarDikmeDegisti?: (kat: 1 | 2, yon: KonteynerYon, yeniListe: number[] | null) => void;
+  /** "container" şablonunda kullanılır: aktif kat+yön duvarının yatay ara profillerini düzenleme. */
+  onKonteynerDuvarYatayDegisti?: (kat: 1 | 2, yon: KonteynerYon, yeniListe: DuvarYatayAraProfilVeri[]) => void;
 }) {
   const n = (k: string): number => Number(params[k] ?? 0);
   const b = (k: string): boolean => Boolean(params[k]);
@@ -262,21 +268,58 @@ export default function SemaGorunum({
           onAcikSayisiDegisti={onAcikSayisiDegisti}
         />
       );
-    case "container":
+    case "container": {
+      const katSayisiKonteyner = (n("katSayisi") === 2 ? 2 : 1) as 1 | 2;
+      const genislikMmKonteyner = n("genislikMm");
+      const uzunlukMmKonteyner = n("uzunlukMm");
+      const katYuksekligiMmKonteyner = n("katYuksekligiMm");
+      const duvarSemaVeri = (duvarParams: Record<string, unknown> | undefined, yon: KonteynerYon): DuvarPaneliSemaVeri => {
+        const dp = duvarParams ?? {};
+        const matAt = (k: string): Material | undefined => {
+          const v = dp[k];
+          return typeof v === "number" ? malzemeler[String(v)] : undefined;
+        };
+        return {
+          genislikMm: yon === "on" || yon === "arka" ? genislikMmKonteyner : uzunlukMmKonteyner,
+          yukseklikMm: katYuksekligiMmKonteyner,
+          dikmeAraligiHedefMm: Number(dp.dikmeAraligiHedefMm ?? 0),
+          bosluklar: (dp.bosluklar as DuvarBoslukVeri[] | undefined) ?? [],
+          disKaplamaVar: Boolean(dp.disKaplamaTuru && dp.disKaplamaTuru !== "yok"),
+          icKaplamaVar: Boolean(dp.icKaplamaTuru && dp.icKaplamaTuru !== "yok"),
+          dikmeKesit: kesitOlcusu(matAt("dikmeProfilId")),
+          rayKesit: kesitOlcusu(matAt("ustProfilId")),
+          dikmePozisyonlariOverrideMm: dp.dikmePozisyonlariMm as number[] | undefined,
+          yatayAraProfilleriMm: (dp.yatayAraProfilleri as DuvarYatayAraProfilVeri[] | undefined) ?? [],
+        };
+      };
+      const duvarlar1Raw = (params.duvarlar as Record<KonteynerYon, Record<string, unknown>> | undefined) ?? ({} as any);
+      const duvarlar2Raw = params.duvarlar2 as Record<KonteynerYon, Record<string, unknown>> | undefined;
+      const kat1: Record<KonteynerYon, DuvarPaneliSemaVeri> = {
+        on: duvarSemaVeri(duvarlar1Raw.on, "on"),
+        arka: duvarSemaVeri(duvarlar1Raw.arka, "arka"),
+        sol: duvarSemaVeri(duvarlar1Raw.sol, "sol"),
+        sag: duvarSemaVeri(duvarlar1Raw.sag, "sag"),
+      };
+      const kat2: Record<KonteynerYon, DuvarPaneliSemaVeri> | undefined =
+        katSayisiKonteyner === 2
+          ? {
+              on: duvarSemaVeri(duvarlar2Raw?.on ?? duvarlar1Raw.on, "on"),
+              arka: duvarSemaVeri(duvarlar2Raw?.arka ?? duvarlar1Raw.arka, "arka"),
+              sol: duvarSemaVeri(duvarlar2Raw?.sol ?? duvarlar1Raw.sol, "sol"),
+              sag: duvarSemaVeri(duvarlar2Raw?.sag ?? duvarlar1Raw.sag, "sag"),
+            }
+          : undefined;
       return (
         <ContainerSchematic
-          veri={{
-            genislikMm: n("genislikMm"),
-            uzunlukMm: n("uzunlukMm"),
-            katYuksekligiMm: n("katYuksekligiMm"),
-            katSayisi: (n("katSayisi") === 2 ? 2 : 1) as 1 | 2,
-            bosluklarMm: (params.bosluklar as KonteynerBoslukVeri[] | undefined) ?? [],
-            merdivenVar: b("merdivenVar"),
-            merdivenDerinlikMm: n("merdivenDerinlikMm") || undefined,
-            platformKorkulukVar: b("platformKorkulukVar"),
-          }}
+          katSayisi={katSayisiKonteyner}
+          kat1Duvarlar={kat1}
+          kat2Duvarlar={kat2}
+          duzenlenebilir={duzenlenebilir}
+          onDikmePozisyonlariDegisti={onKonteynerDuvarDikmeDegisti}
+          onYatayAraProfilleriDegisti={onKonteynerDuvarYatayDegisti}
         />
       );
+    }
     default:
       return null;
   }

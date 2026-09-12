@@ -239,29 +239,23 @@ const steelFrameSchema = z.object({
   ankrajMalzemeId: z.number().int().optional(),
 });
 
-const konteynerBosluklarSchema = z.array(
-  z.object({
-    etiket: z.string().min(1),
-    tipi: z.enum(["pencere", "kapi"]),
-    katNo: z.union([z.literal(1), z.literal(2)]),
-    konumMm: z.number(),
-    genislikMm: z.number(),
-    yukseklikMm: z.number(),
-    tabanYuksekligiMm: z.number().optional(),
-  })
-);
+// Konteynerin bir duvarı, aynı Çelik Duvar Paneli şemasıdır (genişlik/yükseklik hariç -
+// bunlar konteynerin genel ölçülerinden otomatik atanır, 4 duvarın bir kutu oluşturması için).
+const konteynerDuvarSchema = wallSchema.omit({ genislikMm: true, yukseklikMm: true });
+const konteynerDuvarSetiSchema = z.object({
+  on: konteynerDuvarSchema,
+  arka: konteynerDuvarSchema,
+  sol: konteynerDuvarSchema,
+  sag: konteynerDuvarSchema,
+});
 
 const containerSchema = z.object({
   genislikMm: z.number(),
   uzunlukMm: z.number(),
   katYuksekligiMm: z.number(),
   katSayisi: z.union([z.literal(1), z.literal(2)]),
-  bosluklar: konteynerBosluklarSchema.optional(),
-  cerceveProfilId: z.number().int().optional(),
-  cerceveTasmaMm: z.number().optional(),
-  kaplamaTuru: kaplamaTuruEnum.optional(),
-  kaplamaKalinlikMm: z.number().optional(),
-  kaplamaMalzemeId: z.number().int().optional(),
+  duvarlar: konteynerDuvarSetiSchema,
+  duvarlar2: konteynerDuvarSetiSchema.optional(),
   merdivenVar: z.boolean().optional(),
   merdivenGenislikMm: z.number().optional(),
   merdivenBasamakYuksekligiHedefMm: z.number().optional(),
@@ -306,7 +300,17 @@ const customSchema = z.object({
   ),
 });
 
-/** İstemciden gelen "...ProfilId" alanlarını hesaplama motorunun beklediği "...ProfilKey" (string) alanlarına çevirir. */
+/** Herhangi bir değeri (nesne/dizi/skaler) idToKey ile aynı kurala göre derinlemesine dönüştürür -
+ * örn. konteynerin duvarlar.on.ustProfilId gibi iç içe alanlarına da ulaşır. */
+function idToKeyDerin(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(idToKeyDerin);
+  if (v && typeof v === "object") return idToKey(v as Record<string, unknown>);
+  return v;
+}
+
+/** İstemciden gelen "...ProfilId" alanlarını hesaplama motorunun beklediği "...ProfilKey" (string)
+ * alanlarına çevirir. İç içe nesne/dizilere de (örn. konteynerin duvarlar.on.ustProfilId gibi
+ * alanlarına) derinlemesine uygulanır. */
 export function idToKey(obj: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(obj)) {
@@ -314,7 +318,7 @@ export function idToKey(obj: Record<string, unknown>): Record<string, unknown> {
     if (k.endsWith("Id") && typeof v === "number") {
       out[k.replace(/Id$/, "Key")] = String(v);
     } else {
-      out[k] = v;
+      out[k] = idToKeyDerin(v);
     }
   }
   return out;
