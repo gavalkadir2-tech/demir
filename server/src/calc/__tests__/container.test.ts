@@ -381,3 +381,132 @@ test("konteyner: duvar/çatı/iç duvar yalıtım ve malzeme kalemleri doğru ma
   // Çatının kendi malzeme kalemleri (mesnet plakası vb.) de aynı şekilde "Çatı: " önekiyle gelmeli.
   assert.ok(sonuc.baglantiKalemleri.some((k) => k.label.startsWith("Çatı: ")));
 });
+
+test("konteyner: taban döşemesi eklenirse taban alanı kadar kaplama kalemi oluşur", () => {
+  const sonuc = calculateContainer({
+    genislikMm: 2438,
+    uzunlukMm: 6058,
+    katYuksekligiMm: 2591,
+    katSayisi: 1,
+    duvarlar: duvarSeti(),
+    tabanVar: true,
+    tabanKaplamaTuru: "trapez_sac",
+    tabanKaplamaKalinlikMm: 1,
+    tabanKaplamaMalzemeKey: "55",
+  });
+
+  const taban = sonuc.sacKalemleri.find((s) => s.label === "Taban kaplaması (trapez sac)");
+  assert.ok(taban, "Taban kaplaması kalemi eksik");
+  assert.equal(taban!.materialKey, "55");
+  assert.ok(sonuc.ozetDegerler.tabanKaplamaSiparisAlaniM2 > 0);
+});
+
+test("konteyner: taban döşemesi kat sayısından bağımsız çalışır (2 katlı, sadece bir kez)", () => {
+  const sonuc = calculateContainer({
+    genislikMm: 2438,
+    uzunlukMm: 6058,
+    katYuksekligiMm: 2591,
+    katSayisi: 2,
+    duvarlar: duvarSeti(),
+    tabanVar: true,
+    tabanKaplamaTuru: "sandvic_panel",
+  });
+
+  const tabanKalemleri = sonuc.sacKalemleri.filter((s) => s.label.startsWith("Taban kaplaması"));
+  assert.equal(tabanKalemleri.length, 1);
+});
+
+test("konteyner: taban döşemesi eklenip kaplama türü verilmezse hata verir", () => {
+  assert.throws(
+    () =>
+      calculateContainer({
+        genislikMm: 2438,
+        uzunlukMm: 6058,
+        katYuksekligiMm: 2591,
+        katSayisi: 1,
+        duvarlar: duvarSeti(),
+        tabanVar: true,
+      }),
+    HesaplamaHatasi
+  );
+});
+
+test("konteyner: modulSayisi 1 (varsayılan) ile tek modüllü hesapla aynı sonucu verir", () => {
+  const tek = calculateContainer({
+    genislikMm: 2438,
+    uzunlukMm: 6058,
+    katYuksekligiMm: 2591,
+    katSayisi: 1,
+    duvarlar: duvarSeti(),
+  });
+  const modulSayisiBirVerilmis = calculateContainer({
+    genislikMm: 2438,
+    uzunlukMm: 6058,
+    katYuksekligiMm: 2591,
+    katSayisi: 1,
+    duvarlar: duvarSeti(),
+    modulSayisi: 1,
+  });
+  assert.deepEqual(tek.ozetDegerler, modulSayisiBirVerilmis.ozetDegerler);
+  assert.equal(tek.parcalar.length, modulSayisiBirVerilmis.parcalar.length);
+});
+
+test("konteyner: modulSayisi > 1 ile ek modüllerin sol/sağ duvarları ve paylaşımlı ara duvar hesaplanır", () => {
+  const sonuc = calculateContainer({
+    genislikMm: 2438,
+    uzunlukMm: 6058,
+    katYuksekligiMm: 2591,
+    katSayisi: 1,
+    duvarlar: duvarSeti(),
+    modulSayisi: 3,
+    araDuvar: duvar(),
+  });
+
+  // 3 modül: sol/sağ duvarlardan 3'er tane (1. modül + "Modül 2"/"Modül 3" etiketli 2 ek) olmalı.
+  assert.ok(sonuc.parcalar.some((p) => p.label === "Sol Duvar: Dikme"));
+  assert.ok(sonuc.parcalar.some((p) => p.label === "Modül 2 Sol Duvar: Dikme"));
+  assert.ok(sonuc.parcalar.some((p) => p.label === "Modül 3 Sol Duvar: Dikme"));
+  assert.ok(sonuc.parcalar.some((p) => p.label === "Modül 2 Sağ Duvar: Dikme"));
+  assert.ok(sonuc.parcalar.some((p) => p.label === "Modül 3 Sağ Duvar: Dikme"));
+
+  // 3 modül arasında 2 paylaşımlı ara duvar olmalı (on/arka'nın tam eni kadar - genislikMm).
+  assert.ok(sonuc.parcalar.some((p) => p.label === "Ara Duvar 1: Dikme"));
+  assert.ok(sonuc.parcalar.some((p) => p.label === "Ara Duvar 2: Dikme"));
+  assert.ok(!sonuc.parcalar.some((p) => p.label === "Ara Duvar 3: Dikme"));
+  const araDuvarUstRay = sonuc.parcalar.find((p) => p.label === "Ara Duvar 1: Üst ray")!;
+  assert.equal(araDuvarUstRay.uzunlukMm, 2438);
+
+  assert.equal(sonuc.ozetDegerler.modulSayisi, 3);
+  // Taban alanı 3 modül için 3 katına çıkmalı.
+  assert.equal(sonuc.ozetDegerler.tabanAlaniM2, Math.round(((2438 / 1000) * (6058 / 1000) * 3) * 100) / 100);
+});
+
+test("konteyner: modulSayisi > 1 ama araDuvar verilmezse hata verir", () => {
+  assert.throws(
+    () =>
+      calculateContainer({
+        genislikMm: 2438,
+        uzunlukMm: 6058,
+        katYuksekligiMm: 2591,
+        katSayisi: 1,
+        duvarlar: duvarSeti(),
+        modulSayisi: 2,
+      }),
+    (err: unknown) => err instanceof HesaplamaHatasi && err.message.includes("araDuvar")
+  );
+});
+
+test("konteyner: geçersiz modulSayisi (0 veya negatif) hata verir", () => {
+  assert.throws(
+    () =>
+      calculateContainer({
+        genislikMm: 2438,
+        uzunlukMm: 6058,
+        katYuksekligiMm: 2591,
+        katSayisi: 1,
+        duvarlar: duvarSeti(),
+        modulSayisi: 0,
+      }),
+    HesaplamaHatasi
+  );
+});

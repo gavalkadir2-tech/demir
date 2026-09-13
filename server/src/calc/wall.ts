@@ -83,9 +83,12 @@ const VARSAYILAN = {
   lentoTasmaMm: 100,
 };
 
-function kaplamaKalemiEkle(
+/** Bir yüzeye (dış/iç cephe, taban vb.) kaplama malzemesi ekler ve sac kalemi olarak sonuca işler.
+ * `etiketOnEki` parçanın etiketinde görünecek başlıktır (örn. "Dış cephe kaplaması", "Taban
+ * kaplaması") - hem wall.ts (dış/iç cephe) hem container.ts (taban) tarafından paylaşılır. */
+export function kaplamaKalemiEkle(
   sonuc: UrunHesapSonucu,
-  yon: "dış" | "iç",
+  etiketOnEki: string,
   kaplamaTuru: KaplamaTuru,
   kalinlikMmOverride: number | undefined,
   malzemeKey: string | undefined,
@@ -96,7 +99,7 @@ function kaplamaKalemiEkle(
   const kaplamaBilgisi = KAPLAMA_BILGI[kaplamaTuru];
   const ozet = kaplamaHesapla(kaplamaTuru, yukseklikMm, genislikMm);
   sonuc.sacKalemleri.push({
-    label: `${yon === "dış" ? "Dış" : "İç"} cephe kaplaması (${kaplamaBilgisi.label})`,
+    label: `${etiketOnEki} (${kaplamaBilgisi.label})`,
     enMm: kaplamaBilgisi.faydaliGenislikMm,
     boyMm: Math.ceil(yukseklikMm),
     kalinlikMm: kalinlikMmOverride ?? kaplamaBilgisi.varsayilanKalinlikMm,
@@ -284,7 +287,7 @@ export function calculateWallPanel(girdi: DuvarPaneliGirdi): UrunHesapSonucu {
 
   const disKaplamaOzet = kaplamaKalemiEkle(
     sonuc,
-    "dış",
+    "Dış cephe kaplaması",
     disKaplamaTuru,
     girdi.disKaplamaKalinlikMm,
     girdi.disKaplamaMalzemeKey,
@@ -293,7 +296,7 @@ export function calculateWallPanel(girdi: DuvarPaneliGirdi): UrunHesapSonucu {
   );
   const icKaplamaOzet = kaplamaKalemiEkle(
     sonuc,
-    "iç",
+    "İç cephe kaplaması",
     icKaplamaTuru,
     girdi.icKaplamaKalinlikMm,
     girdi.icKaplamaMalzemeKey,

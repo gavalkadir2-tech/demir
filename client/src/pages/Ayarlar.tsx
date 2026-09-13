@@ -59,6 +59,27 @@ export default function Ayarlar() {
           <label className="field-label">Vergi No</label>
           <input className="field-input" value={form.taxNumber ?? ""} onChange={(e) => set("taxNumber", e.target.value)} />
         </div>
+        <div>
+          <label className="field-label">Logo URL (opsiyonel)</label>
+          <input
+            className="field-input"
+            placeholder="https://..."
+            value={form.logoUrl ?? ""}
+            onChange={(e) => set("logoUrl", e.target.value)}
+          />
+          <p className="text-xs text-neutral-500 mt-1">
+            Girilirse teklif PDF'inin üst kısmında firma logosu olarak gösterilir.
+          </p>
+          {form.logoUrl && (
+            <img
+              src={form.logoUrl}
+              alt="Logo önizleme"
+              className="mt-2 h-16 object-contain border border-neutral-200 rounded-lg p-1"
+              onError={(e) => (e.currentTarget.style.display = "none")}
+              onLoad={(e) => (e.currentTarget.style.display = "")}
+            />
+          )}
+        </div>
       </div>
 
       <div className="card space-y-3">

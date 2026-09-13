@@ -12,7 +12,7 @@ export type KaplamaTuru =
   | "yok";
 
 /** Kaplamanın hangi yüzeyde kullanılabileceği - seçim listelerini bağlama göre filtrelemek için. */
-export type KaplamaKullanimAlani = "cati" | "duvar_dis" | "duvar_ic";
+export type KaplamaKullanimAlani = "cati" | "duvar_dis" | "duvar_ic" | "taban";
 
 export interface KaplamaBilgisi {
   label: string;
@@ -38,7 +38,7 @@ export const KAPLAMA_BILGI: Record<Exclude<KaplamaTuru, "yok">, KaplamaBilgisi> 
     efektifYogunlukKgM3: 7850,
     faydaliGenislikMm: 1000,
     tipikFireYuzde: 8,
-    kullanimAlanlari: ["cati", "duvar_dis"],
+    kullanimAlanlari: ["cati", "duvar_dis", "taban"],
   },
   sandvic_panel: {
     label: "sandviç panel",
@@ -46,7 +46,7 @@ export const KAPLAMA_BILGI: Record<Exclude<KaplamaTuru, "yok">, KaplamaBilgisi> 
     efektifYogunlukKgM3: 250,
     faydaliGenislikMm: 1000,
     tipikFireYuzde: 5,
-    kullanimAlanlari: ["cati", "duvar_dis"],
+    kullanimAlanlari: ["cati", "duvar_dis", "taban"],
   },
   etermit: {
     label: "etermit",

@@ -1,10 +1,36 @@
 import { Router } from "express";
 import { z } from "zod";
+import path from "path";
 import PDFDocument from "pdfkit";
 import { prisma } from "../lib/prisma";
 import { asyncHandler } from "../lib/errors";
 
 const router = Router();
+
+// pdfkit'in yerleşik Helvetica fontu Türkçe karakterleri (ş, ğ, ı, İ, ö, ü, ç) desteklemiyor
+// (WinAnsi/CP1252 kodlamasıyla sınırlı) - bunun yerine geniş Unicode kapsamlı DejaVu Sans
+// gömülü font olarak kullanılıyor.
+const FONT_DIR = path.join(path.dirname(require.resolve("dejavu-fonts-ttf/package.json")), "ttf");
+const FONT_GOVDE = path.join(FONT_DIR, "DejaVuSans.ttf");
+const FONT_GOVDE_KALIN = path.join(FONT_DIR, "DejaVuSans-Bold.ttf");
+
+/** Ayarlar'daki logoUrl'i (http(s) URL veya data: URI) PDF'e gömülebilecek bir Buffer'a çevirir.
+ * Ağ hatası/geçersiz URL gibi durumlarda PDF üretimini bozmamak için null döner. */
+async function logoBufferGetir(logoUrl: string | null | undefined): Promise<Buffer | null> {
+  if (!logoUrl) return null;
+  try {
+    if (logoUrl.startsWith("data:")) {
+      const base64 = logoUrl.split(",")[1];
+      return base64 ? Buffer.from(base64, "base64") : null;
+    }
+    if (!/^https?:\/\//.test(logoUrl)) return null;
+    const resp = await fetch(logoUrl);
+    if (!resp.ok) return null;
+    return Buffer.from(await resp.arrayBuffer());
+  } catch {
+    return null;
+  }
+}
 
 interface KonteynerPdfBilgi {
   genislikMm: number;
@@ -44,11 +70,11 @@ function konteynerSemaCiz(doc: PDFKit.PDFDocument, bilgi: KonteynerPdfBilgi, x: 
   const w = Math.max(30, uzunlukMm * scale);
   const h = Math.max(20, genislikMm * scale);
 
-  doc.fontSize(9).font("Helvetica-Bold").fillColor("#000").text("Konteyner Planı (üstten görünüş, ölçekli, temsili)", x, y);
+  doc.fontSize(9).font("Govde-Kalin").fillColor("#000").text("Konteyner Planı (üstten görünüş, ölçekli, temsili)", x, y);
   const boxY = y + 14;
   doc.rect(x, boxY, w, h).lineWidth(1).strokeColor("#404040").stroke();
 
-  doc.fontSize(7).font("Helvetica").fillColor("#666");
+  doc.fontSize(7).font("Govde").fillColor("#666");
   const olcuMetni = `${Math.round(uzunlukMm)} x ${Math.round(genislikMm)} mm, kat yüksekliği ${Math.round(katYuksekligiMm)} mm, ${katSayisi} kat${
     catiVar ? `, çatı eğimi %${catiEgimYuzde ?? "-"}` : ""
   }`;
@@ -72,7 +98,7 @@ function konteynerSemaCiz(doc: PDFKit.PDFDocument, bilgi: KonteynerPdfBilgi, x: 
     sonrakiY = roofBaseY + 18;
   }
 
-  doc.fillColor("#000").font("Helvetica").fontSize(10);
+  doc.fillColor("#000").font("Govde").fontSize(10);
   return sonrakiY;
 }
 
@@ -132,12 +158,25 @@ router.get(
     const settings = await prisma.settings.findUnique({ where: { id: 1 } });
     const konteynerItem = teklif.project.items.find((i) => i.template.key === "container");
     const konteynerBilgi = konteynerItem ? konteynerPdfBilgisiCikar(konteynerItem.paramsJson) : null;
+    const logoBuffer = await logoBufferGetir(settings?.logoUrl);
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="teklif-${teklif.quoteNumber}.pdf"`);
 
     const doc = new PDFDocument({ margin: 40, size: "A4" });
     doc.pipe(res);
+    doc.registerFont("Govde", FONT_GOVDE);
+    doc.registerFont("Govde-Kalin", FONT_GOVDE_KALIN);
+    doc.font("Govde");
+
+    if (logoBuffer) {
+      try {
+        const logoGenislikMm = 90;
+        doc.image(logoBuffer, doc.page.width - doc.page.margins.right - logoGenislikMm, 40, { fit: [logoGenislikMm, 60] });
+      } catch {
+        // Bozuk/desteklenmeyen bir görsel formatı PDF üretimini durdurmasın.
+      }
+    }
 
     const tl = (n: number) => `${n.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`;
 
@@ -170,13 +209,13 @@ router.get(
 
     const tabloBasi = doc.y;
     const kolon = { aciklama: 40, adet: 300, birim: 350, birimFiyat: 410, tutar: 480 };
-    doc.fontSize(9).font("Helvetica-Bold");
+    doc.fontSize(9).font("Govde-Kalin");
     doc.text("Açıklama", kolon.aciklama, tabloBasi);
     doc.text("Adet", kolon.adet, tabloBasi);
     doc.text("Birim", kolon.birim, tabloBasi);
     doc.text("B.Fiyat", kolon.birimFiyat, tabloBasi);
     doc.text("Tutar", kolon.tutar, tabloBasi);
-    doc.font("Helvetica");
+    doc.font("Govde");
     doc.moveDown(0.5);
     doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor("#ccc").stroke();
     doc.moveDown(0.3);
@@ -188,8 +227,8 @@ router.get(
       if (kalemler.length === 0) continue;
 
       if (doc.y > 700) doc.addPage();
-      doc.fontSize(8.5).font("Helvetica-Bold").fillColor("#666").text(BOLUM_ETIKET[bolum], kolon.aciklama, doc.y);
-      doc.fillColor("#000").font("Helvetica");
+      doc.fontSize(8.5).font("Govde-Kalin").fillColor("#666").text(BOLUM_ETIKET[bolum], kolon.aciklama, doc.y);
+      doc.fillColor("#000").font("Govde");
       doc.moveDown(0.2);
 
       for (const kalem of kalemler) {
@@ -209,7 +248,7 @@ router.get(
     doc.moveDown(0.5);
 
     const ozetSatir = (etiket: string, deger: number, kalin = false) => {
-      doc.font(kalin ? "Helvetica-Bold" : "Helvetica").fontSize(kalin ? 11 : 10);
+      doc.font(kalin ? "Govde-Kalin" : "Govde").fontSize(kalin ? 11 : 10);
       doc.text(etiket, 350, doc.y, { continued: true, width: 130 });
       doc.text(tl(deger), { align: "right" });
     };
@@ -233,15 +272,15 @@ router.get(
 
     const kutuY = doc.y;
     doc.rect(340, kutuY - 4, 215, 26).fillAndStroke("#f5f5f5", "#ccc");
-    doc.fillColor("#000").font("Helvetica-Bold").fontSize(13);
+    doc.fillColor("#000").font("Govde-Kalin").fontSize(13);
     doc.text("GENEL TOPLAM", 350, kutuY + 3, { continued: true, width: 130 });
     doc.text(tl(teklif.total), { align: "right" });
-    doc.font("Helvetica").fontSize(10);
+    doc.font("Govde").fontSize(10);
     doc.moveDown(1.2);
 
     if (teklif.notes) {
       doc.moveDown(1);
-      doc.fontSize(9).font("Helvetica").text(`Not: ${teklif.notes}`);
+      doc.fontSize(9).font("Govde").text(`Not: ${teklif.notes}`);
     }
 
     doc.end();

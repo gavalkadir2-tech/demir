@@ -9,6 +9,59 @@ import YapiselKontrolGorunum from "../components/YapiselKontrolGorunum";
 import SemaGorunum from "../components/SemaGorunum";
 import { DuvarYatayAraProfilVeri } from "../components/WallSchematic";
 
+/** İki params nesnesi arasında sığ (üst seviye anahtar bazlı, JSON.stringify tabanlı) fark listesi
+ * çıkarır - bir ürünü düzenlerken orijinal kayıtlı değerlerle canlı form durumunu karşılaştırmak
+ * içindir. Nesne/dizi değerler tek tek alan alan karşılaştırılmaz, sadece "değişti" olarak
+ * işaretlenir - amaç sahaya çıkmadan önce nelerin dokunulduğuna dair hızlı bir özet vermektir. */
+interface ParamsFarki {
+  alan: string;
+  eskiDeger: string;
+  yeniDeger: string;
+}
+
+function paramsFarkiHesapla(eski: Record<string, unknown> | undefined, yeni: Record<string, unknown>): ParamsFarki[] {
+  const eskiObj = eski ?? {};
+  const tumAnahtarlar = Array.from(new Set([...Object.keys(eskiObj), ...Object.keys(yeni)])).sort();
+  const degerYazdir = (v: unknown): string => {
+    if (v === undefined || v === null || v === "") return "(boş)";
+    if (typeof v === "object") return "(değişti)";
+    return String(v);
+  };
+  const farklar: ParamsFarki[] = [];
+  for (const alan of tumAnahtarlar) {
+    const e = eskiObj[alan];
+    const y = yeni[alan];
+    if (JSON.stringify(e) !== JSON.stringify(y)) {
+      farklar.push({ alan, eskiDeger: degerYazdir(e), yeniDeger: degerYazdir(y) });
+    }
+  }
+  return farklar;
+}
+
+/** Bir ürünü düzenlerken (yeni oluştururken değil), orijinal kayıtlı değerlerle canlı form
+ * durumu arasındaki farkı gösteren katlanabilir panel. */
+function ParamsFarkiPaneli({ eski, yeni }: { eski: Record<string, unknown> | undefined; yeni: Record<string, unknown> }) {
+  const farklar = paramsFarkiHesapla(eski, yeni);
+  if (farklar.length === 0) return null;
+  return (
+    <details className="rounded-xl border border-amber-200 bg-amber-50 p-3" open>
+      <summary className="font-semibold cursor-pointer text-amber-800">
+        ✏️ Bu düzenlemede neler değişti? ({farklar.length} alan)
+      </summary>
+      <div className="mt-2 space-y-1 text-sm">
+        {farklar.map((f) => (
+          <div key={f.alan} className="flex flex-wrap gap-1">
+            <span className="font-mono text-xs text-neutral-500">{f.alan}:</span>
+            <span className="text-red-600 line-through">{f.eskiDeger}</span>
+            <span>→</span>
+            <span className="text-emerald-700 font-medium">{f.yeniDeger}</span>
+          </div>
+        ))}
+      </div>
+    </details>
+  );
+}
+
 const TEMPLATE_KATEGORI: Record<string, ProjectCategory> = {
   railing: "RAILING",
   stairs: "STAIRS",
@@ -62,6 +115,14 @@ const DUVAR_DIS_KAPLAMA_SECENEKLERI = [
 
 const DUVAR_IC_KAPLAMA_SECENEKLERI = [
   { key: "alcipan", label: "Alçıpan" },
+  { key: "yok", label: "Kaplama Yok" },
+];
+
+// Taban/zemin döşemesi için: yapısal taşıyıcılık gereken bir yüzey olduğundan sadece sac/panel
+// tipi kaplamalar listelenir (etermit/polikarbon/petopan/alçıpan taban için uygun değildir).
+const KONTEYNER_TABAN_KAPLAMA_SECENEKLERI = [
+  { key: "trapez_sac", label: "Trapez Sac" },
+  { key: "sandvic_panel", label: "Sandviç Panel" },
   { key: "yok", label: "Kaplama Yok" },
 ];
 
@@ -911,6 +972,8 @@ export function UrunFormu({
           <HesapSonucuGorunum sonuc={onizleme.sonuc} malzemeler={onizleme.malzemeler} />
 
           {onizleme.yapiselKontrol && <YapiselKontrolGorunum kontrol={onizleme.yapiselKontrol} />}
+
+          {duzenlemeItemId && <ParamsFarkiPaneli eski={baslangic} yeni={params} />}
 
           <div className="rounded-xl border border-neutral-200 p-4 space-y-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
@@ -2478,6 +2541,14 @@ const KONTEYNER_YON_ETIKET: Record<KonteynerYon, string> = {
 };
 const KONTEYNER_YON_SIRASI: KonteynerYon[] = ["on", "arka", "sol", "sag"];
 
+/** Standart ISO deniz konteyneri iç ölçüleri (yaklaşık, mm) - hızlı seçim için. */
+const KONTEYNER_BOYUT_PRESETLERI: { etiket: string; genislikMm: number; uzunlukMm: number; katYuksekligiMm: number }[] = [
+  { etiket: "10ft", genislikMm: 2438, uzunlukMm: 2991, katYuksekligiMm: 2591 },
+  { etiket: "20ft", genislikMm: 2438, uzunlukMm: 6058, katYuksekligiMm: 2591 },
+  { etiket: "40ft", genislikMm: 2438, uzunlukMm: 12192, katYuksekligiMm: 2591 },
+  { etiket: "40ft HC (Yüksek Küp)", genislikMm: 2438, uzunlukMm: 12192, katYuksekligiMm: 2896 },
+];
+
 interface KonteynerDuvarDegerleri {
   dikmeAraligiHedefMm: number;
   ustProfilId?: number;
@@ -2933,8 +3004,22 @@ function KonteynerAlanlari({
     () => (baslangic?.duvarlar2 as Record<KonteynerYon, KonteynerDuvarDegerleri> | undefined) ?? konteynerDuvarSetiVarsayilan()
   );
 
+  const [modulSayisi, setModulSayisi] = useState<number>(() => (baslangic?.modulSayisi as number) ?? 1);
+  const [araDuvar, setAraDuvar] = useState<KonteynerDuvarDegerleri>(
+    () => (baslangic?.araDuvar as KonteynerDuvarDegerleri | undefined) ?? konteynerDuvarVarsayilan()
+  );
+
   const [icDuvarlar, setIcDuvarlar] = useState<KonteynerIcDuvarDegerleri[]>(
     () => (baslangic?.icDuvarlar as KonteynerIcDuvarDegerleri[] | undefined) ?? []
+  );
+
+  const [tabanVar, setTabanVar] = useState<boolean>(() => (baslangic?.tabanVar as boolean) ?? false);
+  const [tabanKaplamaTuru, setTabanKaplamaTuru] = useState<string>(() => (baslangic?.tabanKaplamaTuru as string) ?? "trapez_sac");
+  const [tabanKaplamaKalinlikMm, setTabanKaplamaKalinlikMm] = useState<number | undefined>(
+    () => baslangic?.tabanKaplamaKalinlikMm as number | undefined
+  );
+  const [tabanKaplamaMalzemeId, setTabanKaplamaMalzemeId] = useState<number | undefined>(
+    () => baslangic?.tabanKaplamaMalzemeId as number | undefined
   );
 
   const [catiVar, setCatiVar] = useState<boolean>(() => (baslangic?.catiVar as boolean) ?? false);
@@ -3019,7 +3104,13 @@ function KonteynerAlanlari({
       katSayisi,
       duvarlar,
       duvarlar2: katSayisi === 2 && kat2Farkli ? duvarlar2 : undefined,
+      modulSayisi,
+      araDuvar: modulSayisi > 1 ? araDuvar : undefined,
       icDuvarlar: icDuvarlar.length > 0 ? icDuvarlar : undefined,
+      tabanVar,
+      tabanKaplamaTuru: tabanVar ? tabanKaplamaTuru : undefined,
+      tabanKaplamaKalinlikMm: tabanVar ? tabanKaplamaKalinlikMm : undefined,
+      tabanKaplamaMalzemeId: tabanVar ? tabanKaplamaMalzemeId : undefined,
       catiVar,
       cati: catiVar ? cati : undefined,
       merdivenVar: katSayisi === 2 ? merdivenVar : false,
@@ -3062,7 +3153,13 @@ function KonteynerAlanlari({
     duvarlar,
     duvarlar2,
     kat2Farkli,
+    modulSayisi,
+    araDuvar,
     icDuvarlar,
+    tabanVar,
+    tabanKaplamaTuru,
+    tabanKaplamaKalinlikMm,
+    tabanKaplamaMalzemeId,
     catiVar,
     cati,
     merdivenVar,
@@ -3106,6 +3203,25 @@ function KonteynerAlanlari({
 
   return (
     <div className="space-y-3">
+      <div>
+        <label className="field-label">Standart Boyut (opsiyonel hızlı seçim)</label>
+        <div className="flex gap-1 flex-wrap">
+          {KONTEYNER_BOYUT_PRESETLERI.map((p) => (
+            <button
+              key={p.etiket}
+              type="button"
+              className="btn-secondary btn-sm"
+              onClick={() => {
+                setGenislikMm(p.genislikMm);
+                setUzunlukMm(p.uzunlukMm);
+                setKatYuksekligiMm(p.katYuksekligiMm);
+              }}
+            >
+              {p.etiket}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <Sayi label="Konteyner Eni (mm)" value={genislikMm} onChange={setGenislikMm} />
         <Sayi label="Konteyner Boyu (mm)" value={uzunlukMm} onChange={setUzunlukMm} />
@@ -3143,6 +3259,29 @@ function KonteynerAlanlari({
             onDegis={(yeni) => duvarGuncelle(yon, yeni)}
           />
         ))}
+      </div>
+
+      <div className="rounded-xl border border-neutral-200 p-3 space-y-3">
+        <Sayi
+          label="Modül Sayısı (yan yana zincirlenen konteyner adedi)"
+          value={modulSayisi}
+          onChange={(v) => setModulSayisi(Math.max(1, Math.round(v)))}
+        />
+        <p className="text-xs text-neutral-500 -mt-2">
+          1'den büyükse, konteyner uzunluk ekseni boyunca uç uca eklenir; her ek modül kendi sol/sağ duvarını tekrar
+          getirir, modüller arasındaki uç duvarları ise dışarı bakmadığından tek bir paylaşımlı "ara duvar" ile
+          değiştirilerek malzeme tasarrufu yansıtılır.
+        </p>
+        {modulSayisi > 1 && (
+          <KonteynerDuvarFormu
+            baslik="Ara Duvar (Modüller Arası Paylaşımlı)"
+            materials={materials}
+            sacMalzemeler={sacMalzemeler}
+            sarfMalzemeler={sarfMalzemeler}
+            deger={araDuvar}
+            onDegis={setAraDuvar}
+          />
+        )}
       </div>
 
       {katSayisi === 2 && (
@@ -3194,6 +3333,47 @@ function KonteynerAlanlari({
           />
         ))}
         {icDuvarlar.length === 0 && <div className="text-xs text-neutral-500">İç bölme duvarı eklenmedi.</div>}
+      </div>
+
+      <div className="rounded-xl border border-neutral-200 p-3 space-y-3">
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input type="checkbox" checked={tabanVar} onChange={(e) => setTabanVar(e.target.checked)} />
+          Taban/zemin döşemesi ekle
+        </label>
+        <p className="text-xs text-neutral-500 -mt-2">
+          Konteynerin taban alanı (eni × boyu) kadar döşeme kaplaması - kat sayısından bağımsız, sadece en alttaki taban
+          içindir (kat arası döşeme değil).
+        </p>
+        {tabanVar && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="field-label">Taban Kaplaması</label>
+              <select className="field-select" value={tabanKaplamaTuru} onChange={(e) => setTabanKaplamaTuru(e.target.value)}>
+                {KONTEYNER_TABAN_KAPLAMA_SECENEKLERI.map((s) => (
+                  <option key={s.key} value={s.key}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {tabanKaplamaTuru !== "yok" && (
+              <>
+                <Sayi
+                  label="Kaplama Kalınlığı (mm, opsiyonel)"
+                  value={tabanKaplamaKalinlikMm ?? 0}
+                  onChange={(v) => setTabanKaplamaKalinlikMm(v > 0 ? v : undefined)}
+                />
+                <MaterialSelect
+                  label="Taban Kaplaması Sac Malzemesi (opsiyonel)"
+                  materials={sacMalzemeler}
+                  value={tabanKaplamaMalzemeId}
+                  onChange={setTabanKaplamaMalzemeId}
+                  allowEmpty
+                />
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="rounded-xl border border-neutral-200 p-3 space-y-3">

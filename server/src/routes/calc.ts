@@ -12,6 +12,7 @@ const kaplamaTuruEnum = z.enum(["trapez_sac", "sandvic_panel", "etermit", "plast
 // Duvar dış/iç cephe kaplaması, çatı kaplamasından farklı bir seçenek kümesi kullanır (bkz. calc/kaplama.ts).
 const disKaplamaTuruEnum = z.enum(["trapez_sac", "sandvic_panel", "petopan", "yok"]);
 const icKaplamaTuruEnum = z.enum(["alcipan", "yok"]);
+const tabanKaplamaTuruEnum = z.enum(["trapez_sac", "sandvic_panel", "yok"]);
 
 const railingSchema = z.object({
   toplamUzunlukMm: z.number(),
@@ -263,7 +264,13 @@ const containerSchema = z.object({
   katSayisi: z.union([z.literal(1), z.literal(2)]),
   duvarlar: konteynerDuvarSetiSchema,
   duvarlar2: konteynerDuvarSetiSchema.optional(),
+  modulSayisi: z.number().int().min(1).optional(),
+  araDuvar: konteynerDuvarSchema.optional(),
   icDuvarlar: z.array(konteynerIcDuvarSchema).optional(),
+  tabanVar: z.boolean().optional(),
+  tabanKaplamaTuru: tabanKaplamaTuruEnum.optional(),
+  tabanKaplamaKalinlikMm: z.number().optional(),
+  tabanKaplamaMalzemeId: z.number().int().optional(),
   catiVar: z.boolean().optional(),
   cati: konteynerCatiSchema.optional(),
   merdivenVar: z.boolean().optional(),

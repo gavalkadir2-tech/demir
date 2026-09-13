@@ -6,9 +6,11 @@
 // (dikme aralığı/profilleri, kapı/pencere boşlukları, iç/dış kaplama, dikme pozisyonlarının elle
 // düzenlenmesi, yatay ara profiller) her bir konteyner duvarında ayrı ayrı kullanılabilir.
 // 2 katlıysa bu 4 duvar seti bir kat daha (isteğe bağlı olarak farklı ayarlarla) tekrarlanır.
-// Ayrıca atölyenin üretebileceği beş ek şey daha hesaplanır:
+// Ayrıca atölyenin üretebileceği altı ek şey daha hesaplanır:
 //   - konteyner içini odalara ayıran iç bölme duvarları (yine calculateWallPanel sarmalanarak, kat
 //     sayısından bağımsız - her katta aynı liste tekrarlanır),
+//   - taban/zemin döşemesi kaplaması (wall.ts'teki kaplamaKalemiEkle paylaşılarak, kat sayısından
+//     bağımsız - sadece en alttaki taban, kat arası döşeme değil),
 //   - konteynerin üzerine oturan çatı kafesi (calculateRoofTruss sarmalanarak, kat sayısından
 //     bağımsız - her konteynerde olabilir),
 //   - (yalnızca kat sayısı 2 ise) kat arası merdiven + korkuluk (calculateStairs sarmalanarak),
@@ -18,7 +20,8 @@
 
 import { HesaplamaHatasi } from "./units";
 import { HesaplananParca, UrunHesapSonucu, bosSonuc, profilOzetOlustur } from "./types";
-import { calculateWallPanel, DuvarPaneliGirdi } from "./wall";
+import { calculateWallPanel, DuvarPaneliGirdi, kaplamaKalemiEkle } from "./wall";
+import { KaplamaTuru } from "./kaplama";
 import { calculateStairs, MerdivenGirdi } from "./stairs";
 import { calculateRailing, KorkulukGirdi } from "./railing";
 import { calculateSteelFrame, KolonKirisGirdi } from "./steelFrame";
@@ -62,10 +65,27 @@ export interface KonteynerGirdi {
    * tekrar kullanılır; farklı pencere/kapı veya kaplama isteniyorsa burada ayrı girilir. */
   duvarlar2?: KonteynerDuvarSeti;
 
+  /** Yan yana zincirlenen modül sayısı (uzunluk ekseni boyunca, tren vagonu gibi uç uca) - verilmezse
+   * (veya 1 ise) tek bir konteyner hesaplanır. N modül için sol/sağ (uzun kenar) duvarları her modülde
+   * ayrı ayrı tekrarlanır (her biri kendi tam dış duvarı), ancak modüller arasındaki (N-1) adet uç
+   * duvarı artık dışarıya bakmadığından, bunların yerine tek bir paylaşımlı `araDuvar` hesaplanır -
+   * modülleri iki ayrı "on"+"arka" duvarı yerine tek bir ortak duvarla birleştirerek malzeme
+   * tasarrufu gerçekçi şekilde yansıtılır. */
+  modulSayisi?: number;
+  /** Modüller arasındaki paylaşımlı duvarın ayarları (dış duvarlarla aynı şema, genişliği konteyner
+   * eniyle otomatik eşleşir) - modulSayisi > 1 ise zorunludur. */
+  araDuvar?: KonteynerDuvarGirdi;
+
   /** İç bölme duvarları (odalar arası) - her kat için aynı liste kullanılır (2 katlıysa her katta
    * aynı bölme planı tekrarlanır). Konteynerin dış kutusunu etkilemez, sadece ek malzeme olarak
    * hesaplanır. */
   icDuvarlar?: KonteynerIcDuvarGirdi[];
+
+  // Taban/zemin döşemesi - konteynerin taban alanı (genislikMm x uzunlukMm) kadar kaplama
+  tabanVar?: boolean;
+  tabanKaplamaTuru?: KaplamaTuru;
+  tabanKaplamaKalinlikMm?: number;
+  tabanKaplamaMalzemeKey?: string;
 
   // Çatı kafesi - kat sayısından bağımsız, konteynerin üzerine oturur
   catiVar?: boolean;
@@ -151,9 +171,13 @@ export function calculateContainer(girdi: KonteynerGirdi): UrunHesapSonucu {
   if (katYuksekligiMm <= 0) throw new HesaplamaHatasi("Kat yüksekliği 0'dan büyük olmalı.");
   if (katSayisi !== 1 && katSayisi !== 2) throw new HesaplamaHatasi("Kat sayısı 1 veya 2 olmalı.");
   if (!girdi.duvarlar) throw new HesaplamaHatasi("Konteynerin 4 duvarının (ön/arka/sol/sağ) ayarları girilmelidir.");
+  const modulSayisi = girdi.modulSayisi ?? 1;
+  if (!Number.isInteger(modulSayisi) || modulSayisi < 1) throw new HesaplamaHatasi("Modül sayısı 1 veya daha büyük bir tam sayı olmalı.");
+  if (modulSayisi > 1 && !girdi.araDuvar) throw new HesaplamaHatasi("Modül sayısı 1'den büyük ama modüller arası paylaşımlı duvar (araDuvar) ayarları girilmedi.");
 
   const sonuc = bosSonuc();
   const parcalar: HesaplananParca[] = [];
+  const icDuvarSonuclari: UrunHesapSonucu[] = [];
 
   // --- 4 duvar × (1 veya 2 kat) - her biri tam bir Çelik Duvar Paneli hesabı ---
   const duvarSonuclari: { yon: keyof KonteynerDuvarSeti; kat: number; sonuc: UrunHesapSonucu }[] = [];
@@ -179,10 +203,42 @@ export function calculateContainer(girdi: KonteynerGirdi): UrunHesapSonucu {
       altSonucuBirlestir(parcalar, sonuc.sacKalemleri, sonuc.baglantiKalemleri, sonuc.uyarilar, duvarSonuc, `${etiketOnEki}${YON_ETIKET[yon]}`);
       duvarSonuclari.push({ yon, kat, sonuc: duvarSonuc });
     });
+
+    // --- Ek modüller (modulSayisi > 1): her ek modül kendi sol+sağ duvarını tekrar getirir, ve
+    // modüller arasındaki (N-1) paylaşımlı ara duvar, iki ayrı dış duvar yerine tek sefer hesaplanır. ---
+    if (modulSayisi > 1) {
+      for (let m = 2; m <= modulSayisi; m++) {
+        (["sol", "sag"] as const).forEach((yon) => {
+          const duvarGirdi: DuvarPaneliGirdi = { ...set[yon], genislikMm: uzunlukMm, yukseklikMm: katYuksekligiMm };
+          const etiket = `${etiketOnEki}Modül ${m} ${YON_ETIKET[yon]}`;
+          let duvarSonuc: UrunHesapSonucu;
+          try {
+            duvarSonuc = calculateWallPanel(duvarGirdi);
+          } catch (e) {
+            if (e instanceof HesaplamaHatasi) throw new HesaplamaHatasi(`${etiket}: ${e.message}`);
+            throw e;
+          }
+          altSonucuBirlestir(parcalar, sonuc.sacKalemleri, sonuc.baglantiKalemleri, sonuc.uyarilar, duvarSonuc, etiket);
+          duvarSonuclari.push({ yon, kat, sonuc: duvarSonuc });
+        });
+      }
+      for (let m = 1; m <= modulSayisi - 1; m++) {
+        const araDuvarGirdi: DuvarPaneliGirdi = { ...girdi.araDuvar!, genislikMm, yukseklikMm: katYuksekligiMm };
+        const etiket = `${etiketOnEki}Ara Duvar ${m}`;
+        let araDuvarSonuc: UrunHesapSonucu;
+        try {
+          araDuvarSonuc = calculateWallPanel(araDuvarGirdi);
+        } catch (e) {
+          if (e instanceof HesaplamaHatasi) throw new HesaplamaHatasi(`${etiket}: ${e.message}`);
+          throw e;
+        }
+        altSonucuBirlestir(parcalar, sonuc.sacKalemleri, sonuc.baglantiKalemleri, sonuc.uyarilar, araDuvarSonuc, etiket);
+        icDuvarSonuclari.push(araDuvarSonuc);
+      }
+    }
   }
 
   // --- İç bölme duvarları (odalar arası) - her katta aynı liste tekrarlanır ---
-  const icDuvarSonuclari: UrunHesapSonucu[] = [];
   for (const { etiketOnEki } of katSetleri) {
     (girdi.icDuvarlar ?? []).forEach((icDuvar, index) => {
       const icDuvarGirdi: DuvarPaneliGirdi = { ...icDuvar, yukseklikMm: katYuksekligiMm };
@@ -199,11 +255,27 @@ export function calculateContainer(girdi: KonteynerGirdi): UrunHesapSonucu {
     });
   }
 
+  // --- Taban/zemin döşemesi (kat sayısından bağımsız, sadece taban - kat arası döşeme değil) ---
+  let tabanKaplamaOzet: ReturnType<typeof kaplamaKalemiEkle> = null;
+  if (girdi.tabanVar) {
+    if (!girdi.tabanKaplamaTuru || girdi.tabanKaplamaTuru === "yok")
+      throw new HesaplamaHatasi("Taban döşemesi eklendi ama kaplama türü seçilmedi.");
+    tabanKaplamaOzet = kaplamaKalemiEkle(
+      sonuc,
+      "Taban kaplaması",
+      girdi.tabanKaplamaTuru,
+      girdi.tabanKaplamaKalinlikMm,
+      girdi.tabanKaplamaMalzemeKey,
+      uzunlukMm * modulSayisi,
+      genislikMm
+    );
+  }
+
   // --- Çatı kafesi (kat sayısından bağımsız, konteynerin üzerine oturur) ---
   let catiSonuc: UrunHesapSonucu | null = null;
   if (girdi.catiVar) {
     if (!girdi.cati) throw new HesaplamaHatasi("Çatı eklendi ama çatı ayarları girilmedi.");
-    const catiGirdi: CatiKafesiGirdi = { ...girdi.cati, acikligMm: genislikMm, catiUzunluguMm: uzunlukMm };
+    const catiGirdi: CatiKafesiGirdi = { ...girdi.cati, acikligMm: genislikMm, catiUzunluguMm: uzunlukMm * modulSayisi };
     try {
       catiSonuc = calculateRoofTruss(catiGirdi);
     } catch (e) {
@@ -277,7 +349,7 @@ export function calculateContainer(girdi: KonteynerGirdi): UrunHesapSonucu {
         throw new HesaplamaHatasi("2. kat iskeleti eklendi ama kolon/kiriş profilleri seçilmedi.");
       const iskeletGirdi: KolonKirisGirdi = {
         acikligMm: genislikMm,
-        uzunlukMm,
+        uzunlukMm: uzunlukMm * modulSayisi,
         yukseklikMm: katYuksekligiMm,
         acikSayisi: girdi.iskeletAcikSayisi ?? VARSAYILAN.iskeletAcikSayisi,
         kolonProfilKey: girdi.iskeletKolonProfilKey,
@@ -295,7 +367,7 @@ export function calculateContainer(girdi: KonteynerGirdi): UrunHesapSonucu {
   sonuc.parcalar = parcalar;
   sonuc.profilOzet = profilOzetOlustur(parcalar);
 
-  const tabanAlaniM2 = (genislikMm / 1000) * (uzunlukMm / 1000);
+  const tabanAlaniM2 = (genislikMm / 1000) * (uzunlukMm / 1000) * modulSayisi;
   const tumDuvarSonuclari = [...duvarSonuclari.map((d) => d.sonuc), ...icDuvarSonuclari];
   const toplamDikmeSayisi = tumDuvarSonuclari.reduce((s, d) => s + (d.ozetDegerler.dikmeSayisi ?? 0), 0);
   const toplamBoslukSayisi = tumDuvarSonuclari.reduce((s, d) => s + (d.ozetDegerler.bosluklarSayisi ?? 0), 0);
@@ -309,6 +381,14 @@ export function calculateContainer(girdi: KonteynerGirdi): UrunHesapSonucu {
     toplamBoslukSayisi,
     toplamDuvarAlaniM2,
     ...(icDuvarSonuclari.length > 0 ? { icDuvarSayisi: (girdi.icDuvarlar ?? []).length } : {}),
+    ...(modulSayisi > 1 ? { modulSayisi } : {}),
+    ...(tabanKaplamaOzet
+      ? {
+          tabanKaplamaSiparisAlaniM2: tabanKaplamaOzet.siparisAlaniM2,
+          tabanKaplamaFireM2: tabanKaplamaOzet.fireM2,
+          tabanKaplamaFireYuzde: tabanKaplamaOzet.fireYuzde,
+        }
+      : {}),
     ...(catiSonuc
       ? {
           catiKafesSayisi: catiSonuc.ozetDegerler.kafesSayisi,
