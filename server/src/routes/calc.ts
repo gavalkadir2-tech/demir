@@ -248,6 +248,7 @@ const konteynerDuvarSetiSchema = z.object({
   sol: konteynerDuvarSchema,
   sag: konteynerDuvarSchema,
 });
+const konteynerCatiSchema = trussSchema.omit({ acikligMm: true, catiUzunluguMm: true });
 
 const containerSchema = z.object({
   genislikMm: z.number(),
@@ -256,6 +257,8 @@ const containerSchema = z.object({
   katSayisi: z.union([z.literal(1), z.literal(2)]),
   duvarlar: konteynerDuvarSetiSchema,
   duvarlar2: konteynerDuvarSetiSchema.optional(),
+  catiVar: z.boolean().optional(),
+  cati: konteynerCatiSchema.optional(),
   merdivenVar: z.boolean().optional(),
   merdivenGenislikMm: z.number().optional(),
   merdivenBasamakYuksekligiHedefMm: z.number().optional(),

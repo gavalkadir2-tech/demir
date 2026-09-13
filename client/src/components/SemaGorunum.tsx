@@ -5,7 +5,7 @@ import StairsSchematic from "./StairsSchematic";
 import CanopySchematic from "./CanopySchematic";
 import DoorSchematic from "./DoorSchematic";
 import WallSchematic, { DuvarBoslukVeri, DuvarYatayAraProfilVeri, DuvarPaneliSemaVeri } from "./WallSchematic";
-import TrussSchematic from "./TrussSchematic";
+import TrussSchematic, { CatiKafesiSemaVeri } from "./TrussSchematic";
 import RafSchematic from "./RafSchematic";
 import DonerMerdivenSchematic from "./DonerMerdivenSchematic";
 import PergolaSchematic from "./PergolaSchematic";
@@ -32,6 +32,7 @@ export default function SemaGorunum({
   onDikeyCubukSayisiDegisti,
   onKonteynerDuvarDikmeDegisti,
   onKonteynerDuvarYatayDegisti,
+  onKonteynerCatiKafesSayisiDegisti,
 }: {
   templateKey: string;
   params: Record<string, unknown>;
@@ -58,6 +59,8 @@ export default function SemaGorunum({
   onKonteynerDuvarDikmeDegisti?: (kat: 1 | 2, yon: KonteynerYon, yeniListe: number[] | null) => void;
   /** "container" şablonunda kullanılır: aktif kat+yön duvarının yatay ara profillerini düzenleme. */
   onKonteynerDuvarYatayDegisti?: (kat: 1 | 2, yon: KonteynerYon, yeniListe: DuvarYatayAraProfilVeri[]) => void;
+  /** "container" şablonunda kullanılır: çatının kafes sayısını tıklayarak artırma/azaltma. */
+  onKonteynerCatiKafesSayisiDegisti?: (yeniSayi: number) => void;
 }) {
   const n = (k: string): number => Number(params[k] ?? 0);
   const b = (k: string): boolean => Boolean(params[k]);
@@ -309,14 +312,40 @@ export default function SemaGorunum({
               sag: duvarSemaVeri(duvarlar2Raw?.sag ?? duvarlar1Raw.sag, "sag"),
             }
           : undefined;
+      const catiParams = params.cati as Record<string, unknown> | undefined;
+      const catiParam = (k: string): unknown => catiParams?.[k];
+      const catiMatAt = (k: string): Material | undefined => {
+        const v = catiParam(k);
+        return typeof v === "number" ? malzemeler[String(v)] : undefined;
+      };
+      const catiVeri: CatiKafesiSemaVeri | undefined = b("catiVar")
+        ? {
+            acikligMm: genislikMmKonteyner,
+            egimYuzde: Number(catiParam("egimYuzde") ?? 0),
+            catiUzunluguMm: uzunlukMmKonteyner,
+            asikVar: Boolean(catiParam("asikProfilId")),
+            asikAraligiHedefMm: Number(catiParam("asikAraligiHedefMm") ?? 0) || 1000,
+            diyagonalVar: Boolean(catiParam("diyagonalProfilId")),
+            diyagonalPanelSayisi: ozetDegerler.catiDiyagonalPanelSayisi,
+            kafesSayisi: ozetDegerler.catiKafesSayisi,
+            gercekAralikMm: ozetDegerler.catiGercekAralikMm,
+            stabiliteVar: Boolean(catiParam("stabiliteBaglantisiVar") && catiParam("stabiliteProfilId")),
+            direkSayisi: Number(catiParam("direkSayisi") ?? 0),
+            ustBaslikKesit: kesitOlcusu(catiMatAt("ustBaslikProfilId")),
+            kralKirisiKesit: kesitOlcusu(catiMatAt("kralKirisiProfilId")),
+            asikKesit: kesitOlcusu(catiMatAt("asikProfilId")),
+          }
+        : undefined;
       return (
         <ContainerSchematic
           katSayisi={katSayisiKonteyner}
           kat1Duvarlar={kat1}
           kat2Duvarlar={kat2}
+          cati={catiVeri}
           duzenlenebilir={duzenlenebilir}
           onDikmePozisyonlariDegisti={onKonteynerDuvarDikmeDegisti}
           onYatayAraProfilleriDegisti={onKonteynerDuvarYatayDegisti}
+          onCatiKafesSayisiDegisti={onKonteynerCatiKafesSayisiDegisti}
         />
       );
     }

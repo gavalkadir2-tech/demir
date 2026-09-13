@@ -649,6 +649,16 @@ export function UrunFormu({
     setSemaSayiSurumu((v) => v + 1);
   };
 
+  /** Konteyner şematiğinin "Çatı" sekmesinde bir kafese tıklanarak artırma/azaltma yapıldığında
+   * çağrılır; kafesSayisiOverride params.cati içine yazılır. */
+  const konteynerCatiKafesSayisiGuncelle = async (yeniSayi: number) => {
+    if (yeniSayi < 2) return;
+    const mevcutCati = (params.cati as Record<string, unknown> | undefined) ?? {};
+    const yeniCati = { ...mevcutCati, kafesSayisiOverride: yeniSayi };
+    await hesapla({ ...params, cati: yeniCati });
+    setSemaSayiSurumu((v) => v + 1);
+  };
+
   /** CatiKafesiAlanlari'nın onChange'i kendi izlediği alanlarla params'ı baştan kurar ve
    * kafesSayisiOverride'ı hiç içermez; çatı uzunluğu değişmediyse (override'ın hâlâ geçerli
    * olduğu anlamına gelir) mevcut override korunur - bu hem sonraki alan değişikliklerinde hem de
@@ -862,6 +872,7 @@ export function UrunFormu({
             onDikeyCubukSayisiDegisti={templateKey === "ferforje_panel" ? dikeyCubukSayisiGuncelle : undefined}
             onKonteynerDuvarDikmeDegisti={templateKey === "container" ? konteynerDuvarDikmeGuncelle : undefined}
             onKonteynerDuvarYatayDegisti={templateKey === "container" ? konteynerDuvarYatayGuncelle : undefined}
+            onKonteynerCatiKafesSayisiDegisti={templateKey === "container" ? konteynerCatiKafesSayisiGuncelle : undefined}
           />
 
           <HesapSonucuGorunum sonuc={onizleme.sonuc} malzemeler={onizleme.malzemeler} />
@@ -2433,6 +2444,34 @@ function konteynerDuvarSetiVarsayilan(): Record<KonteynerYon, KonteynerDuvarDege
   };
 }
 
+interface KonteynerCatiDegerleri {
+  egimYuzde: number;
+  kafesAraligiHedefMm: number;
+  ustBaslikProfilId?: number;
+  altBaslikProfilId?: number;
+  kralKirisiProfilId?: number;
+  diyagonalProfilId?: number;
+  diyagonalSayisi?: number;
+  asikProfilId?: number;
+  asikAraligiHedefMm?: number;
+  kaplamaTuru: string;
+  kaplamaMalzemeId?: number;
+  stabiliteBaglantisiVar?: boolean;
+  stabiliteProfilId?: number;
+  olukluMu?: boolean;
+  olukMesafesiMm?: number;
+  cikmaPayiMm?: number;
+  direkSayisi?: number;
+  direkProfilId?: number;
+  plakaMalzemeId?: number;
+  ankrajMalzemeId?: number;
+  kafesSayisiOverride?: number;
+}
+
+function konteynerCatiVarsayilan(): KonteynerCatiDegerleri {
+  return { egimYuzde: 20, kafesAraligiHedefMm: 900, kaplamaTuru: "trapez_sac" };
+}
+
 /** Konteynerin bir duvarının ayarları - Çelik Duvar Paneli'ndeki (DuvarAlanlari) genişlik/yükseklik
  * dışındaki tüm alanlar (bunlar konteynerin genel ölçülerinden otomatik atanır, 4 duvarın bir kutu
  * oluşturması için). Tam kontrollü bileşendir (kendi state'i yok) - şematik üzerinden yapılan
@@ -2554,6 +2593,156 @@ function KonteynerDuvarFormu({
   );
 }
 
+/** Konteynerin çatısının ayarları - Çatı Kafesi'ndeki (CatiKafesiAlanlari) açıklık/çatı uzunluğu
+ * dışındaki tüm alanlar (bunlar konteynerin eni/boyundan otomatik atanır). Tam kontrollü bileşendir
+ * (kendi state'i yok) - şematik üzerinden yapılan kafes sayısı düzenlemesi de aynı `deger` nesnesi
+ * üzerinden akar. */
+function KonteynerCatiFormu({
+  materials,
+  sacMalzemeler,
+  baglantiMalzemeler,
+  deger,
+  onDegis,
+}: {
+  materials: Material[];
+  sacMalzemeler: Material[];
+  baglantiMalzemeler: Material[];
+  deger: KonteynerCatiDegerleri;
+  onDegis: (yeni: KonteynerCatiDegerleri) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <Sayi label="Eğim (%)" value={deger.egimYuzde} onChange={(v) => onDegis({ ...deger, egimYuzde: v })} />
+        <Sayi label="Kafesler Arası Aralık (mm)" value={deger.kafesAraligiHedefMm} onChange={(v) => onDegis({ ...deger, kafesAraligiHedefMm: v })} />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <MaterialSelect label="Üst Başlık Profili" materials={materials} value={deger.ustBaslikProfilId} onChange={(v) => onDegis({ ...deger, ustBaslikProfilId: v })} />
+        <MaterialSelect label="Alt Başlık Profili" materials={materials} value={deger.altBaslikProfilId} onChange={(v) => onDegis({ ...deger, altBaslikProfilId: v })} />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <MaterialSelect
+          label="Aşık Profili (opsiyonel)"
+          materials={materials}
+          value={deger.asikProfilId}
+          onChange={(v) => onDegis({ ...deger, asikProfilId: v })}
+          allowEmpty
+        />
+        <Sayi
+          label="Aşık Aralığı (mm)"
+          value={deger.asikAraligiHedefMm ?? 1000}
+          onChange={(v) => onDegis({ ...deger, asikAraligiHedefMm: v })}
+        />
+      </div>
+      <div>
+        <label className="field-label">Çatı Kaplaması</label>
+        <select className="field-select" value={deger.kaplamaTuru} onChange={(e) => onDegis({ ...deger, kaplamaTuru: e.target.value })}>
+          {CATI_KAPLAMA_SECENEKLERI.map((s) => (
+            <option key={s.key} value={s.key}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      {deger.kaplamaTuru !== "yok" && (
+        <MaterialSelect
+          label="Kaplama Sac Malzemesi (opsiyonel, stok/maliyet için)"
+          materials={sacMalzemeler}
+          value={deger.kaplamaMalzemeId}
+          onChange={(v) => onDegis({ ...deger, kaplamaMalzemeId: v })}
+          allowEmpty
+        />
+      )}
+      <MaterialSelect
+        label="Mesnet Plakası Sac Malzemesi (opsiyonel, stok/maliyet için)"
+        materials={sacMalzemeler}
+        value={deger.plakaMalzemeId}
+        onChange={(v) => onDegis({ ...deger, plakaMalzemeId: v })}
+        allowEmpty
+      />
+      <MaterialSelect
+        label="Ankraj Malzemesi (opsiyonel, stok/maliyet için)"
+        materials={baglantiMalzemeler}
+        value={deger.ankrajMalzemeId}
+        onChange={(v) => onDegis({ ...deger, ankrajMalzemeId: v })}
+        allowEmpty
+      />
+      <details className="rounded-xl border border-neutral-200 p-3">
+        <summary className="font-semibold cursor-pointer">Gelişmiş: Kral Kirişi, Çapraz Destek ve Stabilite</summary>
+        <div className="grid grid-cols-2 gap-3 mt-3">
+          <MaterialSelect
+            label="Kral Kirişi Profili"
+            materials={materials}
+            value={deger.kralKirisiProfilId}
+            onChange={(v) => onDegis({ ...deger, kralKirisiProfilId: v })}
+            allowEmpty
+          />
+          <MaterialSelect
+            label="Çapraz Destek Profili"
+            materials={materials}
+            value={deger.diyagonalProfilId}
+            onChange={(v) => onDegis({ ...deger, diyagonalProfilId: v })}
+            allowEmpty
+          />
+          <Sayi
+            label="Kafes Başına Çapraz Sayısı"
+            value={deger.diyagonalSayisi ?? 0}
+            onChange={(v) => onDegis({ ...deger, diyagonalSayisi: v })}
+          />
+        </div>
+        <div className="mt-3 pt-3 border-t border-neutral-100 space-y-3">
+          <label className="flex items-center gap-2 text-sm font-medium">
+            <input
+              type="checkbox"
+              checked={deger.stabiliteBaglantisiVar ?? false}
+              onChange={(e) => onDegis({ ...deger, stabiliteBaglantisiVar: e.target.checked })}
+            />
+            İlk açıklığa stabilite bağlantısı (rüzgar/deprem çaprazı) ekle
+          </label>
+          {deger.stabiliteBaglantisiVar && (
+            <MaterialSelect
+              label="Stabilite Bağlantısı Profili (genelde L profil)"
+              materials={materials}
+              value={deger.stabiliteProfilId}
+              onChange={(v) => onDegis({ ...deger, stabiliteProfilId: v })}
+            />
+          )}
+        </div>
+        <div className="mt-3 pt-3 border-t border-neutral-100 space-y-3">
+          <div>
+            <label className="field-label">Saçak Ucu</label>
+            <div className="flex gap-4 text-sm">
+              <label className="flex items-center gap-2">
+                <input type="radio" checked={!deger.olukluMu} onChange={() => onDegis({ ...deger, olukluMu: false })} />
+                Oluksuz (çıkma payı ile uzat)
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="radio" checked={deger.olukluMu ?? false} onChange={() => onDegis({ ...deger, olukluMu: true })} />
+                Oluklu (oluk mesafesi kadar kısalt)
+              </label>
+            </div>
+          </div>
+          {deger.olukluMu ? (
+            <Sayi label="Oluk Mesafesi (mm)" value={deger.olukMesafesiMm ?? 150} onChange={(v) => onDegis({ ...deger, olukMesafesiMm: v })} />
+          ) : (
+            <Sayi label="Çıkma Payı (mm)" value={deger.cikmaPayiMm ?? 300} onChange={(v) => onDegis({ ...deger, cikmaPayiMm: v })} />
+          )}
+        </div>
+        <div className="mt-3 pt-3 border-t border-neutral-100 space-y-3">
+          <Sayi
+            label="Direk Sayısı (makas yarısı başına, opsiyonel)"
+            value={deger.direkSayisi ?? 0}
+            onChange={(v) => onDegis({ ...deger, direkSayisi: v })}
+          />
+          {(deger.direkSayisi ?? 0) > 0 && (
+            <MaterialSelect label="Direk Profili" materials={materials} value={deger.direkProfilId} onChange={(v) => onDegis({ ...deger, direkProfilId: v })} />
+          )}
+        </div>
+      </details>
+    </div>
+  );
+}
+
 function KonteynerAlanlari({
   materials,
   sacMalzemeler,
@@ -2578,6 +2767,11 @@ function KonteynerAlanlari({
   const [kat2Farkli, setKat2Farkli] = useState<boolean>(() => Boolean(baslangic?.duvarlar2));
   const [duvarlar2, setDuvarlar2] = useState<Record<KonteynerYon, KonteynerDuvarDegerleri>>(
     () => (baslangic?.duvarlar2 as Record<KonteynerYon, KonteynerDuvarDegerleri> | undefined) ?? konteynerDuvarSetiVarsayilan()
+  );
+
+  const [catiVar, setCatiVar] = useState<boolean>(() => (baslangic?.catiVar as boolean) ?? false);
+  const [cati, setCati] = useState<KonteynerCatiDegerleri>(
+    () => (baslangic?.cati as KonteynerCatiDegerleri | undefined) ?? konteynerCatiVarsayilan()
   );
 
   const [merdivenVar, setMerdivenVar] = useState<boolean>(() => (baslangic?.merdivenVar as boolean) ?? false);
@@ -2657,6 +2851,8 @@ function KonteynerAlanlari({
       katSayisi,
       duvarlar,
       duvarlar2: katSayisi === 2 && kat2Farkli ? duvarlar2 : undefined,
+      catiVar,
+      cati: catiVar ? cati : undefined,
       merdivenVar: katSayisi === 2 ? merdivenVar : false,
       merdivenGenislikMm,
       merdivenBasamakYuksekligiHedefMm,
@@ -2697,6 +2893,8 @@ function KonteynerAlanlari({
     duvarlar,
     duvarlar2,
     kat2Farkli,
+    catiVar,
+    cati,
     merdivenVar,
     merdivenGenislikMm,
     merdivenBasamakYuksekligiHedefMm,
@@ -2795,6 +2993,19 @@ function KonteynerAlanlari({
           )}
         </div>
       )}
+
+      <div className="rounded-xl border border-neutral-200 p-3 space-y-3">
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input type="checkbox" checked={catiVar} onChange={(e) => setCatiVar(e.target.checked)} />
+          Çatı ekle
+        </label>
+        <p className="text-xs text-neutral-500 -mt-2">
+          Çatının açıklığı konteyner eniyle, uzunluğu konteyner boyuyla otomatik eşleşir; kat sayısından bağımsız çalışır.
+        </p>
+        {catiVar && (
+          <KonteynerCatiFormu materials={materials} sacMalzemeler={sacMalzemeler} baglantiMalzemeler={baglantiMalzemeler} deger={cati} onDegis={setCati} />
+        )}
+      </div>
 
       {katSayisi === 2 && (
         <div className="rounded-xl border border-neutral-200 p-3 space-y-3">

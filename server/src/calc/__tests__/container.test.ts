@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { calculateContainer, KonteynerDuvarGirdi, KonteynerDuvarSeti } from "../container";
+import { calculateContainer, KonteynerDuvarGirdi, KonteynerDuvarSeti, KonteynerCatiGirdi } from "../container";
 import { HesaplamaHatasi } from "../units";
 
 function duvar(overrides: Partial<KonteynerDuvarGirdi> = {}): KonteynerDuvarGirdi {
@@ -19,6 +19,16 @@ function duvarSeti(overrides: Partial<Record<keyof KonteynerDuvarSeti, Partial<K
     arka: duvar(overrides.arka),
     sol: duvar(overrides.sol),
     sag: duvar(overrides.sag),
+  };
+}
+
+function cati(overrides: Partial<KonteynerCatiGirdi> = {}): KonteynerCatiGirdi {
+  return {
+    egimYuzde: 20,
+    kafesAraligiHedefMm: 1000,
+    ustBaslikProfilKey: "40x40x2",
+    altBaslikProfilKey: "40x40x2",
+    ...overrides,
   };
 }
 
@@ -188,5 +198,70 @@ test("konteyner: geçersiz girdilerde hata fırlatır", () => {
         duvarlar: duvarSeti(),
       }),
     HesaplamaHatasi
+  );
+});
+
+test("konteyner: çatı eklenirse konteyner eni/boyu açıklık/çatı uzunluğu olarak kullanılır (tek kat)", () => {
+  const sonuc = calculateContainer({
+    genislikMm: 2438,
+    uzunlukMm: 6058,
+    katYuksekligiMm: 2591,
+    katSayisi: 1,
+    duvarlar: duvarSeti(),
+    catiVar: true,
+    cati: cati(),
+  });
+
+  assert.ok(sonuc.parcalar.some((p) => p.label === "Çatı: Üst başlık"));
+  assert.ok(sonuc.ozetDegerler.catiKafesSayisi > 0);
+  assert.ok(sonuc.ozetDegerler.catiMahyaYuksekligiMm > 0);
+
+  // Çatı, kat sayısından bağımsız - iki katlı olmasa da hesaplanmalı, uyarı verilmemeli.
+  assert.ok(!sonuc.uyarilar.some((u) => u.includes("Çatı")));
+});
+
+test("konteyner: çatı 2 katlı konteynerde de kat sayısından bağımsız çalışır", () => {
+  const sonuc = calculateContainer({
+    genislikMm: 2438,
+    uzunlukMm: 6058,
+    katYuksekligiMm: 2591,
+    katSayisi: 2,
+    duvarlar: duvarSeti(),
+    catiVar: true,
+    cati: cati(),
+  });
+
+  assert.ok(sonuc.parcalar.some((p) => p.label === "Çatı: Üst başlık"));
+  assert.ok(sonuc.ozetDegerler.catiKafesSayisi > 0);
+});
+
+test("konteyner: çatı eklenip ayarları girilmezse hata verir", () => {
+  assert.throws(
+    () =>
+      calculateContainer({
+        genislikMm: 2438,
+        uzunlukMm: 6058,
+        katYuksekligiMm: 2591,
+        katSayisi: 1,
+        duvarlar: duvarSeti(),
+        catiVar: true,
+      }),
+    HesaplamaHatasi
+  );
+});
+
+test("konteyner: çatı hatası konteyner seviyesinde 'Çatı' önekiyle fırlatılır", () => {
+  assert.throws(
+    () =>
+      calculateContainer({
+        genislikMm: 2438,
+        uzunlukMm: 6058,
+        katYuksekligiMm: 2591,
+        katSayisi: 1,
+        duvarlar: duvarSeti(),
+        catiVar: true,
+        cati: cati({ ustBaslikProfilKey: "" }),
+      }),
+    (err: unknown) => err instanceof HesaplamaHatasi && err.message.startsWith("Çatı:")
   );
 });

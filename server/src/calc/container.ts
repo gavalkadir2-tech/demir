@@ -6,12 +6,13 @@
 // (dikme aralığı/profilleri, kapı/pencere boşlukları, iç/dış kaplama, dikme pozisyonlarının elle
 // düzenlenmesi, yatay ara profiller) her bir konteyner duvarında ayrı ayrı kullanılabilir.
 // 2 katlıysa bu 4 duvar seti bir kat daha (isteğe bağlı olarak farklı ayarlarla) tekrarlanır.
-// Ayrıca atölyenin üretebileceği üç ek şey daha hesaplanır (kat sayısı 2 ise):
-//   - kat arası merdiven + korkuluk (calculateStairs sarmalanarak),
-//   - 2. kat/balkon açık kenarına bağımsız platform korkuluğu (calculateRailing sarmalanarak),
-//   - 2. katı taşıyan ek çelik iskelet (calculateSteelFrame sarmalanarak).
-// Çatı ayrıca mühendislik gerektirmez (bu motorun kapsamı dışındadır - gerekirse ayrı bir
-// "Çatı Kafesi" ürünü aynı işe eklenebilir).
+// Ayrıca atölyenin üretebileceği dört ek şey daha hesaplanır:
+//   - konteynerin üzerine oturan çatı kafesi (calculateRoofTruss sarmalanarak, kat sayısından
+//     bağımsız - her konteynerde olabilir),
+//   - (yalnızca kat sayısı 2 ise) kat arası merdiven + korkuluk (calculateStairs sarmalanarak),
+//   - (yalnızca kat sayısı 2 ise) 2. kat/balkon açık kenarına bağımsız platform korkuluğu
+//     (calculateRailing sarmalanarak),
+//   - (yalnızca kat sayısı 2 ise) 2. katı taşıyan ek çelik iskelet (calculateSteelFrame sarmalanarak).
 
 import { HesaplamaHatasi } from "./units";
 import { HesaplananParca, UrunHesapSonucu, bosSonuc, profilOzetOlustur } from "./types";
@@ -19,6 +20,7 @@ import { calculateWallPanel, DuvarPaneliGirdi } from "./wall";
 import { calculateStairs, MerdivenGirdi } from "./stairs";
 import { calculateRailing, KorkulukGirdi } from "./railing";
 import { calculateSteelFrame, KolonKirisGirdi } from "./steelFrame";
+import { calculateRoofTruss, CatiKafesiGirdi } from "./roofTruss";
 
 /** Konteynerin bir duvarının ayarları - Çelik Duvar Paneli'nin (DuvarPaneliGirdi) genişlik ve
  * yükseklik dışındaki tüm alanları. Genişlik/yükseklik konteynerin genel ölçülerinden (genislikMm/
@@ -32,6 +34,11 @@ export interface KonteynerDuvarSeti {
   sol: KonteynerDuvarGirdi;
   sag: KonteynerDuvarGirdi;
 }
+
+/** Konteynerin çatısının ayarları - Çatı Kafesi'nin (CatiKafesiGirdi) açıklık ve çatı uzunluğu
+ * dışındaki tüm alanları. Açıklık/uzunluk konteynerin genel ölçülerinden (genislikMm/uzunlukMm)
+ * otomatik atanır - çatı konteynerin tam üzerine oturmak zorundadır. */
+export type KonteynerCatiGirdi = Omit<CatiKafesiGirdi, "acikligMm" | "catiUzunluguMm">;
 
 export interface KonteynerGirdi {
   /** Konteyner eni (mm) - ön/arka duvarın genişliği, örn. 2438 standart 20/40ft konteyner genişliği */
@@ -47,6 +54,10 @@ export interface KonteynerGirdi {
   /** 2. kat duvar ayarları - verilmezse (katSayisi=2 iken) 1. kat duvarları (duvarlar) aynen
    * tekrar kullanılır; farklı pencere/kapı veya kaplama isteniyorsa burada ayrı girilir. */
   duvarlar2?: KonteynerDuvarSeti;
+
+  // Çatı kafesi - kat sayısından bağımsız, konteynerin üzerine oturur
+  catiVar?: boolean;
+  cati?: KonteynerCatiGirdi;
 
   // Kat arası merdiven + korkuluk (yalnızca katSayisi === 2 ise hesaplanır)
   merdivenVar?: boolean;
@@ -158,6 +169,20 @@ export function calculateContainer(girdi: KonteynerGirdi): UrunHesapSonucu {
     });
   }
 
+  // --- Çatı kafesi (kat sayısından bağımsız, konteynerin üzerine oturur) ---
+  let catiSonuc: UrunHesapSonucu | null = null;
+  if (girdi.catiVar) {
+    if (!girdi.cati) throw new HesaplamaHatasi("Çatı eklendi ama çatı ayarları girilmedi.");
+    const catiGirdi: CatiKafesiGirdi = { ...girdi.cati, acikligMm: genislikMm, catiUzunluguMm: uzunlukMm };
+    try {
+      catiSonuc = calculateRoofTruss(catiGirdi);
+    } catch (e) {
+      if (e instanceof HesaplamaHatasi) throw new HesaplamaHatasi(`Çatı: ${e.message}`);
+      throw e;
+    }
+    altSonucuBirlestir(parcalar, sonuc.sacKalemleri, sonuc.baglantiKalemleri, sonuc.uyarilar, catiSonuc, "Çatı");
+  }
+
   // --- Kat arası merdiven + korkuluk ---
   let merdivenSonuc: UrunHesapSonucu | null = null;
   if (girdi.merdivenVar) {
@@ -252,6 +277,14 @@ export function calculateContainer(girdi: KonteynerGirdi): UrunHesapSonucu {
     toplamDikmeSayisi,
     toplamBoslukSayisi,
     toplamDuvarAlaniM2,
+    ...(catiSonuc
+      ? {
+          catiKafesSayisi: catiSonuc.ozetDegerler.kafesSayisi,
+          catiMahyaYuksekligiMm: catiSonuc.ozetDegerler.mahyaYuksekligiMm,
+          catiGercekAralikMm: catiSonuc.ozetDegerler.gercekAralikMm,
+          catiDiyagonalPanelSayisi: catiSonuc.ozetDegerler.diyagonalPanelSayisi,
+        }
+      : {}),
     ...(merdivenSonuc
       ? {
           merdivenBasamakSayisi: merdivenSonuc.ozetDegerler.basamakSayisi,
