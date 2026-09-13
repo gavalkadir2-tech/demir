@@ -109,11 +109,13 @@ export default function YeniIs() {
   const [materials, setMaterials] = useState<Material[] | null>(null);
   const [sacMalzemeler, setSacMalzemeler] = useState<Material[]>([]);
   const [baglantiMalzemeler, setBaglantiMalzemeler] = useState<Material[]>([]);
+  const [sarfMalzemeler, setSarfMalzemeler] = useState<Material[]>([]);
 
   useEffect(() => {
     api.get<Material[]>("/materials?category=PROFILE").then(setMaterials);
     api.get<Material[]>("/materials?category=SHEET").then(setSacMalzemeler);
     api.get<Material[]>("/materials?category=FASTENER").then(setBaglantiMalzemeler);
+    api.get<Material[]>("/materials?category=CONSUMABLE").then(setSarfMalzemeler);
   }, []);
 
   if (adim === 1) {
@@ -161,6 +163,7 @@ export default function YeniIs() {
         materials={materials}
         sacMalzemeler={sacMalzemeler}
         baglantiMalzemeler={baglantiMalzemeler}
+        sarfMalzemeler={sarfMalzemeler}
         baslangic={aiAlanlar ?? undefined}
       />
     </div>
@@ -451,6 +454,7 @@ export function UrunFormu({
   materials,
   sacMalzemeler,
   baglantiMalzemeler,
+  sarfMalzemeler,
   onSaved,
   baslangic,
   duzenlemeItemId,
@@ -465,6 +469,9 @@ export function UrunFormu({
   /** Bağlantı elemanı (FASTENER) kategorisindeki malzemeler - ankraj/menteşe/kilit/kol vb. için
    * opsiyonel malzeme bağlama alanlarında kullanılır. Verilmezse boş liste. */
   baglantiMalzemeler?: Material[];
+  /** Sarf malzeme (CONSUMABLE) kategorisindeki malzemeler - yalıtım vb. için opsiyonel malzeme
+   * bağlama alanlarında kullanılır. Verilmezse boş liste. */
+  sarfMalzemeler?: Material[];
   onSaved?: () => void;
   baslangic?: Record<string, unknown>;
   /** Verilirse form düzenleme modunda çalışır: kaydet POST yerine bu id'ye PUT yapar. */
@@ -649,6 +656,28 @@ export function UrunFormu({
     setSemaSayiSurumu((v) => v + 1);
   };
 
+  /** Konteyner şematiğinin "İç Duvarlar" sekmesinde aktif iç bölme duvarına tıklanarak dikme
+   * pozisyonu düzenlendiğinde çağrılır. icDuvarlar, duvarlar/duvarlar2 gibi KonteynerAlanlari'nın
+   * tek parça izlediği bir liste olduğundan, ayrı bir "korunabilir" sarmalayıcı gerekmez. */
+  const konteynerIcDuvarDikmeGuncelle = async (index: number, yeniListe: number[] | null) => {
+    const mevcutListe = (params.icDuvarlar as Record<string, unknown>[] | undefined) ?? [];
+    const yeniDuvar = { ...(mevcutListe[index] ?? {}) };
+    if (yeniListe) yeniDuvar.dikmePozisyonlariMm = yeniListe;
+    else delete yeniDuvar.dikmePozisyonlariMm;
+    const yeniListeler = mevcutListe.map((d, i) => (i === index ? yeniDuvar : d));
+    await hesapla({ ...params, icDuvarlar: yeniListeler });
+    setSemaSayiSurumu((v) => v + 1);
+  };
+
+  /** Konteyner şematiğinin "İç Duvarlar" sekmesinde aktif iç bölme duvarına yatay ara profil
+   * eklenip/kaldırıldığında çağrılır. */
+  const konteynerIcDuvarYatayGuncelle = async (index: number, yeniListe: DuvarYatayAraProfilVeri[]) => {
+    const mevcutListe = (params.icDuvarlar as Record<string, unknown>[] | undefined) ?? [];
+    const yeniListeler = mevcutListe.map((d, i) => (i === index ? { ...d, yatayAraProfilleri: yeniListe } : d));
+    await hesapla({ ...params, icDuvarlar: yeniListeler });
+    setSemaSayiSurumu((v) => v + 1);
+  };
+
   /** Konteyner şematiğinin "Çatı" sekmesinde bir kafese tıklanarak artırma/azaltma yapıldığında
    * çağrılır; kafesSayisiOverride params.cati içine yazılır. */
   const konteynerCatiKafesSayisiGuncelle = async (yeniSayi: number) => {
@@ -774,6 +803,7 @@ export function UrunFormu({
             materials={materials}
             sacMalzemeler={sacMalzemeler ?? []}
             baglantiMalzemeler={baglantiMalzemeler ?? []}
+            sarfMalzemeler={sarfMalzemeler ?? []}
             onChange={duvarParamsGuncelle}
             baslangic={baslangic}
           />
@@ -831,6 +861,7 @@ export function UrunFormu({
             materials={materials}
             sacMalzemeler={sacMalzemeler ?? []}
             baglantiMalzemeler={baglantiMalzemeler ?? []}
+            sarfMalzemeler={sarfMalzemeler ?? []}
             onChange={setParams}
             baslangic={semaSayiSurumu > 0 ? params : baslangic}
           />
@@ -872,6 +903,8 @@ export function UrunFormu({
             onDikeyCubukSayisiDegisti={templateKey === "ferforje_panel" ? dikeyCubukSayisiGuncelle : undefined}
             onKonteynerDuvarDikmeDegisti={templateKey === "container" ? konteynerDuvarDikmeGuncelle : undefined}
             onKonteynerDuvarYatayDegisti={templateKey === "container" ? konteynerDuvarYatayGuncelle : undefined}
+            onKonteynerIcDuvarDikmeDegisti={templateKey === "container" ? konteynerIcDuvarDikmeGuncelle : undefined}
+            onKonteynerIcDuvarYatayDegisti={templateKey === "container" ? konteynerIcDuvarYatayGuncelle : undefined}
             onKonteynerCatiKafesSayisiDegisti={templateKey === "container" ? konteynerCatiKafesSayisiGuncelle : undefined}
           />
 
@@ -1537,12 +1570,14 @@ function DuvarAlanlari({
   materials,
   sacMalzemeler,
   baglantiMalzemeler,
+  sarfMalzemeler,
   onChange,
   baslangic,
 }: {
   materials: Material[];
   sacMalzemeler: Material[];
   baglantiMalzemeler: Material[];
+  sarfMalzemeler: Material[];
   onChange: (p: Record<string, unknown>) => void;
   baslangic?: Record<string, unknown>;
 }) {
@@ -1564,6 +1599,9 @@ function DuvarAlanlari({
     () => baslangic?.icKaplamaMalzemeId as number | undefined
   );
   const [dubelMalzemeId, setDubelMalzemeId] = useState<number | undefined>(() => baslangic?.dubelMalzemeId as number | undefined);
+  const [yalitimVar, setYalitimVar] = useState<boolean>(() => (baslangic?.yalitimVar as boolean) ?? false);
+  const [yalitimKalinlikMm, setYalitimKalinlikMm] = useState<number>(() => (baslangic?.yalitimKalinlikMm as number) ?? 50);
+  const [yalitimMalzemeId, setYalitimMalzemeId] = useState<number | undefined>(() => baslangic?.yalitimMalzemeId as number | undefined);
 
   useEffect(() => {
     onChange({
@@ -1579,6 +1617,9 @@ function DuvarAlanlari({
       icKaplamaTuru: icKaplamaTuru === "yok" ? undefined : icKaplamaTuru,
       icKaplamaMalzemeId: icKaplamaTuru !== "yok" ? icKaplamaMalzemeId : undefined,
       dubelMalzemeId,
+      yalitimVar,
+      yalitimKalinlikMm: yalitimVar ? yalitimKalinlikMm : undefined,
+      yalitimMalzemeId: yalitimVar ? yalitimMalzemeId : undefined,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -1594,6 +1635,9 @@ function DuvarAlanlari({
     icKaplamaTuru,
     icKaplamaMalzemeId,
     dubelMalzemeId,
+    yalitimVar,
+    yalitimKalinlikMm,
+    yalitimMalzemeId,
   ]);
 
   const bosluklariGuncelle = (i: number, alan: keyof DuvarBoslukTaslak, deger: string | number) => {
@@ -1664,6 +1708,25 @@ function DuvarAlanlari({
         biri için panel/levha miktarı, m² sipariş alanı ve fire ayrı hesaplanır. Kapı/pencere boşlukları panelden sahada
         kesilir, ayrıca düşülmez.
       </p>
+
+      <div className="rounded-xl border border-neutral-200 p-3 space-y-3">
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input type="checkbox" checked={yalitimVar} onChange={(e) => setYalitimVar(e.target.checked)} />
+          İç/dış kaplama arasına yalıtım ekle (taş yünü, strafor vb.)
+        </label>
+        {yalitimVar && (
+          <div className="grid grid-cols-2 gap-3">
+            <Sayi label="Yalıtım Kalınlığı (mm)" value={yalitimKalinlikMm} onChange={setYalitimKalinlikMm} />
+            <MaterialSelect
+              label="Yalıtım Malzemesi (opsiyonel, stok/maliyet için)"
+              materials={sarfMalzemeler}
+              value={yalitimMalzemeId}
+              onChange={setYalitimMalzemeId}
+              allowEmpty
+            />
+          </div>
+        )}
+      </div>
 
       <div className="rounded-xl border border-neutral-200 p-3 space-y-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
@@ -2427,12 +2490,25 @@ interface KonteynerDuvarDegerleri {
   icKaplamaTuru: string;
   icKaplamaMalzemeId?: number;
   dubelMalzemeId?: number;
+  yalitimVar?: boolean;
+  yalitimKalinlikMm?: number;
+  yalitimMalzemeId?: number;
   dikmePozisyonlariMm?: number[];
   yatayAraProfilleri?: DuvarYatayAraProfilVeri[];
 }
 
 function konteynerDuvarVarsayilan(): KonteynerDuvarDegerleri {
   return { dikmeAraligiHedefMm: 600, bosluklar: [], disKaplamaTuru: "yok", icKaplamaTuru: "yok" };
+}
+
+/** Konteyner içini odalara ayıran bir iç bölme duvarının ayarları - dış duvarların tüm alanlarına
+ * ek olarak kendi uzunluğunu (genislikMm) taşır; konteynerin dış ölçüsüne bağlı değildir. */
+interface KonteynerIcDuvarDegerleri extends KonteynerDuvarDegerleri {
+  genislikMm: number;
+}
+
+function konteynerIcDuvarVarsayilan(): KonteynerIcDuvarDegerleri {
+  return { ...konteynerDuvarVarsayilan(), genislikMm: 2000 };
 }
 
 function konteynerDuvarSetiVarsayilan(): Record<KonteynerYon, KonteynerDuvarDegerleri> {
@@ -2476,28 +2552,29 @@ function konteynerCatiVarsayilan(): KonteynerCatiDegerleri {
  * dışındaki tüm alanlar (bunlar konteynerin genel ölçülerinden otomatik atanır, 4 duvarın bir kutu
  * oluşturması için). Tam kontrollü bileşendir (kendi state'i yok) - şematik üzerinden yapılan
  * dikme/yatay-ara-profil düzenlemeleri de aynı `deger` nesnesi üzerinden akar. */
-function KonteynerDuvarFormu({
-  baslik,
+/** KonteynerDuvarFormu ve KonteynerIcDuvarFormu arasında paylaşılan gövde - dikme/profil/kaplama/
+ * yalıtım/boşluk alanlarının tamamı. Genişlik/uzunluk alanı çağıran bileşene bırakılmıştır (dış
+ * duvarlarda otomatik, iç bölme duvarlarında elle girilir). */
+function KonteynerDuvarGovdesi<T extends KonteynerDuvarDegerleri>({
   materials,
   sacMalzemeler,
+  sarfMalzemeler,
   deger,
   onDegis,
 }: {
-  baslik: string;
   materials: Material[];
   sacMalzemeler: Material[];
-  deger: KonteynerDuvarDegerleri;
-  onDegis: (yeni: KonteynerDuvarDegerleri) => void;
+  sarfMalzemeler: Material[];
+  deger: T;
+  onDegis: (yeni: T) => void;
 }) {
   const bosluklariGuncelle = (i: number, alan: keyof DuvarBoslukTaslak, v: string | number) => {
     onDegis({ ...deger, bosluklar: deger.bosluklar.map((b, idx) => (idx === i ? { ...b, [alan]: v } : b)) });
   };
 
   return (
-    <details className="rounded-xl border border-neutral-200 p-3" open>
-      <summary className="font-semibold cursor-pointer">{baslik}</summary>
-      <div className="mt-3 space-y-3">
-        <div className="grid grid-cols-2 gap-3">
+    <div className="mt-3 space-y-3">
+      <div className="grid grid-cols-2 gap-3">
           <Sayi label="Dikme Aralığı (mm)" value={deger.dikmeAraligiHedefMm} onChange={(v) => onDegis({ ...deger, dikmeAraligiHedefMm: v })} />
           <MaterialSelect label="Dikme Profili" materials={materials} value={deger.dikmeProfilId} onChange={(v) => onDegis({ ...deger, dikmeProfilId: v })} />
           <MaterialSelect label="Üst Ray" materials={materials} value={deger.ustProfilId} onChange={(v) => onDegis({ ...deger, ustProfilId: v })} />
@@ -2541,6 +2618,32 @@ function KonteynerDuvarFormu({
               onChange={(v) => onDegis({ ...deger, icKaplamaMalzemeId: v })}
               allowEmpty
             />
+          )}
+        </div>
+        <div className="rounded-xl border border-neutral-100 p-3 space-y-2">
+          <label className="flex items-center gap-2 text-xs font-semibold">
+            <input
+              type="checkbox"
+              checked={deger.yalitimVar ?? false}
+              onChange={(e) => onDegis({ ...deger, yalitimVar: e.target.checked })}
+            />
+            İç/dış kaplama arasına yalıtım ekle
+          </label>
+          {deger.yalitimVar && (
+            <div className="grid grid-cols-2 gap-3">
+              <Sayi
+                label="Yalıtım Kalınlığı (mm)"
+                value={deger.yalitimKalinlikMm ?? 50}
+                onChange={(v) => onDegis({ ...deger, yalitimKalinlikMm: v })}
+              />
+              <MaterialSelect
+                label="Yalıtım Malzemesi (opsiyonel)"
+                materials={sarfMalzemeler}
+                value={deger.yalitimMalzemeId}
+                onChange={(v) => onDegis({ ...deger, yalitimMalzemeId: v })}
+                allowEmpty
+              />
+            </div>
           )}
         </div>
         <div className="rounded-xl border border-neutral-100 p-3 space-y-2">
@@ -2589,6 +2692,65 @@ function KonteynerDuvarFormu({
           {deger.bosluklar.length === 0 && <div className="text-xs text-neutral-500">Boşluk eklenmedi, duvar tam dolu hesaplanacak.</div>}
         </div>
       </div>
+  );
+}
+
+/** Konteynerin bir dış duvarının (ön/arka/sol/sağ) ayarlarını, üstte katlanabilir bir başlıkla
+ * KonteynerDuvarGovdesi üzerinden gösterir. */
+function KonteynerDuvarFormu({
+  baslik,
+  materials,
+  sacMalzemeler,
+  sarfMalzemeler,
+  deger,
+  onDegis,
+}: {
+  baslik: string;
+  materials: Material[];
+  sacMalzemeler: Material[];
+  sarfMalzemeler: Material[];
+  deger: KonteynerDuvarDegerleri;
+  onDegis: (yeni: KonteynerDuvarDegerleri) => void;
+}) {
+  return (
+    <details className="rounded-xl border border-neutral-200 p-3" open>
+      <summary className="font-semibold cursor-pointer">{baslik}</summary>
+      <KonteynerDuvarGovdesi materials={materials} sacMalzemeler={sacMalzemeler} sarfMalzemeler={sarfMalzemeler} deger={deger} onDegis={onDegis} />
+    </details>
+  );
+}
+
+/** Konteyner içini odalara ayıran bir iç bölme duvarının ayarları - dış duvarlardan farklı olarak
+ * kendi uzunluğunu (genislikMm) da bu formda taşır, ve listeden silinebilir. */
+function KonteynerIcDuvarFormu({
+  index,
+  materials,
+  sacMalzemeler,
+  sarfMalzemeler,
+  deger,
+  onDegis,
+  onSil,
+}: {
+  index: number;
+  materials: Material[];
+  sacMalzemeler: Material[];
+  sarfMalzemeler: Material[];
+  deger: KonteynerIcDuvarDegerleri;
+  onDegis: (yeni: KonteynerIcDuvarDegerleri) => void;
+  onSil: () => void;
+}) {
+  return (
+    <details className="rounded-xl border border-neutral-200 p-3" open>
+      <summary className="font-semibold cursor-pointer">İç Duvar {index + 1}</summary>
+      <div className="mt-3 flex items-end gap-3">
+        <div className="flex-1">
+          <Sayi label="Duvar Uzunluğu (mm)" value={deger.genislikMm} onChange={(v) => onDegis({ ...deger, genislikMm: v })} />
+        </div>
+        <button type="button" className="btn-danger btn-sm" onClick={onSil}>
+          Duvarı Sil
+        </button>
+      </div>
+      <KonteynerDuvarGovdesi materials={materials} sacMalzemeler={sacMalzemeler} sarfMalzemeler={sarfMalzemeler} deger={deger} onDegis={onDegis} />
     </details>
   );
 }
@@ -2747,12 +2909,14 @@ function KonteynerAlanlari({
   materials,
   sacMalzemeler,
   baglantiMalzemeler,
+  sarfMalzemeler,
   onChange,
   baslangic,
 }: {
   materials: Material[];
   sacMalzemeler: Material[];
   baglantiMalzemeler: Material[];
+  sarfMalzemeler: Material[];
   onChange: (p: Record<string, unknown>) => void;
   baslangic?: Record<string, unknown>;
 }) {
@@ -2767,6 +2931,10 @@ function KonteynerAlanlari({
   const [kat2Farkli, setKat2Farkli] = useState<boolean>(() => Boolean(baslangic?.duvarlar2));
   const [duvarlar2, setDuvarlar2] = useState<Record<KonteynerYon, KonteynerDuvarDegerleri>>(
     () => (baslangic?.duvarlar2 as Record<KonteynerYon, KonteynerDuvarDegerleri> | undefined) ?? konteynerDuvarSetiVarsayilan()
+  );
+
+  const [icDuvarlar, setIcDuvarlar] = useState<KonteynerIcDuvarDegerleri[]>(
+    () => (baslangic?.icDuvarlar as KonteynerIcDuvarDegerleri[] | undefined) ?? []
   );
 
   const [catiVar, setCatiVar] = useState<boolean>(() => (baslangic?.catiVar as boolean) ?? false);
@@ -2851,6 +3019,7 @@ function KonteynerAlanlari({
       katSayisi,
       duvarlar,
       duvarlar2: katSayisi === 2 && kat2Farkli ? duvarlar2 : undefined,
+      icDuvarlar: icDuvarlar.length > 0 ? icDuvarlar : undefined,
       catiVar,
       cati: catiVar ? cati : undefined,
       merdivenVar: katSayisi === 2 ? merdivenVar : false,
@@ -2893,6 +3062,7 @@ function KonteynerAlanlari({
     duvarlar,
     duvarlar2,
     kat2Farkli,
+    icDuvarlar,
     catiVar,
     cati,
     merdivenVar,
@@ -2929,6 +3099,10 @@ function KonteynerAlanlari({
 
   const duvarGuncelle = (yon: KonteynerYon, yeni: KonteynerDuvarDegerleri) => setDuvarlar((s) => ({ ...s, [yon]: yeni }));
   const duvar2Guncelle = (yon: KonteynerYon, yeni: KonteynerDuvarDegerleri) => setDuvarlar2((s) => ({ ...s, [yon]: yeni }));
+  const icDuvarEkle = () => setIcDuvarlar((liste) => [...liste, konteynerIcDuvarVarsayilan()]);
+  const icDuvarGuncelle = (index: number, yeni: KonteynerIcDuvarDegerleri) =>
+    setIcDuvarlar((liste) => liste.map((d, i) => (i === index ? yeni : d)));
+  const icDuvarSil = (index: number) => setIcDuvarlar((liste) => liste.filter((_, i) => i !== index));
 
   return (
     <div className="space-y-3">
@@ -2964,6 +3138,7 @@ function KonteynerAlanlari({
             baslik={KONTEYNER_YON_ETIKET[yon]}
             materials={materials}
             sacMalzemeler={sacMalzemeler}
+            sarfMalzemeler={sarfMalzemeler}
             deger={duvarlar[yon]}
             onDegis={(yeni) => duvarGuncelle(yon, yeni)}
           />
@@ -2985,6 +3160,7 @@ function KonteynerAlanlari({
                   baslik={`2. Kat ${KONTEYNER_YON_ETIKET[yon]}`}
                   materials={materials}
                   sacMalzemeler={sacMalzemeler}
+                  sarfMalzemeler={sarfMalzemeler}
                   deger={duvarlar2[yon]}
                   onDegis={(yeni) => duvar2Guncelle(yon, yeni)}
                 />
@@ -2993,6 +3169,32 @@ function KonteynerAlanlari({
           )}
         </div>
       )}
+
+      <div className="rounded-xl border border-neutral-200 p-3 space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <span className="font-semibold text-sm">İç Bölme Duvarları (opsiyonel)</span>
+          <button type="button" className="btn-secondary btn-sm" onClick={icDuvarEkle}>
+            ➕ İç Duvar Ekle
+          </button>
+        </div>
+        <p className="text-xs text-neutral-500 -mt-2">
+          Konteyner içini odalara ayıran bölme duvarları - her biri tam bir Çelik Duvar Paneli gibi yapılandırılır, sadece
+          uzunluğu (konteynerin dış ölçüsünden bağımsız) elle girilir. 2 katlıysa aynı liste her katta tekrarlanır.
+        </p>
+        {icDuvarlar.map((d, i) => (
+          <KonteynerIcDuvarFormu
+            key={i}
+            index={i}
+            materials={materials}
+            sacMalzemeler={sacMalzemeler}
+            sarfMalzemeler={sarfMalzemeler}
+            deger={d}
+            onDegis={(yeni) => icDuvarGuncelle(i, yeni)}
+            onSil={() => icDuvarSil(i)}
+          />
+        ))}
+        {icDuvarlar.length === 0 && <div className="text-xs text-neutral-500">İç bölme duvarı eklenmedi.</div>}
+      </div>
 
       <div className="rounded-xl border border-neutral-200 p-3 space-y-3">
         <label className="flex items-center gap-2 text-sm font-medium">

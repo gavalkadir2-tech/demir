@@ -317,6 +317,8 @@ async function main() {
     { name: "Taşlama Taşı", category: "CONSUMABLE" as const, unit: "ADET" as const, unitPrice: 30, stockQty: 20, minStockQty: 5 },
     { name: "Astar Boya", category: "CONSUMABLE" as const, unit: "KG" as const, unitPrice: 90, stockQty: 8, minStockQty: 2 },
     { name: "Son Kat Boya", category: "CONSUMABLE" as const, unit: "KG" as const, unitPrice: 110, stockQty: 8, minStockQty: 2 },
+    { name: "Taş Yünü İzolasyon (m²)", category: "CONSUMABLE" as const, unit: "M2" as const, unitPrice: 65, stockQty: 100, minStockQty: 20 },
+    { name: "Strafor (EPS) İzolasyon (m²)", category: "CONSUMABLE" as const, unit: "M2" as const, unitPrice: 45, stockQty: 100, minStockQty: 20 },
     { name: "Ankraj (Kimyasal Dübel)", category: "FASTENER" as const, unit: "ADET" as const, unitPrice: 12, stockQty: 100, minStockQty: 20 },
     { name: "Menteşe", category: "FASTENER" as const, unit: "ADET" as const, unitPrice: 45, stockQty: 20, minStockQty: 5 },
     { name: "Kapı Kilidi", category: "FASTENER" as const, unit: "ADET" as const, unitPrice: 220, stockQty: 5, minStockQty: 2 },

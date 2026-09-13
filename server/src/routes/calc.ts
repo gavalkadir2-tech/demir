@@ -140,6 +140,9 @@ const wallSchema = z.object({
   icKaplamaKalinlikMm: z.number().optional(),
   icKaplamaMalzemeId: z.number().int().optional(),
   dubelMalzemeId: z.number().int().optional(),
+  yalitimVar: z.boolean().optional(),
+  yalitimKalinlikMm: z.number().optional(),
+  yalitimMalzemeId: z.number().int().optional(),
 });
 
 const trussSchema = z.object({
@@ -249,6 +252,9 @@ const konteynerDuvarSetiSchema = z.object({
   sag: konteynerDuvarSchema,
 });
 const konteynerCatiSchema = trussSchema.omit({ acikligMm: true, catiUzunluguMm: true });
+// İç bölme duvarı, dış duvarlardan farklı olarak kendi uzunluğunu (genislikMm) taşır - sadece
+// yüksekliği konteynerin kat yüksekliğinden otomatik atanır.
+const konteynerIcDuvarSchema = wallSchema.omit({ yukseklikMm: true });
 
 const containerSchema = z.object({
   genislikMm: z.number(),
@@ -257,6 +263,7 @@ const containerSchema = z.object({
   katSayisi: z.union([z.literal(1), z.literal(2)]),
   duvarlar: konteynerDuvarSetiSchema,
   duvarlar2: konteynerDuvarSetiSchema.optional(),
+  icDuvarlar: z.array(konteynerIcDuvarSchema).optional(),
   catiVar: z.boolean().optional(),
   cati: konteynerCatiSchema.optional(),
   merdivenVar: z.boolean().optional(),

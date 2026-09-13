@@ -60,6 +60,14 @@ export interface DuvarPaneliGirdi {
   /** Kullanıcının şematik üzerinden elle eklediği yatay ara profiller (blokaj) - her biri tek bir
    * gözde (iki dikme arası), belirli bir yükseklikte, kısa bir yatay segment. */
   yatayAraProfilleri?: DuvarYatayAraProfil[];
+  /** İç/dış kaplama arasına konan yalıtım (taş yünü, strafor vb.). Verilirse duvar alanı kadar
+   * m² birimiyle bir malzeme kalemi eklenir (kapı/pencere boşlukları düşülmez - kaplama fire
+   * mantığıyla tutarlı, sahada kesim payı olarak kalır). */
+  yalitimVar?: boolean;
+  yalitimKalinlikMm?: number;
+  /** Yalıtımın alınacağı Material id'si (opsiyonel) - verilirse teklif maliyetine ve iş onayında
+   * stok düşümüne dahil edilir. */
+  yalitimMalzemeKey?: string;
 }
 
 export interface DuvarYatayAraProfil {
@@ -293,6 +301,17 @@ export function calculateWallPanel(girdi: DuvarPaneliGirdi): UrunHesapSonucu {
     genislikMm
   );
 
+  const yalitimVar = girdi.yalitimVar ?? false;
+  if (yalitimVar) {
+    const yalitimKalinlikMm = girdi.yalitimKalinlikMm ?? 50;
+    sonuc.baglantiKalemleri.push({
+      label: `Yalıtım (${yalitimKalinlikMm} mm)`,
+      birim: "m²",
+      adet: Math.round(duvarAlaniM2 * 100) / 100,
+      materialKey: girdi.yalitimMalzemeKey,
+    });
+  }
+
   sonuc.ozetDegerler = {
     dikmeSayisi: dikmePozisyonlari.length,
     araliklarSayisi,
@@ -313,6 +332,7 @@ export function calculateWallPanel(girdi: DuvarPaneliGirdi): UrunHesapSonucu {
           icKaplamaFireYuzde: icKaplamaOzet.fireYuzde,
         }
       : {}),
+    ...(yalitimVar ? { yalitimAlaniM2: Math.round(duvarAlaniM2 * 100) / 100 } : {}),
   };
 
   return sonuc;

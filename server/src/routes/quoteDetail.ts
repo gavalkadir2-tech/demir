@@ -6,6 +6,76 @@ import { asyncHandler } from "../lib/errors";
 
 const router = Router();
 
+interface KonteynerPdfBilgi {
+  genislikMm: number;
+  uzunlukMm: number;
+  katYuksekligiMm: number;
+  katSayisi: number;
+  catiVar?: boolean;
+  catiEgimYuzde?: number;
+}
+
+/** Konteyner ürününün paramsJson'ından PDF'te çizim için gereken temel ölçüleri çıkarır. */
+function konteynerPdfBilgisiCikar(paramsJson: unknown): KonteynerPdfBilgi | null {
+  if (!paramsJson || typeof paramsJson !== "object") return null;
+  const p = paramsJson as Record<string, unknown>;
+  const genislikMm = Number(p.genislikMm);
+  const uzunlukMm = Number(p.uzunlukMm);
+  if (!genislikMm || !uzunlukMm) return null;
+  const cati = p.cati as Record<string, unknown> | undefined;
+  return {
+    genislikMm,
+    uzunlukMm,
+    katYuksekligiMm: Number(p.katYuksekligiMm) || 0,
+    katSayisi: Number(p.katSayisi) === 2 ? 2 : 1,
+    catiVar: Boolean(p.catiVar),
+    catiEgimYuzde: cati ? Number(cati.egimYuzde) || undefined : undefined,
+  };
+}
+
+/** Konteynerin üstten planını (basit dikdörtgen) ve varsa çatı kesitini (temsili üçgen) pdfkit
+ * vektör çizimiyle çizer - fotoğrafik değil, teklif dokümanında ölçü hissi vermek içindir. Bir
+ * sonraki içeriğin başlayabileceği y konumunu döner. */
+function konteynerSemaCiz(doc: PDFKit.PDFDocument, bilgi: KonteynerPdfBilgi, x: number, y: number): number {
+  const maxW = 180;
+  const maxH = 80;
+  const { genislikMm, uzunlukMm, katYuksekligiMm, katSayisi, catiVar, catiEgimYuzde } = bilgi;
+  const scale = Math.min(maxW / uzunlukMm, maxH / genislikMm);
+  const w = Math.max(30, uzunlukMm * scale);
+  const h = Math.max(20, genislikMm * scale);
+
+  doc.fontSize(9).font("Helvetica-Bold").fillColor("#000").text("Konteyner Planı (üstten görünüş, ölçekli, temsili)", x, y);
+  const boxY = y + 14;
+  doc.rect(x, boxY, w, h).lineWidth(1).strokeColor("#404040").stroke();
+
+  doc.fontSize(7).font("Helvetica").fillColor("#666");
+  const olcuMetni = `${Math.round(uzunlukMm)} x ${Math.round(genislikMm)} mm, kat yüksekliği ${Math.round(katYuksekligiMm)} mm, ${katSayisi} kat${
+    catiVar ? `, çatı eğimi %${catiEgimYuzde ?? "-"}` : ""
+  }`;
+  doc.text(olcuMetni, x, boxY + h + 6, { width: Math.max(w, 260) });
+
+  let sonrakiY = boxY + h + 22;
+
+  if (catiVar) {
+    const roofBaseY = sonrakiY + 32;
+    const ridgeX = x + w / 2;
+    const ridgeY = roofBaseY - 26;
+    doc
+      .moveTo(x, roofBaseY)
+      .lineTo(ridgeX, ridgeY)
+      .lineTo(x + w, roofBaseY)
+      .strokeColor("#7c3aed")
+      .lineWidth(1)
+      .stroke();
+    doc.moveTo(x, roofBaseY).lineTo(x + w, roofBaseY).strokeColor("#404040").stroke();
+    doc.fontSize(7).fillColor("#666").text("Çatı kesiti (temsili, ölçekli değil)", x, roofBaseY + 4);
+    sonrakiY = roofBaseY + 18;
+  }
+
+  doc.fillColor("#000").font("Helvetica").fontSize(10);
+  return sonrakiY;
+}
+
 router.get(
   "/",
   asyncHandler(async (req, res) => {
@@ -54,9 +124,14 @@ router.get(
   asyncHandler(async (req, res) => {
     const teklif = await prisma.quote.findUniqueOrThrow({
       where: { id: Number(req.params.id) },
-      include: { items: true, project: { include: { customer: true } } },
+      include: {
+        items: true,
+        project: { include: { customer: true, items: { include: { template: true } } } },
+      },
     });
     const settings = await prisma.settings.findUnique({ where: { id: 1 } });
+    const konteynerItem = teklif.project.items.find((i) => i.template.key === "container");
+    const konteynerBilgi = konteynerItem ? konteynerPdfBilgisiCikar(konteynerItem.paramsJson) : null;
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="teklif-${teklif.quoteNumber}.pdf"`);
@@ -85,6 +160,13 @@ router.get(
     if (teklif.project.customer.address) doc.fontSize(9).text(`Adres: ${teklif.project.customer.address}`);
     doc.fontSize(11).text(`İş: ${teklif.project.title}`);
     doc.moveDown(1);
+
+    if (konteynerBilgi) {
+      if (doc.y > 620) doc.addPage();
+      const semaSonrasiY = konteynerSemaCiz(doc, konteynerBilgi, 40, doc.y);
+      doc.y = semaSonrasiY;
+      doc.moveDown(0.5);
+    }
 
     const tabloBasi = doc.y;
     const kolon = { aciklama: 40, adet: 300, birim: 350, birimFiyat: 410, tutar: 480 };

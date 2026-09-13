@@ -1046,6 +1046,7 @@ function UrunSablonuModal({
   const [materials, setMaterials] = useState<Material[] | null>(null);
   const [sacMalzemeler, setSacMalzemeler] = useState<Material[]>([]);
   const [baglantiMalzemeler, setBaglantiMalzemeler] = useState<Material[]>([]);
+  const [sarfMalzemeler, setSarfMalzemeler] = useState<Material[]>([]);
   const [secilenTemplate, setSecilenTemplate] = useState<string | null>(duzenleItem?.template.key ?? null);
 
   useEffect(() => {
@@ -1053,6 +1054,7 @@ function UrunSablonuModal({
     api.get<Material[]>("/materials?category=PROFILE").then(setMaterials);
     api.get<Material[]>("/materials?category=SHEET").then(setSacMalzemeler);
     api.get<Material[]>("/materials?category=FASTENER").then(setBaglantiMalzemeler);
+    api.get<Material[]>("/materials?category=CONSUMABLE").then(setSarfMalzemeler);
   }, []);
 
   return (
@@ -1079,6 +1081,7 @@ function UrunSablonuModal({
           materials={materials}
           sacMalzemeler={sacMalzemeler}
           baglantiMalzemeler={baglantiMalzemeler}
+          sarfMalzemeler={sarfMalzemeler}
           onSaved={onSaved}
           baslangic={duzenleItem?.paramsJson}
           baslangicAd={duzenleItem?.name}

@@ -284,3 +284,39 @@ test("duvar paneli: sınırların dışına taşan yatay ara profil yok sayılı
   assert.equal(sonuc.parcalar.filter((p) => p.label === "Yatay ara profil").length, 0);
   assert.equal(sonuc.uyarilar.length, 2);
 });
+
+test("duvar paneli: yalıtım eklenirse duvar alanı kadar m² kalemi oluşur", () => {
+  const sonuc = calculateWallPanel({
+    genislikMm: 3000,
+    yukseklikMm: 2500,
+    dikmeAraligiHedefMm: 600,
+    ustProfilKey: "ray",
+    altProfilKey: "ray",
+    dikmeProfilKey: "dikme",
+    yalitimVar: true,
+    yalitimKalinlikMm: 100,
+    yalitimMalzemeKey: "42",
+  });
+
+  const yalitim = sonuc.baglantiKalemleri.find((k) => k.label.includes("Yalıtım"));
+  assert.ok(yalitim, "Yalıtım kalemi eksik");
+  assert.equal(yalitim!.label, "Yalıtım (100 mm)");
+  assert.equal(yalitim!.birim, "m²");
+  assert.equal(yalitim!.adet, 7.5);
+  assert.equal(yalitim!.materialKey, "42");
+  assert.equal(sonuc.ozetDegerler.yalitimAlaniM2, 7.5);
+});
+
+test("duvar paneli: yalıtım eklenmezse hiç kalem/özet değeri oluşmaz", () => {
+  const sonuc = calculateWallPanel({
+    genislikMm: 3000,
+    yukseklikMm: 2500,
+    dikmeAraligiHedefMm: 600,
+    ustProfilKey: "ray",
+    altProfilKey: "ray",
+    dikmeProfilKey: "dikme",
+  });
+
+  assert.ok(!sonuc.baglantiKalemleri.some((k) => k.label.includes("Yalıtım")));
+  assert.equal(sonuc.ozetDegerler.yalitimAlaniM2, undefined);
+});

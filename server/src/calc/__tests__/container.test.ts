@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { calculateContainer, KonteynerDuvarGirdi, KonteynerDuvarSeti, KonteynerCatiGirdi } from "../container";
+import {
+  calculateContainer,
+  KonteynerDuvarGirdi,
+  KonteynerDuvarSeti,
+  KonteynerCatiGirdi,
+  KonteynerIcDuvarGirdi,
+} from "../container";
 import { HesaplamaHatasi } from "../units";
 
 function duvar(overrides: Partial<KonteynerDuvarGirdi> = {}): KonteynerDuvarGirdi {
@@ -28,6 +34,17 @@ function cati(overrides: Partial<KonteynerCatiGirdi> = {}): KonteynerCatiGirdi {
     kafesAraligiHedefMm: 1000,
     ustBaslikProfilKey: "40x40x2",
     altBaslikProfilKey: "40x40x2",
+    ...overrides,
+  };
+}
+
+function icDuvar(overrides: Partial<KonteynerIcDuvarGirdi> = {}): KonteynerIcDuvarGirdi {
+  return {
+    genislikMm: 2000,
+    dikmeAraligiHedefMm: 600,
+    ustProfilKey: "40x40x2",
+    altProfilKey: "40x40x2",
+    dikmeProfilKey: "40x40x2",
     ...overrides,
   };
 }
@@ -264,4 +281,103 @@ test("konteyner: çatı hatası konteyner seviyesinde 'Çatı' önekiyle fırlat
       }),
     (err: unknown) => err instanceof HesaplamaHatasi && err.message.startsWith("Çatı:")
   );
+});
+
+test("konteyner: iç bölme duvarları eklenirse ayrı parça olarak hesaplanır (tek kat)", () => {
+  const sonuc = calculateContainer({
+    genislikMm: 2438,
+    uzunlukMm: 6058,
+    katYuksekligiMm: 2591,
+    katSayisi: 1,
+    duvarlar: duvarSeti(),
+    icDuvarlar: [icDuvar({ genislikMm: 2000 }), icDuvar({ genislikMm: 1500 })],
+  });
+
+  assert.ok(sonuc.parcalar.some((p) => p.label === "İç Duvar 1: Dikme"));
+  assert.ok(sonuc.parcalar.some((p) => p.label === "İç Duvar 2: Dikme"));
+  // Tek kat olduğundan "1. Kat" öneki OLMAMALI.
+  assert.ok(!sonuc.parcalar.some((p) => p.label.includes("1. Kat İç Duvar")));
+  assert.equal(sonuc.ozetDegerler.icDuvarSayisi, 2);
+
+  const icDuvar1UstRay = sonuc.parcalar.find((p) => p.label === "İç Duvar 1: Üst ray")!;
+  assert.equal(icDuvar1UstRay.uzunlukMm, 2000);
+});
+
+test("konteyner: iç bölme duvarları 2 katlı konteynerde her katta tekrarlanır", () => {
+  const sonuc = calculateContainer({
+    genislikMm: 2438,
+    uzunlukMm: 6058,
+    katYuksekligiMm: 2591,
+    katSayisi: 2,
+    duvarlar: duvarSeti(),
+    icDuvarlar: [icDuvar()],
+  });
+
+  assert.ok(sonuc.parcalar.some((p) => p.label === "1. Kat İç Duvar 1: Dikme"));
+  assert.ok(sonuc.parcalar.some((p) => p.label === "2. Kat İç Duvar 1: Dikme"));
+});
+
+test("konteyner: iç bölme duvarı hatası kendi etiketiyle fırlatılır ve toplam duvar alanına dahil olur", () => {
+  assert.throws(
+    () =>
+      calculateContainer({
+        genislikMm: 2438,
+        uzunlukMm: 6058,
+        katYuksekligiMm: 2591,
+        katSayisi: 1,
+        duvarlar: duvarSeti(),
+        icDuvarlar: [icDuvar({ ustProfilKey: "" })],
+      }),
+    (err: unknown) => err instanceof HesaplamaHatasi && err.message.startsWith("İç Duvar 1:")
+  );
+
+  const sonuc = calculateContainer({
+    genislikMm: 2438,
+    uzunlukMm: 6058,
+    katYuksekligiMm: 2591,
+    katSayisi: 1,
+    duvarlar: duvarSeti(),
+  });
+  const sonucIcDuvarli = calculateContainer({
+    genislikMm: 2438,
+    uzunlukMm: 6058,
+    katYuksekligiMm: 2591,
+    katSayisi: 1,
+    duvarlar: duvarSeti(),
+    icDuvarlar: [icDuvar({ genislikMm: 2000 })],
+  });
+  assert.ok(sonucIcDuvarli.ozetDegerler.toplamDuvarAlaniM2 > sonuc.ozetDegerler.toplamDuvarAlaniM2);
+});
+
+test("konteyner: duvar/çatı/iç duvar yalıtım ve malzeme kalemleri doğru materialKey ile ve etiket önekiyle birleşiyor (stok/malzeme raporu için)", () => {
+  const sonuc = calculateContainer({
+    genislikMm: 2438,
+    uzunlukMm: 6058,
+    katYuksekligiMm: 2591,
+    katSayisi: 1,
+    duvarlar: duvarSeti({
+      on: { yalitimVar: true, yalitimKalinlikMm: 100, yalitimMalzemeKey: "42" },
+    }),
+    icDuvarlar: [icDuvar({ yalitimVar: true, yalitimMalzemeKey: "43" })],
+    catiVar: true,
+    cati: cati(),
+  });
+
+  // Ön duvarın yalıtım kalemi, konteyner seviyesinde "Ön Duvar: " önekiyle ve orijinal
+  // materialKey'i koruyarak görünmeli - stok düşümü/malzeme ihtiyacı hesabı bu materialKey'i
+  // kullanarak Material'a bağlanır (bkz. fastenerMaterialAggregation.ts).
+  const onDuvarYalitim = sonuc.baglantiKalemleri.find((k) => k.label === "Ön Duvar: Yalıtım (100 mm)");
+  assert.ok(onDuvarYalitim, "Ön duvar yalıtım kalemi eksik");
+  assert.equal(onDuvarYalitim!.materialKey, "42");
+  assert.equal(onDuvarYalitim!.birim, "m²");
+
+  const icDuvarYalitim = sonuc.baglantiKalemleri.find((k) => k.label === "İç Duvar 1: Yalıtım (50 mm)");
+  assert.ok(icDuvarYalitim, "İç duvar yalıtım kalemi eksik");
+  assert.equal(icDuvarYalitim!.materialKey, "43");
+
+  // Diğer 3 dış duvarda yalıtım istenmedi - kalem oluşmamalı.
+  assert.ok(!sonuc.baglantiKalemleri.some((k) => k.label === "Arka Duvar: Yalıtım (100 mm)"));
+
+  // Çatının kendi malzeme kalemleri (mesnet plakası vb.) de aynı şekilde "Çatı: " önekiyle gelmeli.
+  assert.ok(sonuc.baglantiKalemleri.some((k) => k.label.startsWith("Çatı: ")));
 });

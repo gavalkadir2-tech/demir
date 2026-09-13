@@ -32,6 +32,8 @@ export default function SemaGorunum({
   onDikeyCubukSayisiDegisti,
   onKonteynerDuvarDikmeDegisti,
   onKonteynerDuvarYatayDegisti,
+  onKonteynerIcDuvarDikmeDegisti,
+  onKonteynerIcDuvarYatayDegisti,
   onKonteynerCatiKafesSayisiDegisti,
 }: {
   templateKey: string;
@@ -59,6 +61,10 @@ export default function SemaGorunum({
   onKonteynerDuvarDikmeDegisti?: (kat: 1 | 2, yon: KonteynerYon, yeniListe: number[] | null) => void;
   /** "container" şablonunda kullanılır: aktif kat+yön duvarının yatay ara profillerini düzenleme. */
   onKonteynerDuvarYatayDegisti?: (kat: 1 | 2, yon: KonteynerYon, yeniListe: DuvarYatayAraProfilVeri[]) => void;
+  /** "container" şablonunda kullanılır: aktif iç bölme duvarının dikme pozisyonlarını düzenleme. */
+  onKonteynerIcDuvarDikmeDegisti?: (index: number, yeniListe: number[] | null) => void;
+  /** "container" şablonunda kullanılır: aktif iç bölme duvarının yatay ara profillerini düzenleme. */
+  onKonteynerIcDuvarYatayDegisti?: (index: number, yeniListe: DuvarYatayAraProfilVeri[]) => void;
   /** "container" şablonunda kullanılır: çatının kafes sayısını tıklayarak artırma/azaltma. */
   onKonteynerCatiKafesSayisiDegisti?: (yeniSayi: number) => void;
 }) {
@@ -276,14 +282,14 @@ export default function SemaGorunum({
       const genislikMmKonteyner = n("genislikMm");
       const uzunlukMmKonteyner = n("uzunlukMm");
       const katYuksekligiMmKonteyner = n("katYuksekligiMm");
-      const duvarSemaVeri = (duvarParams: Record<string, unknown> | undefined, yon: KonteynerYon): DuvarPaneliSemaVeri => {
+      const duvarSemaVeriGenel = (duvarParams: Record<string, unknown> | undefined, genislikMmDuvar: number): DuvarPaneliSemaVeri => {
         const dp = duvarParams ?? {};
         const matAt = (k: string): Material | undefined => {
           const v = dp[k];
           return typeof v === "number" ? malzemeler[String(v)] : undefined;
         };
         return {
-          genislikMm: yon === "on" || yon === "arka" ? genislikMmKonteyner : uzunlukMmKonteyner,
+          genislikMm: genislikMmDuvar,
           yukseklikMm: katYuksekligiMmKonteyner,
           dikmeAraligiHedefMm: Number(dp.dikmeAraligiHedefMm ?? 0),
           bosluklar: (dp.bosluklar as DuvarBoslukVeri[] | undefined) ?? [],
@@ -295,6 +301,8 @@ export default function SemaGorunum({
           yatayAraProfilleriMm: (dp.yatayAraProfilleri as DuvarYatayAraProfilVeri[] | undefined) ?? [],
         };
       };
+      const duvarSemaVeri = (duvarParams: Record<string, unknown> | undefined, yon: KonteynerYon): DuvarPaneliSemaVeri =>
+        duvarSemaVeriGenel(duvarParams, yon === "on" || yon === "arka" ? genislikMmKonteyner : uzunlukMmKonteyner);
       const duvarlar1Raw = (params.duvarlar as Record<KonteynerYon, Record<string, unknown>> | undefined) ?? ({} as any);
       const duvarlar2Raw = params.duvarlar2 as Record<KonteynerYon, Record<string, unknown>> | undefined;
       const kat1: Record<KonteynerYon, DuvarPaneliSemaVeri> = {
@@ -312,6 +320,8 @@ export default function SemaGorunum({
               sag: duvarSemaVeri(duvarlar2Raw?.sag ?? duvarlar1Raw.sag, "sag"),
             }
           : undefined;
+      const icDuvarlarRaw = (params.icDuvarlar as Record<string, unknown>[] | undefined) ?? [];
+      const icDuvarlarVeri: DuvarPaneliSemaVeri[] = icDuvarlarRaw.map((dp) => duvarSemaVeriGenel(dp, Number(dp.genislikMm ?? 0)));
       const catiParams = params.cati as Record<string, unknown> | undefined;
       const catiParam = (k: string): unknown => catiParams?.[k];
       const catiMatAt = (k: string): Material | undefined => {
@@ -341,10 +351,13 @@ export default function SemaGorunum({
           katSayisi={katSayisiKonteyner}
           kat1Duvarlar={kat1}
           kat2Duvarlar={kat2}
+          icDuvarlar={icDuvarlarVeri.length > 0 ? icDuvarlarVeri : undefined}
           cati={catiVeri}
           duzenlenebilir={duzenlenebilir}
           onDikmePozisyonlariDegisti={onKonteynerDuvarDikmeDegisti}
           onYatayAraProfilleriDegisti={onKonteynerDuvarYatayDegisti}
+          onIcDuvarDikmePozisyonlariDegisti={onKonteynerIcDuvarDikmeDegisti}
+          onIcDuvarYatayAraProfilleriDegisti={onKonteynerIcDuvarYatayDegisti}
           onCatiKafesSayisiDegisti={onKonteynerCatiKafesSayisiDegisti}
         />
       );
