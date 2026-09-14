@@ -560,6 +560,11 @@ export function UrunFormu({
   // Alanları bileşenini (kendi iç state'i güncel params'tan habersiz kalmasın diye) yeniden
   // mount etmek için kullanılan sayaç - artınca key değişir, baslangic olarak güncel params okunur.
   const [semaSayiSurumu, setSemaSayiSurumu] = useState(0);
+  // Şematik üzerinden yapılan dikme/yatay-ara-profil düzenlemelerinin geri/ileri alınabilmesi için
+  // tam params anlık görüntüleri (snapshot) tutan yığınlar - her biri o ana kadarki TÜM formun
+  // durumunu taşır, sadece tek bir alanı değil (standart "undo" davranışı).
+  const [gecmisYigini, setGecmisYigini] = useState<Record<string, unknown>[]>([]);
+  const [gelecekYigini, setGelecekYigini] = useState<Record<string, unknown>[]>([]);
 
   const hesapla = async (paramsOverride?: Record<string, unknown>) => {
     const gonderilecek = paramsOverride ?? params;
@@ -581,6 +586,38 @@ export function UrunFormu({
     }
   };
 
+  /** Şematik üzerinden yapılan dikme/yatay-ara-profil düzenlemelerinin (wall, railing, konteyner
+   * dış/iç duvarları) ortak sarmalayıcısı: hesaplamadan önce o ana kadarki TAM params durumunu
+   * geri-alma yığınına ekler (ve ileri-alma yığınını temizler - yeni bir dal açıldı), ardından
+   * yeni durumu hesaplar ve gerekiyorsa ilgili Alanları bileşenini (semaSayiSurumu ile) yeniden
+   * mount eder ki kendi iç state'i de güncel params'ı yansıtsın. */
+  const semaDegisikligiUygula = async (yeniParams: Record<string, unknown>) => {
+    setGecmisYigini((g) => [...g, params]);
+    setGelecekYigini([]);
+    await hesapla(yeniParams);
+    setSemaSayiSurumu((v) => v + 1);
+  };
+
+  /** Şematikteki son dikme/yatay-ara-profil düzenlemesini geri alır. */
+  const semaGeriAl = async () => {
+    if (gecmisYigini.length === 0) return;
+    const onceki = gecmisYigini[gecmisYigini.length - 1];
+    setGecmisYigini((g) => g.slice(0, -1));
+    setGelecekYigini((g) => [params, ...g]);
+    await hesapla(onceki);
+    setSemaSayiSurumu((v) => v + 1);
+  };
+
+  /** Geri alınmış bir dikme/yatay-ara-profil düzenlemesini yeniden ileri alır. */
+  const semaIleriAl = async () => {
+    if (gelecekYigini.length === 0) return;
+    const sonraki = gelecekYigini[0];
+    setGelecekYigini((g) => g.slice(1));
+    setGecmisYigini((g) => [...g, params]);
+    await hesapla(sonraki);
+    setSemaSayiSurumu((v) => v + 1);
+  };
+
   /** Duvar veya korkuluk şematiğinde bir dikmeye tıklayarak kaldırma / boş alana tıklayarak ekleme
    * yapıldığında çağrılır: yeni pozisyon listesiyle hemen yeniden hesaplar (null = otomatik yerleşime
    * dön). Her iki şablon da aynı dikmePozisyonlariMm alanını kullandığından ortak kullanılabilir. */
@@ -588,12 +625,12 @@ export function UrunFormu({
     const yeniParams = { ...params };
     if (yeniListe) yeniParams.dikmePozisyonlariMm = yeniListe;
     else delete yeniParams.dikmePozisyonlariMm;
-    hesapla(yeniParams);
+    semaDegisikligiUygula(yeniParams);
   };
 
   /** Yatay ara profil eklendiğinde/kaldırıldığında/düzenlendiğinde çağrılır. */
   const yatayAraProfilleriGuncelle = (yeniListe: DuvarYatayAraProfilVeri[]) => {
-    hesapla({ ...params, yatayAraProfilleri: yeniListe });
+    semaDegisikligiUygula({ ...params, yatayAraProfilleri: yeniListe });
   };
 
   /** DuvarAlanlari'nın onChange'i kendi izlediği alanlarla params'ı baştan kurar; şematik
@@ -700,8 +737,7 @@ export function UrunFormu({
     if (yeniListe) yeniDuvar.dikmePozisyonlariMm = yeniListe;
     else delete yeniDuvar.dikmePozisyonlariMm;
     const yeniSet = { ...temelSet, [yon]: yeniDuvar };
-    await hesapla({ ...params, [hedefAlan]: yeniSet });
-    setSemaSayiSurumu((v) => v + 1);
+    await semaDegisikligiUygula({ ...params, [hedefAlan]: yeniSet });
   };
 
   /** Konteyner şematiğinde aktif kat+yön duvarına yatay ara profil eklenip/kaldırıldığında çağrılır. */
@@ -713,8 +749,7 @@ export function UrunFormu({
     const hedefAlan = kat === 2 ? "duvarlar2" : "duvarlar";
     const temelSet = (params[hedefAlan] as Record<string, Record<string, unknown>> | undefined) ?? (params.duvarlar as Record<string, Record<string, unknown>>);
     const yeniSet = { ...temelSet, [yon]: { ...(temelSet?.[yon] ?? {}), yatayAraProfilleri: yeniListe } };
-    await hesapla({ ...params, [hedefAlan]: yeniSet });
-    setSemaSayiSurumu((v) => v + 1);
+    await semaDegisikligiUygula({ ...params, [hedefAlan]: yeniSet });
   };
 
   /** Konteyner şematiğinin "İç Duvarlar" sekmesinde aktif iç bölme duvarına tıklanarak dikme
@@ -726,8 +761,7 @@ export function UrunFormu({
     if (yeniListe) yeniDuvar.dikmePozisyonlariMm = yeniListe;
     else delete yeniDuvar.dikmePozisyonlariMm;
     const yeniListeler = mevcutListe.map((d, i) => (i === index ? yeniDuvar : d));
-    await hesapla({ ...params, icDuvarlar: yeniListeler });
-    setSemaSayiSurumu((v) => v + 1);
+    await semaDegisikligiUygula({ ...params, icDuvarlar: yeniListeler });
   };
 
   /** Konteyner şematiğinin "İç Duvarlar" sekmesinde aktif iç bölme duvarına yatay ara profil
@@ -735,8 +769,7 @@ export function UrunFormu({
   const konteynerIcDuvarYatayGuncelle = async (index: number, yeniListe: DuvarYatayAraProfilVeri[]) => {
     const mevcutListe = (params.icDuvarlar as Record<string, unknown>[] | undefined) ?? [];
     const yeniListeler = mevcutListe.map((d, i) => (i === index ? { ...d, yatayAraProfilleri: yeniListe } : d));
-    await hesapla({ ...params, icDuvarlar: yeniListeler });
-    setSemaSayiSurumu((v) => v + 1);
+    await semaDegisikligiUygula({ ...params, icDuvarlar: yeniListeler });
   };
 
   /** Konteyner şematiğinin "Çatı" sekmesinde bir kafese tıklanarak artırma/azaltma yapıldığında
@@ -936,6 +969,28 @@ export function UrunFormu({
       {onizleme && (
         <div className="card space-y-4">
           <h2 className="font-bold text-lg">Hesap Sonucu</h2>
+          {(templateKey === "wall" || templateKey === "railing" || templateKey === "container") && (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="btn-secondary btn-sm"
+                disabled={gecmisYigini.length === 0}
+                onClick={semaGeriAl}
+                title="Şematikteki son dikme/yatay profil düzenlemesini geri al"
+              >
+                ↩️ Geri Al
+              </button>
+              <button
+                type="button"
+                className="btn-secondary btn-sm"
+                disabled={gelecekYigini.length === 0}
+                onClick={semaIleriAl}
+                title="Geri alınan düzenlemeyi yeniden ileri al"
+              >
+                ↪️ İleri Al
+              </button>
+            </div>
+          )}
           <SemaGorunum
             templateKey={templateKey}
             params={params}
