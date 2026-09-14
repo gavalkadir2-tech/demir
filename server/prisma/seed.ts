@@ -82,28 +82,84 @@ async function main() {
     update: {},
   });
 
-  const kutuProfiller: { boyut: string; a: number; b: number; t: number }[] = [
+  // fiyat: TEPECİLER DEMİR TİCARETİ "Boyalı Profil Satış Listesi" fişindeki "TL" (liste) sütunundan
+  // (TL/kg). Verilmezse (mevcut ölçülerden bazıları listede yer almıyor) BIRIM_FIYAT_KG yer tutucusu
+  // kullanılır.
+  const kutuProfiller: { boyut: string; a: number; b: number; t: number; fiyat?: number }[] = [
     { boyut: "20x20x2", a: 20, b: 20, t: 2 },
-    { boyut: "40x40x2", a: 40, b: 40, t: 2 },
-    { boyut: "40x40x3", a: 40, b: 40, t: 3 },
-    { boyut: "50x50x2", a: 50, b: 50, t: 2 },
-    { boyut: "50x50x3", a: 50, b: 50, t: 3 },
-    { boyut: "60x40x2", a: 60, b: 40, t: 2 },
-    { boyut: "60x40x3", a: 60, b: 40, t: 3 },
-    { boyut: "80x80x3", a: 80, b: 80, t: 3 },
+    { boyut: "40x40x2", a: 40, b: 40, t: 2, fiyat: 119.64 },
+    { boyut: "40x40x3", a: 40, b: 40, t: 3, fiyat: 172.25 },
+    { boyut: "50x50x2", a: 50, b: 50, t: 2, fiyat: 151.62 },
+    { boyut: "50x50x3", a: 50, b: 50, t: 3, fiyat: 217.53 },
+    { boyut: "60x40x2", a: 60, b: 40, t: 2, fiyat: 151.62 },
+    { boyut: "60x40x3", a: 60, b: 40, t: 3, fiyat: 217.53 },
+    { boyut: "80x80x3", a: 80, b: 80, t: 3, fiyat: 360.3 },
     { boyut: "80x80x4", a: 80, b: 80, t: 4 },
-    { boyut: "100x50x3", a: 100, b: 50, t: 3 },
-    { boyut: "100x100x3", a: 100, b: 100, t: 3 },
+    { boyut: "100x50x3", a: 100, b: 50, t: 3, fiyat: 333.67 },
+    { boyut: "100x100x3", a: 100, b: 100, t: 3, fiyat: 460.63 },
+    // Tepeciler fişindeki, katalogda henüz olmayan ek ölçüler:
+    { boyut: "10x20x1", a: 10, b: 20, t: 1, fiyat: 23.46 },
+    { boyut: "10x30x1", a: 10, b: 30, t: 1, fiyat: 30.54 },
+    { boyut: "10x30x1.2", a: 10, b: 30, t: 1.2, fiyat: 36.29 },
+    { boyut: "10x30x1.5", a: 10, b: 30, t: 1.5, fiyat: 51.91 },
+    { boyut: "20x30x1", a: 20, b: 30, t: 1, fiyat: 37.2 },
+    { boyut: "20x30x1.2", a: 20, b: 30, t: 1.2, fiyat: 45.07 },
+    { boyut: "20x30x1.5", a: 20, b: 30, t: 1.5, fiyat: 62.97 },
+    { boyut: "30x30x1.2", a: 30, b: 30, t: 1.2, fiyat: 53.38 },
+    { boyut: "30x30x1.5", a: 30, b: 30, t: 1.5, fiyat: 73.81 },
+    { boyut: "30x30x2", a: 30, b: 30, t: 2, fiyat: 91.05 },
+    { boyut: "30x40x1", a: 30, b: 40, t: 1, fiyat: 53.61 },
+    { boyut: "30x40x1.2", a: 30, b: 40, t: 1.2, fiyat: 63.03 },
+    { boyut: "30x40x1.5", a: 30, b: 40, t: 1.5, fiyat: 85.4 },
+    { boyut: "30x40x2", a: 30, b: 40, t: 2, fiyat: 105.95 },
+    { boyut: "40x40x1.2", a: 40, b: 40, t: 1.2, fiyat: 72.06 },
+    { boyut: "40x40x1.5", a: 40, b: 40, t: 1.5, fiyat: 97.8 },
+    { boyut: "40x40x2.5", a: 40, b: 40, t: 2.5, fiyat: 144.47 },
+    { boyut: "40x60x1.5", a: 40, b: 60, t: 1.5, fiyat: 124.66 },
+    { boyut: "40x60x2.5", a: 40, b: 60, t: 2.5, fiyat: 182.37 },
+    { boyut: "40x80x1.5", a: 40, b: 80, t: 1.5, fiyat: 155.38 },
+    { boyut: "40x80x2", a: 40, b: 80, t: 2, fiyat: 184.86 },
+    { boyut: "40x80x2.5", a: 40, b: 80, t: 2.5, fiyat: 222.6 },
+    { boyut: "40x80x3", a: 40, b: 80, t: 3, fiyat: 265.62 },
+    { boyut: "40x100x2", a: 40, b: 100, t: 2, fiyat: 226.92 },
+    { boyut: "40x100x2.5", a: 40, b: 100, t: 2.5, fiyat: 264.91 },
+    { boyut: "40x100x3", a: 40, b: 100, t: 3, fiyat: 316.19 },
+    { boyut: "50x100x2", a: 50, b: 100, t: 2, fiyat: 241.49 },
+    { boyut: "50x100x2.5", a: 50, b: 100, t: 2.5, fiyat: 283.78 },
+    { boyut: "80x80x2", a: 80, b: 80, t: 2, fiyat: 259.56 },
+    { boyut: "80x80x2.5", a: 80, b: 80, t: 2.5, fiyat: 303.49 },
+    { boyut: "80x80x6", a: 80, b: 80, t: 6, fiyat: 676.74 },
+    { boyut: "60x120x2.5", a: 60, b: 120, t: 2.5, fiyat: 341.3 },
+    { boyut: "60x120x3", a: 60, b: 120, t: 3, fiyat: 409.18 },
+    { boyut: "100x100x2", a: 100, b: 100, t: 2, fiyat: 332.26 },
+    { boyut: "100x100x2.5", a: 100, b: 100, t: 2.5, fiyat: 390.1 },
+    { boyut: "100x100x4", a: 100, b: 100, t: 4, fiyat: 604.89 },
+    { boyut: "120x120x3", a: 120, b: 120, t: 3, fiyat: 560.26 },
+    { boyut: "30x20x2", a: 30, b: 20, t: 2, fiyat: 75.45 },
+    { boyut: "90x90x2.5", a: 90, b: 90, t: 2.5, fiyat: 341.3 },
+    { boyut: "70x70x5", a: 70, b: 70, t: 5, fiyat: 497.3 },
+    { boyut: "60x60x5", a: 60, b: 60, t: 5, fiyat: 420.39 },
   ];
 
   const BIRIM_FIYAT_KG = 45; // TL/kg - başlangıç yer tutucu, Ayarlar/Malzemeler'den güncellenmeli
+  const TEDARIKCI_TEPECILER = "Tepeciler Demir Ticareti";
 
   for (const p of kutuProfiller) {
     const mevcut = await prisma.material.findFirst({ where: { section: p.boyut, category: "PROFILE" } });
     const sekilAlanlari = { profilSekli: "BOX" as const, widthMm: p.a, heightMm: p.b };
     if (mevcut) {
-      await prisma.material.update({ where: { id: mevcut.id }, data: sekilAlanlari });
+      const fiyatDegisti = p.fiyat != null && p.fiyat !== mevcut.unitPrice;
+      await prisma.material.update({
+        where: { id: mevcut.id },
+        data: {
+          ...sekilAlanlari,
+          ...(fiyatDegisti
+            ? { unitPrice: p.fiyat, supplier: TEDARIKCI_TEPECILER, priceHistory: { create: { price: p.fiyat! } } }
+            : {}),
+        },
+      });
     } else {
+      const fiyat = p.fiyat ?? BIRIM_FIYAT_KG;
       await prisma.material.create({
         data: {
           name: `${p.boyut} Kutu Profil`,
@@ -112,13 +168,14 @@ async function main() {
           thicknessMm: p.t,
           standardLengthM: 6,
           unit: "KG",
-          unitPrice: BIRIM_FIYAT_KG,
+          unitPrice: fiyat,
           unitWeightKgPerM: kutuProfilAgirlik(p.a, p.b, p.t),
           kerfMm: 3,
           stockQty: 20,
           minStockQty: 5,
+          supplier: p.fiyat != null ? TEDARIKCI_TEPECILER : undefined,
           ...sekilAlanlari,
-          priceHistory: { create: { price: BIRIM_FIYAT_KG } },
+          priceHistory: { create: { price: fiyat } },
         },
       });
     }
@@ -232,20 +289,59 @@ async function main() {
     }
   }
 
-  const borular: { boyut: string; d: number; t: number }[] = [
-    { boyut: "Ø21.3x2", d: 21.3, t: 2 },
-    { boyut: "Ø26.9x2", d: 26.9, t: 2 },
+  const borular: { boyut: string; d: number; t: number; fiyat?: number }[] = [
+    { boyut: "Ø21.3x2", d: 21.3, t: 2, fiyat: 59.24 },
+    { boyut: "Ø26.9x2", d: 26.9, t: 2, fiyat: 68.16 },
+    // Fotoğraftaki 34mm/2mm listeye en yakın ölçü ama et kalınlığı (2.6mm) listede yok - yer tutucu kalıyor.
     { boyut: "Ø33.7x2.6", d: 33.7, t: 2.6 },
     { boyut: "Ø42.4x2.6", d: 42.4, t: 2.6 },
-    { boyut: "Ø48.3x3", d: 48.3, t: 3 },
-    { boyut: "Ø60.3x3", d: 60.3, t: 3 },
+    { boyut: "Ø48.3x3", d: 48.3, t: 3, fiyat: 173.46 },
+    { boyut: "Ø60.3x3", d: 60.3, t: 3, fiyat: 215.4 },
+    // Tepeciler fişindeki, katalogda henüz olmayan ek ölçüler (fişteki yuvarlatılmış mm etiketiyle):
+    { boyut: "32x2", d: 32, t: 2, fiyat: 80.24 },
+    { boyut: "34x2", d: 34, t: 2, fiyat: 84.59 },
+    { boyut: "42x1.5", d: 42, t: 1.5, fiyat: 87.84 },
+    { boyut: "42x2", d: 42, t: 2, fiyat: 109.02 },
+    // Not: fişte 42mm için iki ayrı 2,5mm satırı vardı (102,210 ve 129,220) - ikisi de ayrı kalem
+    // olarak eklendi, kontrol edilmesi gerekiyor.
+    { boyut: "42x2.5", d: 42, t: 2.5, fiyat: 102.21 },
+    { boyut: "42x2.5-b", d: 42, t: 2.5, fiyat: 129.22 },
+    { boyut: "42x3", d: 42, t: 3, fiyat: 151.8 },
+    { boyut: "48x1.5", d: 48, t: 1.5, fiyat: 98.86 },
+    { boyut: "48x2", d: 48, t: 2, fiyat: 123.29 },
+    { boyut: "48x2.5", d: 48, t: 2.5, fiyat: 146.72 },
+    { boyut: "60x1.5", d: 60, t: 1.5, fiyat: 124.16 },
+    { boyut: "60x2", d: 60, t: 2, fiyat: 149.5 },
+    { boyut: "60x2.5", d: 60, t: 2.5, fiyat: 182.67 },
+    { boyut: "76x2", d: 76, t: 2, fiyat: 192.01 },
+    { boyut: "76x2.5", d: 76, t: 2.5, fiyat: 232.97 },
+    { boyut: "76x3", d: 76, t: 3, fiyat: 277.41 },
+    { boyut: "89x2", d: 89, t: 2, fiyat: 232.7 },
+    { boyut: "89x2.5", d: 89, t: 2.5, fiyat: 275.03 },
+    { boyut: "89x3", d: 89, t: 3, fiyat: 326.96 },
+    { boyut: "89x4", d: 89, t: 4, fiyat: 429.07 },
+    { boyut: "102x2", d: 102, t: 2, fiyat: 269.27 },
+    { boyut: "114x2.5", d: 114, t: 2.5, fiyat: 357.61 },
+    { boyut: "114x3", d: 114, t: 3, fiyat: 425.64 },
+    { boyut: "114x4", d: 114, t: 4, fiyat: 562.24 },
+    { boyut: "139x4", d: 139, t: 4, fiyat: 711.66 },
   ];
   for (const p of borular) {
     const mevcut = await prisma.material.findFirst({ where: { section: p.boyut, category: "PROFILE", name: { contains: "Boru" } } });
     const sekilAlanlari = { profilSekli: "ROUND_PIPE" as const, widthMm: p.d };
     if (mevcut) {
-      await prisma.material.update({ where: { id: mevcut.id }, data: sekilAlanlari });
+      const fiyatDegisti = p.fiyat != null && p.fiyat !== mevcut.unitPrice;
+      await prisma.material.update({
+        where: { id: mevcut.id },
+        data: {
+          ...sekilAlanlari,
+          ...(fiyatDegisti
+            ? { unitPrice: p.fiyat, supplier: TEDARIKCI_TEPECILER, priceHistory: { create: { price: p.fiyat! } } }
+            : {}),
+        },
+      });
     } else {
+      const fiyat = p.fiyat ?? BIRIM_FIYAT_KG;
       await prisma.material.create({
         data: {
           name: `${p.boyut} Boru`,
@@ -254,13 +350,14 @@ async function main() {
           thicknessMm: p.t,
           standardLengthM: 6,
           unit: "KG",
-          unitPrice: BIRIM_FIYAT_KG,
+          unitPrice: fiyat,
           unitWeightKgPerM: boruAgirlik(p.d, p.t),
           kerfMm: 3,
           stockQty: 10,
           minStockQty: 3,
+          supplier: p.fiyat != null ? TEDARIKCI_TEPECILER : undefined,
           ...sekilAlanlari,
-          priceHistory: { create: { price: BIRIM_FIYAT_KG } },
+          priceHistory: { create: { price: fiyat } },
         },
       });
     }
