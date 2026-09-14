@@ -20,16 +20,44 @@ const DURUMLAR: ProjectStatus[] = [
 export default function Isler() {
   const [isler, setIsler] = useState<(Project & { customer: { name: string } })[] | null>(null);
   const [durum, setDurum] = useState<ProjectStatus | "">("");
+  const [secililer, setSecililer] = useState<Set<number>>(new Set());
   const navigate = useNavigate();
 
   useEffect(() => {
     api.get<(Project & { customer: { name: string } })[]>(`/projects${durum ? `?status=${durum}` : ""}`).then(setIsler);
+    setSecililer(new Set());
   }, [durum]);
 
   const copeTasi = async (id: number) => {
     if (!confirm("Bu iş çöp kutusuna taşınsın mı? Çöp Kutusu'ndan geri yükleyebilirsiniz.")) return;
     await api.del(`/projects/${id}`);
     setIsler((liste) => liste?.filter((p) => p.id !== id) ?? liste);
+    setSecililer((s) => {
+      const yeni = new Set(s);
+      yeni.delete(id);
+      return yeni;
+    });
+  };
+
+  const secimDegistir = (id: number) => {
+    setSecililer((s) => {
+      const yeni = new Set(s);
+      if (yeni.has(id)) yeni.delete(id);
+      else yeni.add(id);
+      return yeni;
+    });
+  };
+
+  const tumunuSec = () => setSecililer(new Set(isler?.map((p) => p.id) ?? []));
+  const secimiTemizle = () => setSecililer(new Set());
+
+  const secilenleriCopeTasi = async () => {
+    if (secililer.size === 0) return;
+    if (!confirm(`${secililer.size} iş çöp kutusuna taşınsın mı? Çöp Kutusu'ndan geri yükleyebilirsiniz.`)) return;
+    const idler = [...secililer];
+    await Promise.all(idler.map((id) => api.del(`/projects/${id}`)));
+    setIsler((liste) => liste?.filter((p) => !secililer.has(p.id)) ?? liste);
+    setSecililer(new Set());
   };
 
   return (
@@ -55,6 +83,22 @@ export default function Isler() {
         ))}
       </select>
 
+      {isler && isler.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <button type="button" className="btn-secondary btn-sm" onClick={secililer.size === isler.length ? secimiTemizle : tumunuSec}>
+            {secililer.size === isler.length ? "Seçimi Temizle" : "Tümünü Seç"}
+          </button>
+          {secililer.size > 0 && (
+            <>
+              <span className="text-sm text-neutral-500">{secililer.size} seçili</span>
+              <button type="button" className="btn-danger btn-sm" onClick={secilenleriCopeTasi}>
+                🗑️ Seçilenleri Çöpe Taşı
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       {!isler ? (
         <Spinner />
       ) : isler.length === 0 ? (
@@ -63,6 +107,13 @@ export default function Isler() {
         <div className="grid gap-3">
           {isler.map((p) => (
             <div key={p.id} className="card flex items-center justify-between gap-3 hover:shadow-md">
+              <input
+                type="checkbox"
+                className="h-4 w-4 shrink-0"
+                checked={secililer.has(p.id)}
+                onChange={() => secimDegistir(p.id)}
+                aria-label="İşi seç"
+              />
               <Link to={`/isler/${p.id}`} className="min-w-0 flex-1">
                 <div className="font-bold text-lg flex items-center gap-2 flex-wrap">
                   {p.title}
