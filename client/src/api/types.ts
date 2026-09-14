@@ -345,6 +345,7 @@ export interface Project {
   validityDays: number;
   stockDeducted: boolean;
   publicToken: string;
+  deletedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   items?: ProjectItem[];

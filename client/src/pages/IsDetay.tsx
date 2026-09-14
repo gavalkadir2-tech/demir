@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import {
   Project,
@@ -123,7 +123,9 @@ export default function IsDetay() {
   const projectId = Number(id);
   const [proje, setProje] = useState<Project | null>(null);
   const [tab, setTab] = useState<SekmeKey>("ozet");
-  const [duzenleModal, setDuzenleModal] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  // İşler listesindeki "✏️ Düzenle" kısayolu ?duzenle=1 ile buraya gelip modalı doğrudan açar.
+  const [duzenleModal, setDuzenleModal] = useState(() => searchParams.get("duzenle") === "1");
 
   const yukle = () => api.get<Project>(`/projects/${projectId}`).then(setProje);
 
@@ -180,9 +182,13 @@ export default function IsDetay() {
       {duzenleModal && (
         <IsDuzenleModal
           proje={proje}
-          onClose={() => setDuzenleModal(false)}
+          onClose={() => {
+            setDuzenleModal(false);
+            if (searchParams.get("duzenle")) setSearchParams({}, { replace: true });
+          }}
           onSaved={() => {
             setDuzenleModal(false);
+            if (searchParams.get("duzenle")) setSearchParams({}, { replace: true });
             yukle();
           }}
         />

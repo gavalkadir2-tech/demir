@@ -72,8 +72,12 @@ router.get(
   asyncHandler(async (req, res) => {
     const status = typeof req.query.status === "string" ? req.query.status : undefined;
     const q = typeof req.query.q === "string" ? req.query.q : undefined;
+    // Varsayılan olarak çöp kutusundaki (deletedAt dolu) işler listede görünmez;
+    // ?trash=true verilirse sadece çöp kutusundakiler döner (Çöp Kutusu sayfası için).
+    const trash = req.query.trash === "true";
     const projeler = await prisma.project.findMany({
       where: {
+        deletedAt: trash ? { not: null } : null,
         ...(status ? { status: status as any } : {}),
         ...(q
           ? {
@@ -182,8 +186,29 @@ router.put(
   })
 );
 
+// Çöpe taşı (soft delete) - işi kalıcı olarak silmez, sadece deletedAt işaretler.
+// İşler listesinden kaybolur, Çöp Kutusu'ndan geri yüklenebilir veya kalıcı silinebilir.
 router.delete(
   "/:id",
+  asyncHandler(async (req, res) => {
+    await prisma.project.update({ where: { id: Number(req.params.id) }, data: { deletedAt: new Date() } });
+    res.status(204).end();
+  })
+);
+
+router.post(
+  "/:id/restore",
+  asyncHandler(async (req, res) => {
+    const proje = await prisma.project.update({ where: { id: Number(req.params.id) }, data: { deletedAt: null } });
+    res.json(proje);
+  })
+);
+
+// Kalıcı silme - sadece çöp kutusundaki (deletedAt dolu) işler için. Bilerek deletedAt kontrolü
+// yapılmıyor (çöp kutusu UI'ı sadece oradaki işler için bu aksiyonu gösterir); route yine de
+// gerçek bir prisma.delete olduğundan geri alınamaz.
+router.delete(
+  "/:id/permanent",
   asyncHandler(async (req, res) => {
     await prisma.project.delete({ where: { id: Number(req.params.id) } });
     res.status(204).end();

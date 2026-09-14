@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { Project, ProjectStatus, DURUM_ETIKET, DURUM_RENK, DURUM_SIMGE, KATEGORI_ETIKET, ONCELIK_ETIKET, ONCELIK_RENK } from "../api/types";
 import { Spinner, EmptyState, Badge } from "../components/ui";
@@ -20,18 +20,30 @@ const DURUMLAR: ProjectStatus[] = [
 export default function Isler() {
   const [isler, setIsler] = useState<(Project & { customer: { name: string } })[] | null>(null);
   const [durum, setDurum] = useState<ProjectStatus | "">("");
+  const navigate = useNavigate();
 
   useEffect(() => {
     api.get<(Project & { customer: { name: string } })[]>(`/projects${durum ? `?status=${durum}` : ""}`).then(setIsler);
   }, [durum]);
 
+  const copeTasi = async (id: number) => {
+    if (!confirm("Bu iş çöp kutusuna taşınsın mı? Çöp Kutusu'ndan geri yükleyebilirsiniz.")) return;
+    await api.del(`/projects/${id}`);
+    setIsler((liste) => liste?.filter((p) => p.id !== id) ?? liste);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">İşler</h1>
-        <Link to="/yeni-is" className="btn-primary">
-          ➕ Yeni İş
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link to="/cop-kutusu" className="btn-secondary" title="Çöp Kutusu">
+            🗑️ Çöp Kutusu
+          </Link>
+          <Link to="/yeni-is" className="btn-primary">
+            ➕ Yeni İş
+          </Link>
+        </div>
       </div>
 
       <select className="field-select w-auto" value={durum} onChange={(e) => setDurum(e.target.value as any)}>
@@ -50,8 +62,8 @@ export default function Isler() {
       ) : (
         <div className="grid gap-3">
           {isler.map((p) => (
-            <Link to={`/isler/${p.id}`} key={p.id} className="card flex items-center justify-between hover:shadow-md">
-              <div>
+            <div key={p.id} className="card flex items-center justify-between gap-3 hover:shadow-md">
+              <Link to={`/isler/${p.id}`} className="min-w-0 flex-1">
                 <div className="font-bold text-lg flex items-center gap-2 flex-wrap">
                   {p.title}
                   {p.priority !== "NORMAL" && (
@@ -62,11 +74,29 @@ export default function Isler() {
                   {p.customer.name} • {KATEGORI_ETIKET[p.category]} • {tarih(p.createdAt)}
                   {p.dueDate && ` • Teslim: ${tarih(p.dueDate)}`}
                 </div>
+              </Link>
+              <div className="flex items-center gap-2 shrink-0">
+                <Badge className={DURUM_RENK[p.status]}>
+                  {DURUM_SIMGE[p.status]} {DURUM_ETIKET[p.status]}
+                </Badge>
+                <button
+                  type="button"
+                  className="btn-secondary btn-sm"
+                  title="İşi düzenle"
+                  onClick={() => navigate(`/isler/${p.id}?duzenle=1`)}
+                >
+                  ✏️
+                </button>
+                <button
+                  type="button"
+                  className="btn-danger btn-sm"
+                  title="Çöp kutusuna taşı"
+                  onClick={() => copeTasi(p.id)}
+                >
+                  🗑️
+                </button>
               </div>
-              <Badge className={DURUM_RENK[p.status]}>
-                {DURUM_SIMGE[p.status]} {DURUM_ETIKET[p.status]}
-              </Badge>
-            </Link>
+            </div>
           ))}
         </div>
       )}

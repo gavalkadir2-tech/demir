@@ -4,6 +4,7 @@ import Dashboard from "./pages/Dashboard";
 import YeniIs from "./pages/YeniIs";
 import Isler from "./pages/Isler";
 import IsDetay from "./pages/IsDetay";
+import CopKutusu from "./pages/CopKutusu";
 import Urunler from "./pages/Urunler";
 import Malzemeler from "./pages/Malzemeler";
 import KesimListeleri from "./pages/KesimListeleri";
@@ -29,6 +30,7 @@ export default function App() {
         <Route path="/yeni-is" element={<YeniIs />} />
         <Route path="/isler" element={<Isler />} />
         <Route path="/isler/:id" element={<IsDetay />} />
+        <Route path="/cop-kutusu" element={<CopKutusu />} />
         <Route path="/urunler" element={<Urunler />} />
         <Route path="/malzemeler" element={<Malzemeler />} />
         <Route path="/kesim-listeleri" element={<KesimListeleri />} />

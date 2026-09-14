@@ -21,6 +21,7 @@ const DIGER_ITEMS = [
   { to: "/kesim-listeleri", label: "Kesim Listeleri", emoji: "✂️" },
   { to: "/teklifler", label: "Teklifler", emoji: "📄" },
   { to: "/isciler", label: "İşçiler", emoji: "👷" },
+  { to: "/cop-kutusu", label: "Çöp Kutusu", emoji: "🗑️" },
 ];
 
 const navLinkClass = (koyu: boolean) =>

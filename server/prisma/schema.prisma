@@ -140,6 +140,10 @@ model Project {
 
   stockDeducted Boolean        @default(false)
 
+  // Çöp kutusu: null ise aktif, dolu ise kullanıcı işi çöpe taşımış demektir (Isler listesinde
+  // görünmez, Çöp Kutusu'nda geri yüklenebilir/kalıcı silinebilir).
+  deletedAt DateTime?
+
   // Müşterinin girişsiz erişebildiği "iş takip" sayfasının bağlantısında kullanılan, tahmin
   // edilemez rastgele kimlik (sıralı Int id'yi doğrudan paylaşmamak için).
   publicToken String @unique @default(cuid())
