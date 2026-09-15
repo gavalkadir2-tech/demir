@@ -24,7 +24,12 @@ app.use(cors());
 // AI plan fotoğrafı yüklemeleri base64 olarak JSON gövdesinde gelir; varsayılan 100kb limiti yetersiz.
 app.use(express.json({ limit: "12mb" }));
 
-app.get("/api/health", (_req, res) => res.json({ ok: true }));
+// Render, her deploy'da RENDER_GIT_COMMIT ortam değişkenini otomatik ayarlar - hangi commit'in
+// yayında olduğunu görmek için (örn. bir düzeltmenin gerçekten deploy olup olmadığını doğrulamak
+// için) tarayıcıdan bu adrese gidip sonucu okumak yeterli, DevTools gerekmez.
+app.get("/api/health", (_req, res) =>
+  res.json({ ok: true, commit: process.env.RENDER_GIT_COMMIT ?? null, checkedAt: new Date().toISOString() })
+);
 
 app.use("/api/customers", customersRouter);
 app.use("/api/materials", materialsRouter);
