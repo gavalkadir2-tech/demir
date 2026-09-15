@@ -30,6 +30,10 @@ export interface DuvarPaneliGirdi {
   yukseklikMm: number;
   /** Hedeflenen dikme aralığı (mm), örn. 600 */
   dikmeAraligiHedefMm: number;
+  /** Belirtilmezse true kabul edilir. false ise bu duvarda hiç dikme oluşturulmaz - kullanıcı
+   * "Dikme yok" seçtiğinde (örn. dikmeye ihtiyaç duyulmayan basit/hafif bir bölme). Üst/alt ray ve
+   * (varsa) lento/eşik/yatay ara profiller yine hesaplanır; sadece "Dikme" parçası atlanır. */
+  dikmeVar?: boolean;
   /** Üst ray profil kesiti */
   ustProfilKey: string;
   /** Alt ray profil kesiti */
@@ -113,6 +117,7 @@ export function kaplamaKalemiEkle(
 
 export function calculateWallPanel(girdi: DuvarPaneliGirdi): UrunHesapSonucu {
   const { genislikMm, yukseklikMm, dikmeAraligiHedefMm, ustProfilKey, altProfilKey, dikmeProfilKey } = girdi;
+  const dikmeVar = girdi.dikmeVar ?? true;
   const lentoProfilKey = girdi.lentoProfilKey ?? dikmeProfilKey;
   const lentoTasmaMm = girdi.lentoTasmaMm ?? VARSAYILAN.lentoTasmaMm;
   const bosluklar = girdi.bosluklar ?? [];
@@ -121,7 +126,7 @@ export function calculateWallPanel(girdi: DuvarPaneliGirdi): UrunHesapSonucu {
 
   if (genislikMm <= 0) throw new HesaplamaHatasi("Duvar genişliği 0'dan büyük olmalı.");
   if (yukseklikMm <= 0) throw new HesaplamaHatasi("Duvar yüksekliği 0'dan büyük olmalı.");
-  if (dikmeAraligiHedefMm <= 0) throw new HesaplamaHatasi("Dikme aralığı 0'dan büyük olmalı.");
+  if (dikmeVar && dikmeAraligiHedefMm <= 0) throw new HesaplamaHatasi("Dikme aralığı 0'dan büyük olmalı.");
   if (!ustProfilKey || !altProfilKey || !dikmeProfilKey)
     throw new HesaplamaHatasi("Üst ray, alt ray ve dikme profili seçilmelidir.");
 
@@ -150,7 +155,13 @@ export function calculateWallPanel(girdi: DuvarPaneliGirdi): UrunHesapSonucu {
   let gercekAralikMm: number;
   let dikmePozisyonlari: number[];
 
-  if (girdi.dikmePozisyonlariMm && girdi.dikmePozisyonlariMm.length > 0) {
+  if (!dikmeVar) {
+    // Kullanıcı bu duvarda dikme istemiyor - hiç dikme pozisyonu üretilmez, "Dikme" parçası da
+    // aşağıda atlanır. Üst/alt ray, lento/eşik ve yatay ara profiller etkilenmez.
+    dikmePozisyonlari = [];
+    araliklarSayisi = 0;
+    gercekAralikMm = 0;
+  } else if (girdi.dikmePozisyonlariMm && girdi.dikmePozisyonlariMm.length > 0) {
     // Kullanıcı şematik üzerinden dikmeleri elle düzenlemiş - otomatik yerleşim yerine bu listeyi
     // aynen kullan. Yapısal sağlamlık kullanıcının sorumluluğunda; sadece göze çarpan riskleri uyar.
     dikmePozisyonlari = Array.from(new Set(girdi.dikmePozisyonlariMm.map((x) => Math.round(x)))).sort((a, b) => a - b);
@@ -208,16 +219,22 @@ export function calculateWallPanel(girdi: DuvarPaneliGirdi): UrunHesapSonucu {
 
   const parcalar: HesaplananParca[] = [];
 
-  parcalar.push({
-    label: "Dikme",
-    profilKey: dikmeProfilKey,
-    uzunlukMm: yukseklikMm,
-    adet: dikmePozisyonlari.length,
-    not:
-      siraliBosluklar.length > 0
-        ? "Boşluk kenarlarındaki dikmeler basitleştirilmiştir; sahada çift dikme (king/jack stud) gerekebilir."
-        : undefined,
-  });
+  if (dikmeVar) {
+    parcalar.push({
+      label: "Dikme",
+      profilKey: dikmeProfilKey,
+      uzunlukMm: yukseklikMm,
+      adet: dikmePozisyonlari.length,
+      not:
+        siraliBosluklar.length > 0
+          ? "Boşluk kenarlarındaki dikmeler basitleştirilmiştir; sahada çift dikme (king/jack stud) gerekebilir."
+          : undefined,
+    });
+  } else {
+    sonuc.uyarilar.push(
+      "Bu duvar dikmesiz olarak hesaplandı - üst/alt ray arası ek destek gerekip gerekmediğini sahada değerlendirin."
+    );
+  }
 
   parcalar.push({ label: "Üst ray", profilKey: ustProfilKey, uzunlukMm: Math.round(genislikMm), adet: 1 });
 

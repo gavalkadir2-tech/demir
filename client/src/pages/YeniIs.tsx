@@ -1091,11 +1091,27 @@ export function UrunFormu({
   );
 }
 
-function Sayi({ label, value, onChange }: { label: string; value: number | undefined; onChange: (v: number) => void }) {
+function Sayi({
+  label,
+  value,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  value: number | undefined;
+  onChange: (v: number) => void;
+  disabled?: boolean;
+}) {
   return (
     <div>
       <label className="field-label">{label}</label>
-      <input type="number" className="field-input" value={value ?? ""} onChange={(e) => onChange(Number(e.target.value))} />
+      <input
+        type="number"
+        className="field-input"
+        value={value ?? ""}
+        onChange={(e) => onChange(Number(e.target.value))}
+        disabled={disabled}
+      />
     </div>
   );
 }
@@ -1702,6 +1718,7 @@ function DuvarAlanlari({
   const [genislikMm, setGenislikMm] = useState<number>(() => (baslangic?.genislikMm as number) ?? 4000);
   const [yukseklikMm, setYukseklikMm] = useState<number>(() => (baslangic?.yukseklikMm as number) ?? 2500);
   const [dikmeAraligiHedefMm, setDikmeAraligiHedefMm] = useState<number>(() => (baslangic?.dikmeAraligiHedefMm as number) ?? 600);
+  const [dikmeVar, setDikmeVar] = useState<boolean>(() => (baslangic?.dikmeVar as boolean) ?? true);
   const [ustProfilId, setUstProfilId] = useState<number | undefined>(() => baslangic?.ustProfilId as number | undefined);
   const [altProfilId, setAltProfilId] = useState<number | undefined>(() => baslangic?.altProfilId as number | undefined);
   const [dikmeProfilId, setDikmeProfilId] = useState<number | undefined>(() => baslangic?.dikmeProfilId as number | undefined);
@@ -1726,6 +1743,7 @@ function DuvarAlanlari({
       genislikMm,
       yukseklikMm,
       dikmeAraligiHedefMm,
+      dikmeVar,
       ustProfilId,
       altProfilId,
       dikmeProfilId,
@@ -1744,6 +1762,7 @@ function DuvarAlanlari({
     genislikMm,
     yukseklikMm,
     dikmeAraligiHedefMm,
+    dikmeVar,
     ustProfilId,
     altProfilId,
     dikmeProfilId,
@@ -1767,8 +1786,12 @@ function DuvarAlanlari({
       <div className="grid grid-cols-3 gap-3">
         <Sayi label="Duvar Genişliği (mm)" value={genislikMm} onChange={setGenislikMm} />
         <Sayi label="Duvar Yüksekliği (mm)" value={yukseklikMm} onChange={setYukseklikMm} />
-        <Sayi label="Dikme Aralığı (mm)" value={dikmeAraligiHedefMm} onChange={setDikmeAraligiHedefMm} />
+        <Sayi label="Dikme Aralığı (mm)" value={dikmeAraligiHedefMm} onChange={setDikmeAraligiHedefMm} disabled={!dikmeVar} />
       </div>
+      <label className="flex items-center gap-2 text-xs font-semibold -mt-1">
+        <input type="checkbox" checked={!dikmeVar} onChange={(e) => setDikmeVar(!e.target.checked)} />
+        Dikme yok (bu duvarda dikme hesaplanmasın)
+      </label>
       <div className="grid grid-cols-3 gap-3">
         <MaterialSelect label="Üst Ray" materials={materials} value={ustProfilId} onChange={setUstProfilId} />
         <MaterialSelect label="Alt Ray" materials={materials} value={altProfilId} onChange={setAltProfilId} />
@@ -2606,6 +2629,9 @@ const KONTEYNER_BOYUT_PRESETLERI: { etiket: string; genislikMm: number; uzunlukM
 
 interface KonteynerDuvarDegerleri {
   dikmeAraligiHedefMm: number;
+  /** Belirtilmezse (undefined) true kabul edilir - dikme hesaplanır. false ise bu duvarda hiç
+   * dikme oluşturulmaz (kullanıcı "Dikme yok" seçtiğinde). */
+  dikmeVar?: boolean;
   ustProfilId?: number;
   altProfilId?: number;
   dikmeProfilId?: number;
@@ -2707,11 +2733,24 @@ function KonteynerDuvarGovdesi<T extends KonteynerDuvarDegerleri>({
   return (
     <div className="mt-3 space-y-3">
       <div className="grid grid-cols-2 gap-3">
-          <Sayi label="Dikme Aralığı (mm)" value={deger.dikmeAraligiHedefMm} onChange={(v) => onDegis({ dikmeAraligiHedefMm: v } as Partial<T>)} />
+          <Sayi
+            label="Dikme Aralığı (mm)"
+            value={deger.dikmeAraligiHedefMm}
+            onChange={(v) => onDegis({ dikmeAraligiHedefMm: v } as Partial<T>)}
+            disabled={deger.dikmeVar === false}
+          />
           <MaterialSelect label="Dikme Profili" materials={materials} value={deger.dikmeProfilId} onChange={(v) => onDegis({ dikmeProfilId: v } as Partial<T>)} />
           <MaterialSelect label="Üst Ray" materials={materials} value={deger.ustProfilId} onChange={(v) => onDegis({ ustProfilId: v } as Partial<T>)} />
           <MaterialSelect label="Alt Ray" materials={materials} value={deger.altProfilId} onChange={(v) => onDegis({ altProfilId: v } as Partial<T>)} />
         </div>
+        <label className="flex items-center gap-2 text-xs font-semibold">
+          <input
+            type="checkbox"
+            checked={deger.dikmeVar === false}
+            onChange={(e) => onDegis({ dikmeVar: !e.target.checked } as Partial<T>)}
+          />
+          Dikme yok (bu duvarda dikme hesaplanmasın)
+        </label>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="field-label">Dış Cephe Kaplaması</label>

@@ -320,3 +320,74 @@ test("duvar paneli: yalıtım eklenmezse hiç kalem/özet değeri oluşmaz", () 
   assert.ok(!sonuc.baglantiKalemleri.some((k) => k.label.includes("Yalıtım")));
   assert.equal(sonuc.ozetDegerler.yalitimAlaniM2, undefined);
 });
+
+test("duvar paneli: dikmeVar false ise hiç Dikme parçası oluşmaz ama üst/alt ray etkilenmez", () => {
+  const sonuc = calculateWallPanel({
+    genislikMm: 3000,
+    yukseklikMm: 2500,
+    dikmeAraligiHedefMm: 600,
+    dikmeVar: false,
+    ustProfilKey: "ray",
+    altProfilKey: "ray",
+    dikmeProfilKey: "dikme",
+  });
+
+  assert.ok(!sonuc.parcalar.some((p) => p.label === "Dikme"));
+  assert.equal(sonuc.ozetDegerler.dikmeSayisi, 0);
+  assert.equal(sonuc.ozetDegerler.araliklarSayisi, 0);
+  assert.equal(sonuc.ozetDegerler.gercekAralikMm, 0);
+
+  const ustRay = sonuc.parcalar.find((p) => p.label === "Üst ray")!;
+  assert.equal(ustRay.uzunlukMm, 3000);
+  const altRaylar = sonuc.parcalar.filter((p) => p.label === "Alt ray");
+  assert.equal(altRaylar.length, 1);
+  assert.equal(altRaylar[0].uzunlukMm, 3000);
+
+  assert.ok(sonuc.uyarilar.some((u) => u.includes("dikmesiz")));
+});
+
+test("duvar paneli: dikmeVar false iken dikme aralığı 0/negatif olsa da hata vermez", () => {
+  const sonuc = calculateWallPanel({
+    genislikMm: 3000,
+    yukseklikMm: 2500,
+    dikmeAraligiHedefMm: 0,
+    dikmeVar: false,
+    ustProfilKey: "ray",
+    altProfilKey: "ray",
+    dikmeProfilKey: "dikme",
+  });
+  assert.ok(!sonuc.parcalar.some((p) => p.label === "Dikme"));
+});
+
+test("duvar paneli: dikmeVar belirtilmezse (undefined) varsayılan true davranışı korunur", () => {
+  const sonuc = calculateWallPanel({
+    genislikMm: 3000,
+    yukseklikMm: 2500,
+    dikmeAraligiHedefMm: 600,
+    ustProfilKey: "ray",
+    altProfilKey: "ray",
+    dikmeProfilKey: "dikme",
+  });
+  const dikme = sonuc.parcalar.find((p) => p.label === "Dikme")!;
+  assert.equal(dikme.adet, 6);
+});
+
+test("duvar paneli: dikmeVar false iken boşluklu duvar da doğru hesaplanır (lento/eşik etkilenmez)", () => {
+  const sonuc = calculateWallPanel({
+    genislikMm: 4000,
+    yukseklikMm: 2500,
+    dikmeAraligiHedefMm: 600,
+    dikmeVar: false,
+    ustProfilKey: "ray",
+    altProfilKey: "ray",
+    dikmeProfilKey: "dikme",
+    bosluklar: [{ etiket: "Kapı", konumMm: 1500, genislikMm: 1000, yukseklikMm: 2100 }],
+  });
+
+  assert.ok(!sonuc.parcalar.some((p) => p.label === "Dikme"));
+  const lento = sonuc.parcalar.find((p) => p.label.startsWith("Lento"))!;
+  assert.ok(lento);
+  assert.equal(lento.uzunlukMm, 1100);
+  const altRaylar = sonuc.parcalar.filter((p) => p.label === "Alt ray");
+  assert.equal(altRaylar.length, 2);
+});

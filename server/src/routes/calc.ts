@@ -121,6 +121,7 @@ const wallSchema = z.object({
   genislikMm: z.number(),
   yukseklikMm: z.number(),
   dikmeAraligiHedefMm: z.number(),
+  dikmeVar: z.boolean().optional(),
   ustProfilId: z.number().int(),
   altProfilId: z.number().int(),
   dikmeProfilId: z.number().int(),
