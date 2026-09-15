@@ -2596,12 +2596,12 @@ const KONTEYNER_YON_ETIKET: Record<KonteynerYon, string> = {
 };
 const KONTEYNER_YON_SIRASI: KonteynerYon[] = ["on", "arka", "sol", "sag"];
 
-/** Standart ISO deniz konteyneri iç ölçüleri (yaklaşık, mm) - hızlı seçim için. */
+/** Hazır taban ölçüsü seçenekleri (mm) - hızlı seçim için. Üçü de 40x40x2 profille otomatik doldurulur
+ * (bkz. MaterialSelect - zorunlu profil alanları zaten bu ölçüyü varsayılan seçer). */
 const KONTEYNER_BOYUT_PRESETLERI: { etiket: string; genislikMm: number; uzunlukMm: number; katYuksekligiMm: number }[] = [
-  { etiket: "10ft", genislikMm: 2438, uzunlukMm: 2991, katYuksekligiMm: 2591 },
-  { etiket: "20ft", genislikMm: 2438, uzunlukMm: 6058, katYuksekligiMm: 2591 },
-  { etiket: "40ft", genislikMm: 2438, uzunlukMm: 12192, katYuksekligiMm: 2591 },
-  { etiket: "40ft HC (Yüksek Küp)", genislikMm: 2438, uzunlukMm: 12192, katYuksekligiMm: 2896 },
+  { etiket: "15 m² (3×5 m)", genislikMm: 3000, uzunlukMm: 5000, katYuksekligiMm: 2591 },
+  { etiket: "21 m² (3×7 m)", genislikMm: 3000, uzunlukMm: 7000, katYuksekligiMm: 2591 },
+  { etiket: "32 m² (4×8 m)", genislikMm: 4000, uzunlukMm: 8000, katYuksekligiMm: 2591 },
 ];
 
 interface KonteynerDuvarDegerleri {
@@ -2692,24 +2692,30 @@ function KonteynerDuvarGovdesi<T extends KonteynerDuvarDegerleri>({
   sacMalzemeler: Material[];
   sarfMalzemeler: Material[];
   deger: T;
-  onDegis: (yeni: T) => void;
+  /** Sadece değişen alan(lar)ı içeren bir "patch" alır (tam nesne değil) - birden fazla
+   * MaterialSelect aynı anda (örn. bileşen mount olurken otomatik varsayılan profil ataması,
+   * bkz. MaterialSelect.tsx) kendi alanını ayarlamaya çalıştığında, her biri son render'daki
+   * (stale olabilecek) `deger`'i spread edip tam nesne göndermek yerine sadece kendi alanını
+   * bildirir; birleştirme en üstteki state güncelleyicide (örn. duvarGuncelle) en güncel state
+   * üzerinden yapılır - böylece eşzamanlı ayarlamalar birbirini ezmez. */
+  onDegis: (patch: Partial<T>) => void;
 }) {
   const bosluklariGuncelle = (i: number, alan: keyof DuvarBoslukTaslak, v: string | number) => {
-    onDegis({ ...deger, bosluklar: deger.bosluklar.map((b, idx) => (idx === i ? { ...b, [alan]: v } : b)) });
+    onDegis({ bosluklar: deger.bosluklar.map((b, idx) => (idx === i ? { ...b, [alan]: v } : b)) } as Partial<T>);
   };
 
   return (
     <div className="mt-3 space-y-3">
       <div className="grid grid-cols-2 gap-3">
-          <Sayi label="Dikme Aralığı (mm)" value={deger.dikmeAraligiHedefMm} onChange={(v) => onDegis({ ...deger, dikmeAraligiHedefMm: v })} />
-          <MaterialSelect label="Dikme Profili" materials={materials} value={deger.dikmeProfilId} onChange={(v) => onDegis({ ...deger, dikmeProfilId: v })} />
-          <MaterialSelect label="Üst Ray" materials={materials} value={deger.ustProfilId} onChange={(v) => onDegis({ ...deger, ustProfilId: v })} />
-          <MaterialSelect label="Alt Ray" materials={materials} value={deger.altProfilId} onChange={(v) => onDegis({ ...deger, altProfilId: v })} />
+          <Sayi label="Dikme Aralığı (mm)" value={deger.dikmeAraligiHedefMm} onChange={(v) => onDegis({ dikmeAraligiHedefMm: v } as Partial<T>)} />
+          <MaterialSelect label="Dikme Profili" materials={materials} value={deger.dikmeProfilId} onChange={(v) => onDegis({ dikmeProfilId: v } as Partial<T>)} />
+          <MaterialSelect label="Üst Ray" materials={materials} value={deger.ustProfilId} onChange={(v) => onDegis({ ustProfilId: v } as Partial<T>)} />
+          <MaterialSelect label="Alt Ray" materials={materials} value={deger.altProfilId} onChange={(v) => onDegis({ altProfilId: v } as Partial<T>)} />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="field-label">Dış Cephe Kaplaması</label>
-            <select className="field-select" value={deger.disKaplamaTuru} onChange={(e) => onDegis({ ...deger, disKaplamaTuru: e.target.value })}>
+            <select className="field-select" value={deger.disKaplamaTuru} onChange={(e) => onDegis({ disKaplamaTuru: e.target.value } as Partial<T>)}>
               {DUVAR_DIS_KAPLAMA_SECENEKLERI.map((s) => (
                 <option key={s.key} value={s.key}>
                   {s.label}
@@ -2719,7 +2725,7 @@ function KonteynerDuvarGovdesi<T extends KonteynerDuvarDegerleri>({
           </div>
           <div>
             <label className="field-label">İç Cephe Kaplaması</label>
-            <select className="field-select" value={deger.icKaplamaTuru} onChange={(e) => onDegis({ ...deger, icKaplamaTuru: e.target.value })}>
+            <select className="field-select" value={deger.icKaplamaTuru} onChange={(e) => onDegis({ icKaplamaTuru: e.target.value } as Partial<T>)}>
               {DUVAR_IC_KAPLAMA_SECENEKLERI.map((s) => (
                 <option key={s.key} value={s.key}>
                   {s.label}
@@ -2732,7 +2738,7 @@ function KonteynerDuvarGovdesi<T extends KonteynerDuvarDegerleri>({
               label="Dış Kaplama Sac Malzemesi (opsiyonel)"
               materials={sacMalzemeler}
               value={deger.disKaplamaMalzemeId}
-              onChange={(v) => onDegis({ ...deger, disKaplamaMalzemeId: v })}
+              onChange={(v) => onDegis({ disKaplamaMalzemeId: v } as Partial<T>)}
               allowEmpty
             />
           )}
@@ -2741,7 +2747,7 @@ function KonteynerDuvarGovdesi<T extends KonteynerDuvarDegerleri>({
               label="İç Kaplama Sac Malzemesi (opsiyonel)"
               materials={sacMalzemeler}
               value={deger.icKaplamaMalzemeId}
-              onChange={(v) => onDegis({ ...deger, icKaplamaMalzemeId: v })}
+              onChange={(v) => onDegis({ icKaplamaMalzemeId: v } as Partial<T>)}
               allowEmpty
             />
           )}
@@ -2751,7 +2757,7 @@ function KonteynerDuvarGovdesi<T extends KonteynerDuvarDegerleri>({
             <input
               type="checkbox"
               checked={deger.yalitimVar ?? false}
-              onChange={(e) => onDegis({ ...deger, yalitimVar: e.target.checked })}
+              onChange={(e) => onDegis({ yalitimVar: e.target.checked } as Partial<T>)}
             />
             İç/dış kaplama arasına yalıtım ekle
           </label>
@@ -2760,13 +2766,13 @@ function KonteynerDuvarGovdesi<T extends KonteynerDuvarDegerleri>({
               <Sayi
                 label="Yalıtım Kalınlığı (mm)"
                 value={deger.yalitimKalinlikMm ?? 50}
-                onChange={(v) => onDegis({ ...deger, yalitimKalinlikMm: v })}
+                onChange={(v) => onDegis({ yalitimKalinlikMm: v } as Partial<T>)}
               />
               <MaterialSelect
                 label="Yalıtım Malzemesi (opsiyonel)"
                 materials={sarfMalzemeler}
                 value={deger.yalitimMalzemeId}
-                onChange={(v) => onDegis({ ...deger, yalitimMalzemeId: v })}
+                onChange={(v) => onDegis({ yalitimMalzemeId: v } as Partial<T>)}
                 allowEmpty
               />
             </div>
@@ -2780,7 +2786,7 @@ function KonteynerDuvarGovdesi<T extends KonteynerDuvarDegerleri>({
                 type="button"
                 className="btn-secondary btn-sm"
                 onClick={() =>
-                  onDegis({ ...deger, bosluklar: [...deger.bosluklar, { etiket: "Kapı", konumMm: 0, tabanYuksekligiMm: 0, genislikMm: 900, yukseklikMm: 2100 }] })
+                  onDegis({ bosluklar: [...deger.bosluklar, { etiket: "Kapı", konumMm: 0, tabanYuksekligiMm: 0, genislikMm: 900, yukseklikMm: 2100 }] } as Partial<T>)
                 }
               >
                 ➕ Kapı
@@ -2789,7 +2795,7 @@ function KonteynerDuvarGovdesi<T extends KonteynerDuvarDegerleri>({
                 type="button"
                 className="btn-secondary btn-sm"
                 onClick={() =>
-                  onDegis({ ...deger, bosluklar: [...deger.bosluklar, { etiket: "Pencere", konumMm: 0, tabanYuksekligiMm: 900, genislikMm: 1200, yukseklikMm: 1200 }] })
+                  onDegis({ bosluklar: [...deger.bosluklar, { etiket: "Pencere", konumMm: 0, tabanYuksekligiMm: 900, genislikMm: 1200, yukseklikMm: 1200 }] } as Partial<T>)
                 }
               >
                 ➕ Pencere
@@ -2809,7 +2815,7 @@ function KonteynerDuvarGovdesi<T extends KonteynerDuvarDegerleri>({
               <button
                 type="button"
                 className="btn-danger btn-sm"
-                onClick={() => onDegis({ ...deger, bosluklar: deger.bosluklar.filter((_, idx) => idx !== i) })}
+                onClick={() => onDegis({ bosluklar: deger.bosluklar.filter((_, idx) => idx !== i) } as Partial<T>)}
               >
                 Sil
               </button>
@@ -2836,7 +2842,7 @@ function KonteynerDuvarFormu({
   sacMalzemeler: Material[];
   sarfMalzemeler: Material[];
   deger: KonteynerDuvarDegerleri;
-  onDegis: (yeni: KonteynerDuvarDegerleri) => void;
+  onDegis: (patch: Partial<KonteynerDuvarDegerleri>) => void;
 }) {
   return (
     <details className="rounded-xl border border-neutral-200 p-3" open>
@@ -2862,7 +2868,7 @@ function KonteynerIcDuvarFormu({
   sacMalzemeler: Material[];
   sarfMalzemeler: Material[];
   deger: KonteynerIcDuvarDegerleri;
-  onDegis: (yeni: KonteynerIcDuvarDegerleri) => void;
+  onDegis: (patch: Partial<KonteynerIcDuvarDegerleri>) => void;
   onSil: () => void;
 }) {
   return (
@@ -2870,7 +2876,7 @@ function KonteynerIcDuvarFormu({
       <summary className="font-semibold cursor-pointer">İç Duvar {index + 1}</summary>
       <div className="mt-3 flex items-end gap-3">
         <div className="flex-1">
-          <Sayi label="Duvar Uzunluğu (mm)" value={deger.genislikMm} onChange={(v) => onDegis({ ...deger, genislikMm: v })} />
+          <Sayi label="Duvar Uzunluğu (mm)" value={deger.genislikMm} onChange={(v) => onDegis({ genislikMm: v })} />
         </div>
         <button type="button" className="btn-danger btn-sm" onClick={onSil}>
           Duvarı Sil
@@ -2896,35 +2902,37 @@ function KonteynerCatiFormu({
   sacMalzemeler: Material[];
   baglantiMalzemeler: Material[];
   deger: KonteynerCatiDegerleri;
-  onDegis: (yeni: KonteynerCatiDegerleri) => void;
+  /** bkz. KonteynerDuvarGovdesi'ndeki onDegis açıklaması - sadece değişen alanı içeren bir patch
+   * alır, eşzamanlı otomatik profil ataması gibi durumlarda birbirini ezmeyi önler. */
+  onDegis: (patch: Partial<KonteynerCatiDegerleri>) => void;
 }) {
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
-        <Sayi label="Eğim (%)" value={deger.egimYuzde} onChange={(v) => onDegis({ ...deger, egimYuzde: v })} />
-        <Sayi label="Kafesler Arası Aralık (mm)" value={deger.kafesAraligiHedefMm} onChange={(v) => onDegis({ ...deger, kafesAraligiHedefMm: v })} />
+        <Sayi label="Eğim (%)" value={deger.egimYuzde} onChange={(v) => onDegis({ egimYuzde: v })} />
+        <Sayi label="Kafesler Arası Aralık (mm)" value={deger.kafesAraligiHedefMm} onChange={(v) => onDegis({ kafesAraligiHedefMm: v })} />
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <MaterialSelect label="Üst Başlık Profili" materials={materials} value={deger.ustBaslikProfilId} onChange={(v) => onDegis({ ...deger, ustBaslikProfilId: v })} />
-        <MaterialSelect label="Alt Başlık Profili" materials={materials} value={deger.altBaslikProfilId} onChange={(v) => onDegis({ ...deger, altBaslikProfilId: v })} />
+        <MaterialSelect label="Üst Başlık Profili" materials={materials} value={deger.ustBaslikProfilId} onChange={(v) => onDegis({ ustBaslikProfilId: v })} />
+        <MaterialSelect label="Alt Başlık Profili" materials={materials} value={deger.altBaslikProfilId} onChange={(v) => onDegis({ altBaslikProfilId: v })} />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <MaterialSelect
           label="Aşık Profili (opsiyonel)"
           materials={materials}
           value={deger.asikProfilId}
-          onChange={(v) => onDegis({ ...deger, asikProfilId: v })}
+          onChange={(v) => onDegis({ asikProfilId: v })}
           allowEmpty
         />
         <Sayi
           label="Aşık Aralığı (mm)"
           value={deger.asikAraligiHedefMm ?? 1000}
-          onChange={(v) => onDegis({ ...deger, asikAraligiHedefMm: v })}
+          onChange={(v) => onDegis({ asikAraligiHedefMm: v })}
         />
       </div>
       <div>
         <label className="field-label">Çatı Kaplaması</label>
-        <select className="field-select" value={deger.kaplamaTuru} onChange={(e) => onDegis({ ...deger, kaplamaTuru: e.target.value })}>
+        <select className="field-select" value={deger.kaplamaTuru} onChange={(e) => onDegis({ kaplamaTuru: e.target.value })}>
           {CATI_KAPLAMA_SECENEKLERI.map((s) => (
             <option key={s.key} value={s.key}>
               {s.label}
@@ -2937,7 +2945,7 @@ function KonteynerCatiFormu({
           label="Kaplama Sac Malzemesi (opsiyonel, stok/maliyet için)"
           materials={sacMalzemeler}
           value={deger.kaplamaMalzemeId}
-          onChange={(v) => onDegis({ ...deger, kaplamaMalzemeId: v })}
+          onChange={(v) => onDegis({ kaplamaMalzemeId: v })}
           allowEmpty
         />
       )}
@@ -2945,14 +2953,14 @@ function KonteynerCatiFormu({
         label="Mesnet Plakası Sac Malzemesi (opsiyonel, stok/maliyet için)"
         materials={sacMalzemeler}
         value={deger.plakaMalzemeId}
-        onChange={(v) => onDegis({ ...deger, plakaMalzemeId: v })}
+        onChange={(v) => onDegis({ plakaMalzemeId: v })}
         allowEmpty
       />
       <MaterialSelect
         label="Ankraj Malzemesi (opsiyonel, stok/maliyet için)"
         materials={baglantiMalzemeler}
         value={deger.ankrajMalzemeId}
-        onChange={(v) => onDegis({ ...deger, ankrajMalzemeId: v })}
+        onChange={(v) => onDegis({ ankrajMalzemeId: v })}
         allowEmpty
       />
       <details className="rounded-xl border border-neutral-200 p-3">
@@ -2962,20 +2970,20 @@ function KonteynerCatiFormu({
             label="Kral Kirişi Profili"
             materials={materials}
             value={deger.kralKirisiProfilId}
-            onChange={(v) => onDegis({ ...deger, kralKirisiProfilId: v })}
+            onChange={(v) => onDegis({ kralKirisiProfilId: v })}
             allowEmpty
           />
           <MaterialSelect
             label="Çapraz Destek Profili"
             materials={materials}
             value={deger.diyagonalProfilId}
-            onChange={(v) => onDegis({ ...deger, diyagonalProfilId: v })}
+            onChange={(v) => onDegis({ diyagonalProfilId: v })}
             allowEmpty
           />
           <Sayi
             label="Kafes Başına Çapraz Sayısı"
             value={deger.diyagonalSayisi ?? 0}
-            onChange={(v) => onDegis({ ...deger, diyagonalSayisi: v })}
+            onChange={(v) => onDegis({ diyagonalSayisi: v })}
           />
         </div>
         <div className="mt-3 pt-3 border-t border-neutral-100 space-y-3">
@@ -2983,7 +2991,7 @@ function KonteynerCatiFormu({
             <input
               type="checkbox"
               checked={deger.stabiliteBaglantisiVar ?? false}
-              onChange={(e) => onDegis({ ...deger, stabiliteBaglantisiVar: e.target.checked })}
+              onChange={(e) => onDegis({ stabiliteBaglantisiVar: e.target.checked })}
             />
             İlk açıklığa stabilite bağlantısı (rüzgar/deprem çaprazı) ekle
           </label>
@@ -2992,7 +3000,7 @@ function KonteynerCatiFormu({
               label="Stabilite Bağlantısı Profili (genelde L profil)"
               materials={materials}
               value={deger.stabiliteProfilId}
-              onChange={(v) => onDegis({ ...deger, stabiliteProfilId: v })}
+              onChange={(v) => onDegis({ stabiliteProfilId: v })}
             />
           )}
         </div>
@@ -3001,29 +3009,29 @@ function KonteynerCatiFormu({
             <label className="field-label">Saçak Ucu</label>
             <div className="flex gap-4 text-sm">
               <label className="flex items-center gap-2">
-                <input type="radio" checked={!deger.olukluMu} onChange={() => onDegis({ ...deger, olukluMu: false })} />
+                <input type="radio" checked={!deger.olukluMu} onChange={() => onDegis({ olukluMu: false })} />
                 Oluksuz (çıkma payı ile uzat)
               </label>
               <label className="flex items-center gap-2">
-                <input type="radio" checked={deger.olukluMu ?? false} onChange={() => onDegis({ ...deger, olukluMu: true })} />
+                <input type="radio" checked={deger.olukluMu ?? false} onChange={() => onDegis({ olukluMu: true })} />
                 Oluklu (oluk mesafesi kadar kısalt)
               </label>
             </div>
           </div>
           {deger.olukluMu ? (
-            <Sayi label="Oluk Mesafesi (mm)" value={deger.olukMesafesiMm ?? 150} onChange={(v) => onDegis({ ...deger, olukMesafesiMm: v })} />
+            <Sayi label="Oluk Mesafesi (mm)" value={deger.olukMesafesiMm ?? 150} onChange={(v) => onDegis({ olukMesafesiMm: v })} />
           ) : (
-            <Sayi label="Çıkma Payı (mm)" value={deger.cikmaPayiMm ?? 300} onChange={(v) => onDegis({ ...deger, cikmaPayiMm: v })} />
+            <Sayi label="Çıkma Payı (mm)" value={deger.cikmaPayiMm ?? 300} onChange={(v) => onDegis({ cikmaPayiMm: v })} />
           )}
         </div>
         <div className="mt-3 pt-3 border-t border-neutral-100 space-y-3">
           <Sayi
             label="Direk Sayısı (makas yarısı başına, opsiyonel)"
             value={deger.direkSayisi ?? 0}
-            onChange={(v) => onDegis({ ...deger, direkSayisi: v })}
+            onChange={(v) => onDegis({ direkSayisi: v })}
           />
           {(deger.direkSayisi ?? 0) > 0 && (
-            <MaterialSelect label="Direk Profili" materials={materials} value={deger.direkProfilId} onChange={(v) => onDegis({ ...deger, direkProfilId: v })} />
+            <MaterialSelect label="Direk Profili" materials={materials} value={deger.direkProfilId} onChange={(v) => onDegis({ direkProfilId: v })} />
           )}
         </div>
       </details>
@@ -3249,11 +3257,17 @@ function KonteynerAlanlari({
     iskeletStabiliteProfilId,
   ]);
 
-  const duvarGuncelle = (yon: KonteynerYon, yeni: KonteynerDuvarDegerleri) => setDuvarlar((s) => ({ ...s, [yon]: yeni }));
-  const duvar2Guncelle = (yon: KonteynerYon, yeni: KonteynerDuvarDegerleri) => setDuvarlar2((s) => ({ ...s, [yon]: yeni }));
+  // Patch'i (sadece değişen alanları) en güncel state'e göre birleştirir - bkz. KonteynerDuvarGovdesi'ndeki
+  // onDegis açıklaması. Birden fazla MaterialSelect aynı anda kendi alanını ayarlamaya çalıştığında
+  // (örn. bir duvarın Dikme/Üst Ray/Alt Ray alanları mount olurken otomatik varsayılan atarken), her
+  // patch ayrı ayrı ve en güncel `s[yon]` üzerinden uygulanır; böylece birbirlerini ezmezler.
+  const duvarGuncelle = (yon: KonteynerYon, patch: Partial<KonteynerDuvarDegerleri>) =>
+    setDuvarlar((s) => ({ ...s, [yon]: { ...s[yon], ...patch } }));
+  const duvar2Guncelle = (yon: KonteynerYon, patch: Partial<KonteynerDuvarDegerleri>) =>
+    setDuvarlar2((s) => ({ ...s, [yon]: { ...s[yon], ...patch } }));
   const icDuvarEkle = () => setIcDuvarlar((liste) => [...liste, konteynerIcDuvarVarsayilan()]);
-  const icDuvarGuncelle = (index: number, yeni: KonteynerIcDuvarDegerleri) =>
-    setIcDuvarlar((liste) => liste.map((d, i) => (i === index ? yeni : d)));
+  const icDuvarGuncelle = (index: number, patch: Partial<KonteynerIcDuvarDegerleri>) =>
+    setIcDuvarlar((liste) => liste.map((d, i) => (i === index ? { ...d, ...patch } : d)));
   const icDuvarSil = (index: number) => setIcDuvarlar((liste) => liste.filter((_, i) => i !== index));
 
   return (
@@ -3290,8 +3304,9 @@ function KonteynerAlanlari({
         </div>
       </div>
       <p className="text-xs text-neutral-500 -mt-1">
-        Standart 20/40ft konteyner: en 2438mm, kat yüksekliği 2591mm (standart) / 2896mm (yüksek küp). Konteynerin kendi
-        gövdesi bu hesaba dahil değildir; sadece takviye/kaplama/merdiven/iskelet hesaplanır.
+        Hazır ölçüler (15/21/32 m²) taban dış ölçüsünü doldurur; profil seçimleri otomatik 40x40x2 gelir,
+        isterseniz değiştirebilirsiniz. Kat yüksekliği ayrıca elle girilir (standart 2591mm / yüksek küp 2896mm).
+        Konteynerin kendi gövdesi bu hesaba dahil değildir; sadece takviye/kaplama/merdiven/iskelet hesaplanır.
       </p>
 
       <div className="space-y-3">
@@ -3334,7 +3349,7 @@ function KonteynerAlanlari({
             sacMalzemeler={sacMalzemeler}
             sarfMalzemeler={sarfMalzemeler}
             deger={araDuvar}
-            onDegis={setAraDuvar}
+            onDegis={(patch) => setAraDuvar((s) => ({ ...s, ...patch }))}
           />
         )}
       </div>
@@ -3440,7 +3455,13 @@ function KonteynerAlanlari({
           Çatının açıklığı konteyner eniyle, uzunluğu konteyner boyuyla otomatik eşleşir; kat sayısından bağımsız çalışır.
         </p>
         {catiVar && (
-          <KonteynerCatiFormu materials={materials} sacMalzemeler={sacMalzemeler} baglantiMalzemeler={baglantiMalzemeler} deger={cati} onDegis={setCati} />
+          <KonteynerCatiFormu
+            materials={materials}
+            sacMalzemeler={sacMalzemeler}
+            baglantiMalzemeler={baglantiMalzemeler}
+            deger={cati}
+            onDegis={(patch) => setCati((s) => ({ ...s, ...patch }))}
+          />
         )}
       </div>
 
