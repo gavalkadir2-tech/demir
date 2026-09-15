@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
-import { asyncHandler, ApiHatasi } from "../lib/errors";
+import { asyncHandler } from "../lib/errors";
 
 const router = Router({ mergeParams: true });
 
@@ -31,16 +31,9 @@ router.post(
     const projectId = Number(req.params.projectId);
     const data = parcaSchema.parse(req.body);
 
-    const malzeme = await prisma.material.findUniqueOrThrow({ where: { id: data.materialId } });
-    if (malzeme.standardLengthM && data.lengthMm > malzeme.standardLengthM * 1000) {
-      throw new ApiHatasi(
-        400,
-        `Bu parça (${data.lengthMm} mm), "${malzeme.name}" malzemesinin standart boyundan (${
-          malzeme.standardLengthM * 1000
-        } mm) uzun; tek parça olarak kesilemez.`
-      );
-    }
-
+    // Not: parça uzunluğu malzemenin standart (veya alternatif) stok boyundan uzun olabilir -
+    // kesim planı bu durumda parçayı otomatik olarak ek (kaynaklı birleştirme) parçalarına böler,
+    // bkz. calc/cutting.ts optimizeCutting. Bu yüzden burada uzunluk üst sınırı uygulanmaz.
     const parca = await prisma.part.create({ data: { ...data, projectId }, include: { material: true } });
     await prisma.project.updateMany({ where: { id: projectId, status: "DRAFT" }, data: { status: "CALCULATED" } });
     res.status(201).json(parca);

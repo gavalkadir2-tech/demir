@@ -405,8 +405,18 @@ export interface Payment {
   createdAt: string;
 }
 
+export interface KesimParcasi {
+  lengthMm: number;
+  /** Mevcut en uzun stoktan uzun bir parçanın bölünmesiyle oluştuysa, aynı gruptaki
+   * ek parçaları eşleştirmek için kullanılır (kaynakla birleştirilecek parçalar). */
+  spliceGroupId?: string;
+  spliceIndex?: number;
+  spliceCount?: number;
+  originalLengthMm?: number;
+}
+
 export interface KesimCubugu {
-  cuts: number[];
+  cuts: KesimParcasi[];
   wasteMm: number;
   stockLengthMm: number;
 }

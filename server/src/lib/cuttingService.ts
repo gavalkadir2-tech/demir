@@ -40,6 +40,10 @@ export async function generateCuttingListsForProject(projectId: number, mod: Kes
       const pieces = expandPieces(g.items);
       const mevcutBoylarMm = [g.material.standardLengthM! * 1000, ...g.material.alternatifBoylarM.map((m) => m * 1000)];
       const kesim = optimizeCutting(pieces, mevcutBoylarMm, g.material.kerfMm);
+      if (kesim.warnings.length > 0) {
+        const etiket = `${g.material.name}${g.groupLabel ? ` (${g.groupLabel})` : ""}`;
+        for (const w of kesim.warnings) uyarilar.push(`${etiket}: ${w}`);
+      }
       const row = await prisma.cuttingList.create({
         data: {
           projectId,

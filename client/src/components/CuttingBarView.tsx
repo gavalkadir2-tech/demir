@@ -4,7 +4,9 @@ import { sayi } from "../lib/format";
 const RENKLER = ["bg-brand-500", "bg-blue-500", "bg-emerald-500", "bg-purple-500", "bg-pink-500", "bg-amber-500", "bg-teal-500"];
 
 /** Bir kesim çubuğunu, kendi stok boyuna göre ölçekli bar olarak gösterir. Karışık stok boyu
- * kullanıldığında (bkz. Material.alternatifBoylarM) her çubuk kendi stockLengthMm'ine göre çizilir. */
+ * kullanıldığında (bkz. Material.alternatifBoylarM) her çubuk kendi stockLengthMm'ine göre çizilir.
+ * Mevcut en uzun stoktan uzun parçalar bölünüp ek (kaynak) parçası olarak işaretlenmişse
+ * (bkz. KesimParcasi.spliceGroupId), bu parçalar taralı desen ve 🔗 simgesiyle vurgulanır. */
 export default function CuttingBarView({ bar, index }: { bar: KesimCubugu; index: number }) {
   const boyMm = bar.stockLengthMm;
   return (
@@ -16,11 +18,22 @@ export default function CuttingBarView({ bar, index }: { bar: KesimCubugu; index
         {bar.cuts.map((c, i) => (
           <div
             key={i}
-            className={`flex items-center justify-center text-[11px] font-bold text-white border-r border-white/40 ${RENKLER[i % RENKLER.length]}`}
-            style={{ width: `${(c / boyMm) * 100}%` }}
-            title={`${c} mm`}
+            className={`relative flex items-center justify-center text-[11px] font-bold text-white border-r border-white/40 ${RENKLER[i % RENKLER.length]}`}
+            style={{ width: `${(c.lengthMm / boyMm) * 100}%` }}
+            title={
+              c.spliceGroupId
+                ? `${c.lengthMm} mm — Ek parçası (${c.spliceIndex}/${c.spliceCount}), ${c.originalLengthMm} mm'lik parçayı oluşturmak için kaynakla birleştirilecek`
+                : `${c.lengthMm} mm`
+            }
           >
-            <span className="truncate px-0.5">{sayi(c)}</span>
+            {c.spliceGroupId && (
+              <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,rgba(255,255,255,0.35),rgba(255,255,255,0.35)_4px,transparent_4px,transparent_8px)]" />
+            )}
+            <span className="truncate px-0.5 relative">
+              {c.spliceGroupId && "🔗 "}
+              {sayi(c.lengthMm)}
+              {c.spliceGroupId && ` (ek ${c.spliceIndex}/${c.spliceCount})`}
+            </span>
           </div>
         ))}
         {bar.wasteMm > 0 && (

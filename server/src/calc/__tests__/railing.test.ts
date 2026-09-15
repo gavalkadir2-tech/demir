@@ -71,7 +71,7 @@ test("korkuluk: kesim planı ve fire doğru hesaplanıyor (40x40x2, 6000mm stand
   assert.ok(kesim.totalBars > 0);
   // Hiçbir çubuğun kullanılan+fire toplamı 6000mm'yi aşmamalı
   for (const bar of kesim.bars) {
-    const kullanilan = bar.cuts.reduce((s, c) => s + c, 0) + (bar.cuts.length - 1) * 3;
+    const kullanilan = bar.cuts.reduce((s, c) => s + c.lengthMm, 0) + (bar.cuts.length - 1) * 3;
     assert.ok(kullanilan + bar.wasteMm <= 6000 + 1e-6);
     assert.ok(Math.abs(kullanilan + bar.wasteMm - 6000) < 1e-6);
   }
