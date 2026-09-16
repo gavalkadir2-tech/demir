@@ -15,6 +15,7 @@ import {
   SemaGorunumTipi,
   Izometrik3DSahne,
   Kiris3D,
+  Yuzey3D,
 } from "./schematicShared";
 
 export interface DuvarBoslukVeri {
@@ -364,22 +365,56 @@ function UstenGorunum({ veri }: { veri: DuvarPaneliSemaVeri }) {
 }
 
 function Gorunum3D({ veri }: { veri: DuvarPaneliSemaVeri }) {
-  const { genislikMm, yukseklikMm, dikmeKesit, rayKesit } = veri;
+  const { genislikMm, yukseklikMm, dikmeKesit, rayKesit, disKaplamaVar, icKaplamaVar } = veri;
   const { dikmePozisyonlari } = dikmePozisyonHesapla(veri);
+  // Önceden dikme/ray tek bir düzlemde (z=0), kaplama hiç gösterilmeden çizilirdi - bu da gerçekte
+  // gerçek bir "3D" değil, eğik çizilmiş bir düzlem gibi görünüyordu. Artık karkas gerçek profil
+  // derinliğine (dikmeKesit.kalinlikMm) oturtuluyor ve dış/iç kaplama seçiliyse iki yüzü de (örn.
+  // "iç duvarın iki tarafı da alçıpan") sandviç panel gibi gösteren yarı saydam yüzeyler ekleniyor.
+  const derinlikMm = dikmeKesit?.kalinlikMm ?? 40;
+  const midZ = derinlikMm / 2;
 
   const kirisler: Kiris3D[] = [];
   dikmePozisyonlari.forEach((x, i) => {
-    kirisler.push({ a: [x, 0, 0], b: [x, yukseklikMm, 0], enMm: dikmeKesit?.enMm ?? 40, renk: PALET.ana, etiket: i === 0 ? mmEtiket(yukseklikMm) : undefined });
+    kirisler.push({ a: [x, 0, midZ], b: [x, yukseklikMm, midZ], enMm: dikmeKesit?.enMm ?? 40, renk: PALET.ana, etiket: i === 0 ? mmEtiket(yukseklikMm) : undefined });
   });
-  kirisler.push({ a: [0, yukseklikMm, 0], b: [genislikMm, yukseklikMm, 0], enMm: rayKesit?.kalinlikMm ?? 40, renk: PALET.yatay });
-  kirisler.push({ a: [0, 0, 0], b: [genislikMm, 0, 0], enMm: rayKesit?.kalinlikMm ?? 40, renk: PALET.yatay, etiket: mmEtiket(genislikMm) });
+  kirisler.push({ a: [0, yukseklikMm, midZ], b: [genislikMm, yukseklikMm, midZ], enMm: rayKesit?.kalinlikMm ?? 40, renk: PALET.yatay });
+  kirisler.push({ a: [0, 0, midZ], b: [genislikMm, 0, midZ], enMm: rayKesit?.kalinlikMm ?? 40, renk: PALET.yatay, etiket: mmEtiket(genislikMm) });
+
+  const yuzeyler: Yuzey3D[] = [];
+  if (disKaplamaVar) {
+    yuzeyler.push({
+      noktalar: [
+        [0, 0, 0],
+        [genislikMm, 0, 0],
+        [genislikMm, yukseklikMm, 0],
+        [0, yukseklikMm, 0],
+      ],
+      fill: PALET.destek,
+      fillOpacity: 0.4,
+    });
+  }
+  if (icKaplamaVar) {
+    yuzeyler.push({
+      noktalar: [
+        [0, 0, derinlikMm],
+        [genislikMm, 0, derinlikMm],
+        [genislikMm, yukseklikMm, derinlikMm],
+        [0, yukseklikMm, derinlikMm],
+      ],
+      fill: PALET.ikincil,
+      fillOpacity: 0.4,
+    });
+  }
 
   const lejant = [
     { renk: PALET.ana, etiket: "Dikme" },
     { renk: PALET.yatay, etiket: "Üst/Alt Ray" },
+    ...(disKaplamaVar ? [{ renk: PALET.destek, etiket: "Dış Cephe Kaplaması" }] : []),
+    ...(icKaplamaVar ? [{ renk: PALET.ikincil, etiket: "İç Cephe Kaplaması" }] : []),
   ];
 
-  return <Izometrik3DSahne kirisler={kirisler} lejant={lejant} ariaLabel="Duvar paneli 3D izometrik görünüm" />;
+  return <Izometrik3DSahne kirisler={kirisler} yuzeyler={yuzeyler} lejant={lejant} ariaLabel="Duvar paneli 3D izometrik görünüm" />;
 }
 
 /** Duvar panelinin önden/üstten/3D görünüşlerini, seçilen dikme/ray profilinin gerçek

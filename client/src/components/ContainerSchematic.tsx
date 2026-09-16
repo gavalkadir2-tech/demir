@@ -1,7 +1,7 @@
 import { useState } from "react";
 import WallSchematic, { DuvarPaneliSemaVeri, DuvarYatayAraProfilVeri } from "./WallSchematic";
 import TrussSchematic, { CatiKafesiSemaVeri } from "./TrussSchematic";
-import { Izometrik3DSahne, Kiris3D, Nokta3D, PALET, mmEtiket } from "./schematicShared";
+import { Izometrik3DSahne, Kiris3D, Nokta3D, Yuzey3D, PALET, mmEtiket } from "./schematicShared";
 
 export type KonteynerYon = "on" | "arka" | "sol" | "sag";
 
@@ -35,6 +35,7 @@ function ContainerGorunum3D({
 }) {
   const toplamYukseklikMm = katYuksekligiMm * katSayisi;
   const kirisler: Kiris3D[] = [];
+  const yuzeyler: Yuzey3D[] = [];
 
   const altKoseler: Nokta3D[] = [
     [0, 0, 0],
@@ -43,6 +44,16 @@ function ContainerGorunum3D({
     [0, 0, genislikMm],
   ];
   const ustKoseler: Nokta3D[] = altKoseler.map(([x, , z]) => [x, toplamYukseklikMm, z] as Nokta3D);
+
+  // 4 duvarı yarı saydam dolu yüzey olarak çiz - önceden sadece kenar çizgileri (tel kafes)
+  // görünüyordu, bu da kutuyu içi boş bir iskelet gibi gösteriyordu. Otomatik gölgelendirme
+  // (bkz. Izometrik3DSahne) her duvara bakış açısına göre farklı bir ton verir.
+  for (let i = 0; i < 4; i++) {
+    yuzeyler.push({
+      noktalar: [altKoseler[i], altKoseler[(i + 1) % 4], ustKoseler[(i + 1) % 4], ustKoseler[i]],
+      fill: PALET.ana,
+    });
+  }
 
   kirisler.push({ a: altKoseler[0], b: altKoseler[1], enMm: 60, renk: PALET.ana, etiket: mmEtiket(uzunlukMm) });
   kirisler.push({ a: altKoseler[1], b: altKoseler[2], enMm: 60, renk: PALET.ana, etiket: mmEtiket(genislikMm) });
@@ -68,6 +79,12 @@ function ContainerGorunum3D({
     kirisler.push({ a: ustKoseler[3], b: ridgeA, enMm: 40, renk: PALET.ikincil });
     kirisler.push({ a: ustKoseler[1], b: ridgeB, enMm: 40, renk: PALET.ikincil });
     kirisler.push({ a: ustKoseler[2], b: ridgeB, enMm: 40, renk: PALET.ikincil });
+    // İki eğimli çatı yüzeyi (mahyanın iki yanı).
+    yuzeyler.push({ noktalar: [ustKoseler[0], ustKoseler[1], ridgeB, ridgeA], fill: PALET.ikincil, fillOpacity: 0.45 });
+    yuzeyler.push({ noktalar: [ridgeA, ridgeB, ustKoseler[2], ustKoseler[3]], fill: PALET.ikincil, fillOpacity: 0.45 });
+  } else {
+    // Çatı eklenmemişse düz bir üst yüzey (tavan) göster ki kutu tamamen kapalı görünsün.
+    yuzeyler.push({ noktalar: ustKoseler, fill: PALET.ana, fillOpacity: 0.3 });
   }
 
   for (const b of onDuvarBosluklari ?? []) {
@@ -97,7 +114,7 @@ function ContainerGorunum3D({
         Basitleştirilmiş genel görünüm - dikme/profil detayı için ilgili duvarın kendi 3D görünüşüne bakın. Sadece ön
         duvarın kapı/pencere boşlukları temsili olarak gösterilir.
       </p>
-      <Izometrik3DSahne kirisler={kirisler} lejant={lejant} ariaLabel="Konteyner 3D basitleştirilmiş görünüm" />
+      <Izometrik3DSahne kirisler={kirisler} yuzeyler={yuzeyler} lejant={lejant} ariaLabel="Konteyner 3D basitleştirilmiş görünüm" />
     </div>
   );
 }

@@ -10,7 +10,9 @@ const router = Router();
 
 const kaplamaTuruEnum = z.enum(["trapez_sac", "sandvic_panel", "etermit", "plastik_etermit", "polikarbon", "yok"]);
 // Duvar dış/iç cephe kaplaması, çatı kaplamasından farklı bir seçenek kümesi kullanır (bkz. calc/kaplama.ts).
-const disKaplamaTuruEnum = z.enum(["trapez_sac", "sandvic_panel", "petopan", "yok"]);
+// Dış cephe listesine alçıpan da eklendi ki iç bölme duvarlarının iki yüzü de (dış+iç kaplama
+// alanları) alçıpan olarak seçilebilsin - bkz. client DUVAR_DIS_KAPLAMA_SECENEKLERI.
+const disKaplamaTuruEnum = z.enum(["trapez_sac", "sandvic_panel", "petopan", "alcipan", "yok"]);
 const icKaplamaTuruEnum = z.enum(["alcipan", "yok"]);
 const tabanKaplamaTuruEnum = z.enum(["trapez_sac", "sandvic_panel", "yok"]);
 

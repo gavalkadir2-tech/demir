@@ -1,3 +1,4 @@
+import { ReactNode } from "react";
 import { sayi } from "../lib/format";
 import { Material } from "../api/types";
 
@@ -22,21 +23,32 @@ export interface LejantKalemi {
 
 export const LEGEND_H = 32;
 
-/** Şema altında, kullanılan renklerin ne anlama geldiğini gösteren küçük bir lejant. */
+/** Şema altında, kullanılan renklerin ne anlama geldiğini gösteren küçük bir lejant. Her kaleme,
+ * eşit pay yerine kendi metin uzunluğuyla orantılı genişlik ayrılır - eskiden sabit eşit paylaşım
+ * kısa etiketlerde israf, uzun etiketlerde (örn. "Duvarlar (kutu, basitleştirilmiş)") bir sonraki
+ * kalemin üzerine binen metin taşmasına yol açıyordu. */
 export function Lejant({ kalemler, y }: { kalemler: LejantKalemi[]; y: number }) {
   if (kalemler.length === 0) return null;
-  const itemW = Math.min(170, (VIEW_W - 20) / kalemler.length);
-  const startX = (VIEW_W - itemW * kalemler.length) / 2;
+  const kullanilabilirGenislik = VIEW_W - 20;
+  const toplamKarakter = kalemler.reduce((s, k) => s + k.etiket.length, 0) || 1;
+  const genislikler = kalemler.map((k) => Math.max(45, (k.etiket.length / toplamKarakter) * kullanilabilirGenislik));
+  const toplamGenislik = genislikler.reduce((a, b) => a + b, 0);
+  const startX = (VIEW_W - toplamGenislik) / 2;
+  let ilerleme = 0;
   return (
     <g>
-      {kalemler.map((k, i) => (
-        <g key={i} transform={`translate(${startX + i * itemW}, ${y})`}>
-          <rect x={0} y={0} width={12} height={12} rx={2} fill={k.renk} />
-          <text x={18} y={10} fontSize={11} fill="#525252">
-            {k.etiket}
-          </text>
-        </g>
-      ))}
+      {kalemler.map((k, i) => {
+        const x = startX + ilerleme;
+        ilerleme += genislikler[i];
+        return (
+          <g key={i} transform={`translate(${x}, ${y})`}>
+            <rect x={0} y={0} width={12} height={12} rx={2} fill={k.renk} />
+            <text x={18} y={10} fontSize={11} fill="#525252">
+              {k.etiket}
+            </text>
+          </g>
+        );
+      })}
     </g>
   );
 }
@@ -237,8 +249,44 @@ export function izoProjeksiyon(x: number, y: number, z: number): { sx: number; s
   return { sx: (x - z) * IZO_COS30, sy: (x + z) * IZO_SIN30 - y };
 }
 
+/** Bir yüzeyin (en az 3 nokta) 3D normal vektörünü döndürür - ilk üç noktanın kenar vektörlerinin
+ * çapraz çarpımı. Otomatik gölgelendirme için kullanılır. */
+function yuzeyNormali(noktalar: Nokta3D[]): Nokta3D {
+  if (noktalar.length < 3) return [0, 1, 0];
+  const [p0, p1, p2] = noktalar;
+  const e1: Nokta3D = [p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]];
+  const e2: Nokta3D = [p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2]];
+  const n: Nokta3D = [
+    e1[1] * e2[2] - e1[2] * e2[1],
+    e1[2] * e2[0] - e1[0] * e2[2],
+    e1[0] * e2[1] - e1[1] * e2[0],
+  ];
+  const uzunluk = Math.hypot(n[0], n[1], n[2]) || 1;
+  return [n[0] / uzunluk, n[1] / uzunluk, n[2] / uzunluk];
+}
+
+/** Yüzeyin bakış yönüne göre bir opaklık çarpanı üretir - üstten sanal bir ışık kaynağı varsayımıyla
+ * yatay (tavan/çatı/taban gibi yukarı veya aşağı bakan) yüzeyler en açık, dikey yüzeyler arasında da
+ * kameraya daha dönük olan taraf biraz daha açık render edilir. Böylece düz tek renkli dolgular
+ * yerine, kutu/duvar gibi şekiller gerçekten üç boyutluymuş hissi verir. */
+function yuzeyOpaklikCarpani(normal: Nokta3D): number {
+  const [nx, , nz] = normal;
+  const yatayBakis = Math.abs(normal[1]);
+  if (yatayBakis > 0.5) return 0.55; // tavan/çatı/taban - en açık (ışığa en dönük)
+  if (nx >= 0 && nz >= 0) return 0.85; // kameraya dönük ön yüzeyler
+  return 1.35; // arkaya/yana dönük yüzeyler - en koyu (gölgede)
+}
+
+interface RenderElemani {
+  derinlik: number;
+  cizim: () => ReactNode;
+}
+
 /** Bir 3D kiriş/çubuk listesini (opsiyonel dolgu yüzeylerle) otomatik ölçek/kadrajla izometrik
- * SVG sahnesi olarak render eder. Gerçek kesit kalınlıkları çizgi kalınlığına yansıtılır. */
+ * SVG sahnesi olarak render eder. Gerçek kesit kalınlıkları çizgi kalınlığına yansır. Yüzeyler
+ * yön/ışığa göre otomatik gölgelendirilir; tüm kiriş+yüzey öğeleri kameraya uzaklığına göre
+ * (painter's algorithm) sıralanıp öyle çizilir - böylece önde olan öğeler arkadakileri doğru
+ * şekilde örter. */
 export function Izometrik3DSahne({
   kirisler,
   yuzeyler = [],
@@ -274,35 +322,44 @@ export function Izometrik3DSahne({
     const { sx, sy } = izoProjeksiyon(p[0], p[1], p[2]);
     return { x: sx * scale + offX, y: sy * scale + offY };
   };
+  // Bu izometrik kamera düzeninde (bkz. izoProjeksiyon) x+z arttıkça öğe kameraya/izleyiciye
+  // yaklaşır - derinlik sıralaması için ortalama (x+z) kullanılır, küçükten büyüğe çizilir ki
+  // arkadaki önce, öndeki en son (üstte) çizilsin.
+  const derinlikSkoru = (noktalar: Nokta3D[]) =>
+    noktalar.reduce((s, p) => s + p[0] + p[2], 0) / noktalar.length;
 
-  return (
-    <svg
-      viewBox={`0 0 ${viewW} ${viewH + (lejant.length ? LEGEND_H : 0)}`}
-      className="w-full h-auto"
-      role="img"
-      aria-label={ariaLabel}
-    >
-      {yuzeyler.map((y, i) => (
-        <polygon
-          key={i}
-          points={y.noktalar
-            .map((p) => {
+  const elemanlar: RenderElemani[] = [
+    ...yuzeyler.map((y, i) => ({
+      derinlik: derinlikSkoru(y.noktalar),
+      cizim: () => {
+        const carpan = yuzeyOpaklikCarpani(yuzeyNormali(y.noktalar));
+        const opaklik = Math.min(0.9, Math.max(0.12, (y.fillOpacity ?? 0.38) * carpan));
+        return (
+          <polygon
+            key={`y${i}`}
+            points={y.noktalar.map((p) => {
               const s = S(p);
               return `${s.x},${s.y}`;
-            })
-            .join(" ")}
-          fill={y.fill}
-          fillOpacity={y.fillOpacity ?? 0.25}
-          stroke="none"
-        />
-      ))}
-      {kirisler.map((k, i) => {
+            }).join(" ")}
+            fill={y.fill}
+            fillOpacity={opaklik}
+            stroke={y.fill}
+            strokeOpacity={0.5}
+            strokeWidth={0.75}
+            strokeLinejoin="round"
+          />
+        );
+      },
+    })),
+    ...kirisler.map((k, i) => ({
+      derinlik: derinlikSkoru([k.a, k.b]),
+      cizim: () => {
         const a = S(k.a);
         const b = S(k.b);
         const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
         const aci = Math.atan2(b.y - a.y, b.x - a.x) * (180 / Math.PI);
         return (
-          <g key={i}>
+          <g key={`k${i}`}>
             <line
               x1={a.x}
               y1={a.y}
@@ -328,7 +385,18 @@ export function Izometrik3DSahne({
             )}
           </g>
         );
-      })}
+      },
+    })),
+  ].sort((a, b) => a.derinlik - b.derinlik);
+
+  return (
+    <svg
+      viewBox={`0 0 ${viewW} ${viewH + (lejant.length ? LEGEND_H : 0)}`}
+      className="w-full h-auto"
+      role="img"
+      aria-label={ariaLabel}
+    >
+      {elemanlar.map((e) => e.cizim())}
       {lejant.length > 0 && <Lejant kalemler={lejant} y={viewH + 6} />}
     </svg>
   );

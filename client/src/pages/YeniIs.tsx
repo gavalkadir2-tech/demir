@@ -110,6 +110,10 @@ const DUVAR_DIS_KAPLAMA_SECENEKLERI = [
   { key: "trapez_sac", label: "Trapez Sac (Cephe)" },
   { key: "sandvic_panel", label: "Sandviç Panel" },
   { key: "petopan", label: "Petopan (Dış Cephe Mantolama)" },
+  // İç bölme duvarlarının iki yüzü de oda içidir, ikisi de alçıpan olabilir (bkz. Dış/İç Kaplama
+  // birbirinden bağımsız iki alan - konteynerin gerçek dış cephesinde kullanıcı yine trapez sac/
+  // sandviç panel/petopan seçmeye devam edebilir, bu sadece seçeneği ekler, zorunlu kılmaz).
+  { key: "alcipan", label: "Alçıpan" },
   { key: "yok", label: "Kaplama Yok" },
 ];
 
