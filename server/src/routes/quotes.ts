@@ -55,7 +55,6 @@ router.post(
 
     const uyarilar: string[] = [...kesimUyarilari];
     let materialCost = 0;
-    let wasteCost = 0;
     const materialItems: { description: string; qty: number; unit: string; unitPrice: number; lineTotal: number }[] = [];
 
     const cuttingByMaterial = new Map(cuttingLists.map((c) => [c.materialId, c]));
@@ -72,8 +71,7 @@ router.post(
           kesim.totalBars
         );
         if (uyari) uyarilar.push(uyari);
-        materialCost += netCost;
-        wasteCost += parcaFire;
+        materialCost += netCost + parcaFire;
         materialItems.push({
           description: `${malzeme.name}${malzeme.section ? " (" + malzeme.section + ")" : ""}`,
           qty: kesim.totalBars,
@@ -134,7 +132,6 @@ router.post(
 
     const maliyet = calculateCost({
       materialCost,
-      wasteCost,
       consumableCost,
       laborCost,
       paintCost,

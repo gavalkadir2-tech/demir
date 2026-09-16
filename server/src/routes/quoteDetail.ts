@@ -253,8 +253,7 @@ router.get(
       doc.text(tl(deger), { align: "right" });
     };
 
-    ozetSatir("Malzeme maliyeti", teklif.materialCost);
-    ozetSatir("Fire maliyeti", teklif.wasteCost);
+    ozetSatir("Malzeme maliyeti (fire dahil)", teklif.materialCost);
     ozetSatir("Sarf malzeme", teklif.consumableCost);
     ozetSatir("İşçilik", teklif.laborCost);
     ozetSatir("Boya", teklif.paintCost);

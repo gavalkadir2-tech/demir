@@ -127,8 +127,7 @@ export default function TeklifDetay() {
       </div>
 
       <div className="card space-y-1 max-w-md ml-auto">
-        <OzetSatir label="Malzeme maliyeti" deger={teklif.materialCost} />
-        <OzetSatir label="Fire maliyeti" deger={teklif.wasteCost} />
+        <OzetSatir label="Malzeme maliyeti (fire dahil)" deger={teklif.materialCost} />
         <OzetSatir label="Sarf malzeme" deger={teklif.consumableCost} />
         <OzetSatir label="İşçilik" deger={teklif.laborCost} />
         <OzetSatir label="Boya" deger={teklif.paintCost} />

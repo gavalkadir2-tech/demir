@@ -134,7 +134,9 @@ model Project {
   laborRate    Float           @default(0)
   overheadPercent Float        @default(0)
   profitMode   ProfitMode      @default(PERCENT)
-  profitValue  Float           @default(20)
+  // PERCENT modunda malzeme maliyetine (fire dahil) uygulanır; varsayılan %50 = "kârı malzeme
+  // fiyatının yarısı olarak baz al" kuralına karşılık gelir.
+  profitValue  Float           @default(50)
   vatPercent   Float           @default(20)
   validityDays Int             @default(15)
 
@@ -462,8 +464,7 @@ model Quote {
   // Müşterinin girişsiz erişip teklifi onaylayabildiği sayfanın bağlantısında kullanılır.
   publicToken String @unique @default(cuid())
 
-  materialCost    Float
-  wasteCost       Float
+  materialCost    Float // fire (kesim artığı) maliyeti dahil
   consumableCost  Float
   laborCost       Float
   paintCost       Float

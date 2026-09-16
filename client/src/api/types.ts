@@ -492,8 +492,7 @@ export interface Quote {
   validUntil: string;
   status: QuoteStatus;
   publicToken: string;
-  materialCost: number;
-  wasteCost: number;
+  materialCost: number; // fire (kesim artığı) maliyeti dahil
   consumableCost: number;
   laborCost: number;
   paintCost: number;

@@ -1,17 +1,21 @@
 // Maliyet motoru. bkz. spesifikasyon madde 15-16-17.
 //
-// Zincir: Malzeme + Fire + Sarf + İşçilik + Boya + Nakliye + Montaj + Diğer = Toplam Maliyet
+// Zincir: Malzeme (fire dahil) + Sarf + İşçilik + Boya + Nakliye + Montaj + Diğer = Toplam Maliyet
 //         Toplam Maliyet + Genel Gider = Ara Toplam
 //         Ara Toplam + Kâr (% veya sabit TL) = Teklif Fiyatı (KDV hariç)
 //         Teklif Fiyatı + KDV = Genel Toplam
+//
+// Not: Fire (kesim artığı) maliyeti artık ayrı bir kalem değil, malzeme maliyetine dahil ediliyor
+// (bkz. routes/quotes.ts - boughtCost, netCost+wasteCost olarak doğrudan materialCost'a ekleniyor).
+// Kâr yüzdesi modunda taban, ara toplam değil doğrudan malzeme maliyeti (fire dahil) - "kârı
+// malzeme fiyatının yarısı olarak baz al" kuralı, profitValue=50 ile karşılık bulur.
 
 import { HesaplamaHatasi, round2 } from "./units";
 
 export type KarModu = "PERCENT" | "FIXED";
 
 export interface MaliyetGirdi {
-  materialCost: number; // profil + sac net malzeme maliyeti
-  wasteCost: number; // fire (kesim artığı) maliyeti
+  materialCost: number; // profil + sac malzeme maliyeti (fire dahil)
   consumableCost: number; // sarf malzeme + bağlantı elemanları
   laborCost: number; // işçilik toplamı
   paintCost: number;
@@ -20,20 +24,19 @@ export interface MaliyetGirdi {
   otherCost: number;
   overheadPercent: number; // genel gider %
   profitMode: KarModu;
-  profitValue: number; // % ise yüzde, sabit ise TL
+  profitValue: number; // PERCENT modunda malzeme maliyetine uygulanan yüzde, FIXED modunda sabit TL
   vatPercent: number;
 }
 
 export interface MaliyetSonucu {
   materialCost: number;
-  wasteCost: number;
   consumableCost: number;
   laborCost: number;
   paintCost: number;
   transportCost: number;
   installCost: number;
   otherCost: number;
-  totalCost: number; // 8 kalemin toplamı (genel gider hariç)
+  totalCost: number; // 7 kalemin toplamı (genel gider hariç)
   overheadAmount: number;
   subtotalBeforeProfit: number; // totalCost + overheadAmount
   profitAmount: number;
@@ -46,7 +49,6 @@ export interface MaliyetSonucu {
 export function calculateCost(girdi: MaliyetGirdi): MaliyetSonucu {
   const buckets = [
     girdi.materialCost,
-    girdi.wasteCost,
     girdi.consumableCost,
     girdi.laborCost,
     girdi.paintCost,
@@ -65,7 +67,7 @@ export function calculateCost(girdi: MaliyetGirdi): MaliyetSonucu {
   const subtotalBeforeProfit = totalCost + overheadAmount;
 
   const profitAmount =
-    girdi.profitMode === "PERCENT" ? subtotalBeforeProfit * (girdi.profitValue / 100) : girdi.profitValue;
+    girdi.profitMode === "PERCENT" ? girdi.materialCost * (girdi.profitValue / 100) : girdi.profitValue;
 
   const subtotal = subtotalBeforeProfit + profitAmount;
   const vatAmount = subtotal * (girdi.vatPercent / 100);
@@ -73,7 +75,6 @@ export function calculateCost(girdi: MaliyetGirdi): MaliyetSonucu {
 
   return {
     materialCost: round2(girdi.materialCost),
-    wasteCost: round2(girdi.wasteCost),
     consumableCost: round2(girdi.consumableCost),
     laborCost: round2(girdi.laborCost),
     paintCost: round2(girdi.paintCost),
