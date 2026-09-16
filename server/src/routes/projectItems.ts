@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { asyncHandler, ApiHatasi } from "../lib/errors";
 import { calculateByTemplateKey } from "../calc";
+import { HesaplananParca } from "../calc/types";
 import { idToKey, TEMPLATE_SCHEMAS, CUSTOM_SCHEMA, malzemeSozlugu } from "./calc";
 
 const router = Router({ mergeParams: true });
@@ -12,6 +13,27 @@ const gövdeSchema = z.object({
   name: z.string().min(1),
   params: z.record(z.any()),
 });
+
+/** sonuc.parcalar'dan Part.createMany için satır listesi üretir - profilKey sayısal bir Material
+ * id'sine çevrilemiyorsa (örn. custom şablonun bazı serbest metin girişleri) o parça atlanır.
+ * Tek tek tx.part.create() döngüsü yerine tek bir createMany çağrısı kullanılır - havuzlanmış
+ * (pooled/PgBouncer) veritabanı bağlantılarında uzun süren interaktif transaction'lar "Transaction
+ * not found" (P2028) hatasıyla kopabiliyor; çok sayıda ardışık round-trip yerine tek round-trip bu
+ * riski ortadan kaldırır. */
+function partSatirlariOlustur(parcalar: HesaplananParca[], projectId: number, projectItemId: number) {
+  return parcalar
+    .map((parca) => ({ materialId: Number(parca.profilKey), parca }))
+    .filter((p): p is { materialId: number; parca: HesaplananParca } => !Number.isNaN(p.materialId))
+    .map(({ materialId, parca }) => ({
+      projectId,
+      projectItemId,
+      materialId,
+      label: parca.label,
+      lengthMm: parca.uzunlukMm,
+      qty: parca.adet,
+      note: parca.not,
+    }));
+}
 
 router.get(
   "/",
@@ -58,20 +80,9 @@ router.post(
         },
       });
 
-      for (const parca of sonuc.parcalar) {
-        const materialId = Number(parca.profilKey);
-        if (Number.isNaN(materialId)) continue;
-        await tx.part.create({
-          data: {
-            projectId,
-            projectItemId: created.id,
-            materialId,
-            label: parca.label,
-            lengthMm: parca.uzunlukMm,
-            qty: parca.adet,
-            note: parca.not,
-          },
-        });
+      const partSatirlari = partSatirlariOlustur(sonuc.parcalar, projectId, created.id);
+      if (partSatirlari.length > 0) {
+        await tx.part.createMany({ data: partSatirlari });
       }
 
       await tx.project.updateMany({
@@ -118,20 +129,9 @@ router.put(
         data: { name, paramsJson: params, resultJson: sonuc as any },
       });
 
-      for (const parca of sonuc.parcalar) {
-        const materialId = Number(parca.profilKey);
-        if (Number.isNaN(materialId)) continue;
-        await tx.part.create({
-          data: {
-            projectId,
-            projectItemId: itemId,
-            materialId,
-            label: parca.label,
-            lengthMm: parca.uzunlukMm,
-            qty: parca.adet,
-            note: parca.not,
-          },
-        });
+      const partSatirlari = partSatirlariOlustur(sonuc.parcalar, projectId, itemId);
+      if (partSatirlari.length > 0) {
+        await tx.part.createMany({ data: partSatirlari });
       }
 
       return updated;
