@@ -172,6 +172,7 @@ export default function SemaGorunum({
         <TrussSchematic
           veri={{
             catiTipi: (params.catiTipi as string | undefined) ?? "acik_besik",
+            dikmeYuksekligiMm: n("dikmeYuksekligiMm"),
             acikligMm: n("acikligMm"),
             egimYuzde: n("egimYuzde"),
             catiUzunluguMm: n("catiUzunluguMm"),
@@ -332,6 +333,7 @@ export default function SemaGorunum({
       const catiVeri: CatiKafesiSemaVeri | undefined = b("catiVar")
         ? {
             catiTipi: (catiParam("catiTipi") as string | undefined) ?? "acik_besik",
+            dikmeYuksekligiMm: Number(catiParam("dikmeYuksekligiMm") ?? 0),
             acikligMm: genislikMmKonteyner,
             egimYuzde: Number(catiParam("egimYuzde") ?? 0),
             catiUzunluguMm: uzunlukMmKonteyner,

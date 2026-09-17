@@ -2767,7 +2767,7 @@ interface KonteynerCatiDegerleri {
 }
 
 function konteynerCatiVarsayilan(): KonteynerCatiDegerleri {
-  return { catiTipi: "acik_besik", egimYuzde: 20, kafesAraligiHedefMm: 900, kaplamaTuru: "trapez_sac" };
+  return { catiTipi: "acik_besik", egimYuzde: 20, kafesAraligiHedefMm: 900, dikmeYuksekligiMm: 900, kaplamaTuru: "trapez_sac" };
 }
 
 /** Konteynerin bir duvarının ayarları - Çelik Duvar Paneli'ndeki (DuvarAlanlari) genişlik/yükseklik

@@ -3,6 +3,8 @@ import { PALET } from "./schematicShared";
 export interface TrussIsoVeri {
   /** bkz. TrussSchematic.tsx CatiKafesiSemaVeri.catiTipi. */
   catiTipi?: string;
+  /** bkz. TrussSchematic.tsx CatiKafesiSemaVeri.dikmeYuksekligiMm. */
+  dikmeYuksekligiMm?: number;
   acikligMm: number;
   egimYuzde: number;
   catiUzunluguMm: number;
@@ -33,6 +35,7 @@ interface Cizgi {
 export default function TrussIsometricView({ veri }: { veri: TrussIsoVeri }) {
   const {
     catiTipi = "acik_besik",
+    dikmeYuksekligiMm: dikmeYuksekligiMmGirdi,
     acikligMm,
     egimYuzde,
     catiUzunluguMm,
@@ -50,6 +53,9 @@ export default function TrussIsometricView({ veri }: { veri: TrussIsoVeri }) {
   const yariAciklik = tekEgimliMi ? acikligMm : acikligMm / 2;
   const mahya = yariAciklik * (etkinEgimYuzde / 100);
   const ustBaslikUzunluk = Math.sqrt(yariAciklik ** 2 + mahya ** 2);
+  // Çatı katı: eğimli çatı gövdesi (rafter üçgeni) diz duvarının (kneewall) üzerine oturur - tüm
+  // çatı gövdesi T kadar yukarı kaydırılır, altına dikey diz duvarı postaları/rayları eklenir.
+  const T = catiTipi === "catikati" ? Math.max(0, dikmeYuksekligiMmGirdi ?? 0) : 0;
 
   const COS30 = Math.cos(Math.PI / 6);
   const SIN30 = Math.sin(Math.PI / 6);
@@ -59,10 +65,10 @@ export default function TrussIsometricView({ veri }: { veri: TrussIsoVeri }) {
   const kösePuanlari = [
     proj(0, 0, 0),
     proj(0, 0, acikligMm),
-    proj(0, mahya, yariAciklik),
+    proj(0, T + mahya, yariAciklik),
     proj(catiUzunluguMm, 0, 0),
     proj(catiUzunluguMm, 0, acikligMm),
-    proj(catiUzunluguMm, mahya, yariAciklik),
+    proj(catiUzunluguMm, T + mahya, yariAciklik),
   ];
   const minX = Math.min(...kösePuanlari.map((p) => p.sx));
   const maxX = Math.max(...kösePuanlari.map((p) => p.sx));
@@ -87,28 +93,36 @@ export default function TrussIsometricView({ veri }: { veri: TrussIsoVeri }) {
   const cizgi = (a: { x: number; y: number }, b: { x: number; y: number }, renk: string, kalinlik: number, kesikli?: boolean) =>
     cizgiler.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, renk, kalinlik, kesikli });
 
-  // Kafesler (üst başlık, alt başlık, kral kirişi)
+  // Kafesler (üst başlık, alt başlık, kral kirişi) - çatı katıda T kadar yukarıda oturur.
   for (const X of kafesXler) {
-    const eaveL = S(X, 0, 0);
-    const eaveR = S(X, 0, acikligMm);
-    const apex = S(X, mahya, yariAciklik);
-    const tabanOrta = S(X, 0, yariAciklik);
+    const eaveL = S(X, T, 0);
+    const eaveR = S(X, T, acikligMm);
+    const apex = S(X, T + mahya, yariAciklik);
+    const tabanOrta = S(X, T, yariAciklik);
     cizgi(eaveL, apex, PALET.ana, 2);
     if (!tekEgimliMi) cizgi(apex, eaveR, PALET.ana, 2);
     cizgi(eaveL, eaveR, PALET.ana, 1.5);
     cizgi(tabanOrta, apex, PALET.ikincil, 1.5, true);
+    if (T > 0) {
+      cizgi(S(X, 0, 0), eaveL, PALET.yatay, 2);
+      cizgi(S(X, 0, acikligMm), eaveR, PALET.yatay, 2);
+    }
+  }
+  if (T > 0) {
+    cizgi(S(0, 0, 0), S(catiUzunluguMm, 0, 0), PALET.yatay, 1.5);
+    cizgi(S(0, 0, acikligMm), S(catiUzunluguMm, 0, acikligMm), PALET.yatay, 1.5);
   }
 
   // Aşıklar (çatı uzunluğu boyunca; tek eğimlide tek yamaç, diğerlerinde iki yamaç)
   if (asikVar) {
     for (const oran of asikOranlari) {
-      const solBas = S(0, oran * mahya, oran * yariAciklik);
-      const solSon = S(catiUzunluguMm, oran * mahya, oran * yariAciklik);
+      const solBas = S(0, T + oran * mahya, oran * yariAciklik);
+      const solSon = S(catiUzunluguMm, T + oran * mahya, oran * yariAciklik);
       cizgi(solBas, solSon, PALET.vurgu, 1.5);
       if (!tekEgimliMi) {
         const sagZ = acikligMm - oran * yariAciklik;
-        const sagBas = S(0, oran * mahya, sagZ);
-        const sagSon = S(catiUzunluguMm, oran * mahya, sagZ);
+        const sagBas = S(0, T + oran * mahya, sagZ);
+        const sagSon = S(catiUzunluguMm, T + oran * mahya, sagZ);
         cizgi(sagBas, sagSon, PALET.vurgu, 1.5);
       }
     }
@@ -119,30 +133,69 @@ export default function TrussIsometricView({ veri }: { veri: TrussIsoVeri }) {
     const X0 = kafesXler[0];
     const X1 = kafesXler[1];
     // Yatay (üst başlık düzleminde; tek eğimlide tek yamaç, diğerlerinde iki yamaç)
-    cizgi(S(X0, 0, 0), S(X1, mahya, yariAciklik), PALET.stabilite, 2);
-    cizgi(S(X0, mahya, yariAciklik), S(X1, 0, 0), PALET.stabilite, 2);
+    cizgi(S(X0, T, 0), S(X1, T + mahya, yariAciklik), PALET.stabilite, 2);
+    cizgi(S(X0, T + mahya, yariAciklik), S(X1, T, 0), PALET.stabilite, 2);
     if (!tekEgimliMi) {
-      cizgi(S(X0, 0, acikligMm), S(X1, mahya, yariAciklik), PALET.stabilite, 2);
-      cizgi(S(X0, mahya, yariAciklik), S(X1, 0, acikligMm), PALET.stabilite, 2);
+      cizgi(S(X0, T, acikligMm), S(X1, T + mahya, yariAciklik), PALET.stabilite, 2);
+      cizgi(S(X0, T + mahya, yariAciklik), S(X1, T, acikligMm), PALET.stabilite, 2);
     }
     // Düşey (kral kirişleri/yüksek uç dikmeleri arasında)
-    cizgi(S(X0, 0, yariAciklik), S(X1, mahya, yariAciklik), PALET.yatay, 2);
-    cizgi(S(X0, mahya, yariAciklik), S(X1, 0, yariAciklik), PALET.yatay, 2);
+    cizgi(S(X0, T, yariAciklik), S(X1, T + mahya, yariAciklik), PALET.yatay, 2);
+    cizgi(S(X0, T + mahya, yariAciklik), S(X1, T, yariAciklik), PALET.yatay, 2);
   }
 
-  // Çatı kaplaması (yarı saydam, sadece görsel bağlam için) - tek eğimlide tek yamaç yüzeyi yeterli.
+  // Kırma: mahya, uçlarda köşelere inen pah (hip) hatlarıyla kısalır - açık beşikten farklı olarak
+  // kaplama yüzeyleri uçlarda üçgen pah yüzeyleriyle kapanır (dikdörtgen değil, altıgen taban).
+  const kirmaMi = catiTipi === "kirma";
+  const hipInsetMm = kirmaMi ? Math.min(yariAciklik, catiUzunluguMm / 2) : 0;
+  if (kirmaMi) {
+    const A0 = S(0, T, 0);
+    const Aend = S(catiUzunluguMm, T, 0);
+    const B0 = S(0, T, acikligMm);
+    const Bend = S(catiUzunluguMm, T, acikligMm);
+    const R0 = S(hipInsetMm, T + mahya, yariAciklik);
+    const R1 = S(catiUzunluguMm - hipInsetMm, T + mahya, yariAciklik);
+    cizgi(A0, R0, PALET.destek, 2);
+    cizgi(B0, R0, PALET.destek, 2);
+    cizgi(Aend, R1, PALET.destek, 2);
+    cizgi(Bend, R1, PALET.destek, 2);
+  }
+
+  // Çatı kaplaması (yarı saydam, sadece görsel bağlam için) - tek eğimlide tek yamaç yüzeyi yeterli;
+  // kırmada mahya kısalır ve uçlarda üçgen pah yüzeyleri eklenir.
   const kaplamaPoligonlari = kaplamaGoster
-    ? [
-        [S(0, 0, 0), S(0, mahya, yariAciklik), S(catiUzunluguMm, mahya, yariAciklik), S(catiUzunluguMm, 0, 0)],
-        ...(tekEgimliMi
-          ? []
-          : [[S(0, mahya, yariAciklik), S(0, 0, acikligMm), S(catiUzunluguMm, 0, acikligMm), S(catiUzunluguMm, mahya, yariAciklik)]]),
-      ]
+    ? kirmaMi
+      ? [
+          [S(0, T, 0), S(hipInsetMm, T + mahya, yariAciklik), S(catiUzunluguMm - hipInsetMm, T + mahya, yariAciklik), S(catiUzunluguMm, T, 0)],
+          [
+            S(hipInsetMm, T + mahya, yariAciklik),
+            S(0, T, acikligMm),
+            S(catiUzunluguMm, T, acikligMm),
+            S(catiUzunluguMm - hipInsetMm, T + mahya, yariAciklik),
+          ],
+          [S(0, T, 0), S(hipInsetMm, T + mahya, yariAciklik), S(0, T, acikligMm)],
+          [S(catiUzunluguMm, T, 0), S(catiUzunluguMm - hipInsetMm, T + mahya, yariAciklik), S(catiUzunluguMm, T, acikligMm)],
+        ]
+      : [
+          [S(0, T, 0), S(0, T + mahya, yariAciklik), S(catiUzunluguMm, T + mahya, yariAciklik), S(catiUzunluguMm, T, 0)],
+          ...(tekEgimliMi
+            ? []
+            : [
+                [
+                  S(0, T + mahya, yariAciklik),
+                  S(0, T, acikligMm),
+                  S(catiUzunluguMm, T, acikligMm),
+                  S(catiUzunluguMm, T + mahya, yariAciklik),
+                ],
+              ]),
+        ]
     : [];
 
   const lejant = [
     { renk: PALET.ana, etiket: "Başlık" },
-    { renk: PALET.ikincil, etiket: "Kral Kirişi" },
+    { renk: PALET.ikincil, etiket: tekEgimliMi ? "Yüksek Uç Dikmesi" : "Kral Kirişi" },
+    ...(T > 0 ? [{ renk: PALET.yatay, etiket: "Diz Duvarı (Kneewall)" }] : []),
+    ...(kirmaMi ? [{ renk: PALET.destek, etiket: "Kırma (Pah) Hattı" }] : []),
     ...(asikVar ? [{ renk: PALET.vurgu, etiket: "Aşık" }] : []),
     ...(stabiliteVar ? [{ renk: PALET.stabilite, etiket: "Yatay Stabilite" }] : []),
     ...(stabiliteVar ? [{ renk: PALET.yatay, etiket: "Düşey Stabilite" }] : []),

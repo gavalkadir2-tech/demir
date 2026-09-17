@@ -68,34 +68,96 @@ function ContainerGorunum3D({
     for (let i = 0; i < 4; i++) kirisler.push({ a: araKoseler[i], b: araKoseler[(i + 1) % 4], enMm: 40, renk: PALET.yatay });
   }
 
-  // "duz"/"sundurma" tek eğimlidir (mahya yok); diğer tipler (açık beşik/çatı katı/kırma) görsel
-  // olarak simetrik iki eğimli şemayı kullanır (bkz. server calc/roofTruss.ts CatiTipi).
+  // "duz"/"sundurma" tek eğimlidir (mahya yok); "kırma" uçlarda pah ile kısalır; "çatı katı" diz
+  // duvarının üzerine oturur; diğerleri (açık beşik) simetrik iki eğimli şemayı kullanır
+  // (bkz. server calc/roofTruss.ts CatiTipi).
   const tekEgimliMi = cati?.catiTipi === "duz" || cati?.catiTipi === "sundurma";
+  const kirmaMi = cati?.catiTipi === "kirma";
   const etkinEgimYuzde = cati?.catiTipi === "duz" ? 0 : cati?.egimYuzde ?? 0;
   const yariAciklikMm = cati ? (tekEgimliMi ? cati.acikligMm : cati.acikligMm / 2) : 0;
   const mahyaYuksekligiMm = cati ? yariAciklikMm * (etkinEgimYuzde / 100) : 0;
+  // Çatı katı: çatı gövdesi diz duvarının (kneewall) üzerine oturur - taban kat duvarlarının
+  // tepesinden dikmeYuksekligiMm kadar yukarıda başlar, altına dikey diz duvarı postaları eklenir.
+  const dikmeYuksekligiMm = cati?.catiTipi === "catikati" ? Math.max(0, cati.dikmeYuksekligiMm ?? 0) : 0;
+  const catiTabanY = toplamYukseklikMm + dikmeYuksekligiMm;
+  if (dikmeYuksekligiMm > 0) {
+    kirisler.push({ a: [0, catiTabanY, 0], b: [uzunlukMm, catiTabanY, 0], enMm: 40, renk: PALET.yatay });
+    kirisler.push({ a: [0, catiTabanY, genislikMm], b: [uzunlukMm, catiTabanY, genislikMm], enMm: 40, renk: PALET.yatay });
+    for (const x of [0, uzunlukMm]) {
+      kirisler.push({ a: [x, toplamYukseklikMm, 0], b: [x, catiTabanY, 0], enMm: 40, renk: PALET.yatay });
+      kirisler.push({ a: [x, toplamYukseklikMm, genislikMm], b: [x, catiTabanY, genislikMm], enMm: 40, renk: PALET.yatay });
+    }
+  }
   if (cati && mahyaYuksekligiMm > 0 && tekEgimliMi) {
     // Sundurma: tek eğimli, mahya yok - genişlik ekseninin bir tarafı (z = genislikMm) yüksek kenar.
-    const highY = toplamYukseklikMm + mahyaYuksekligiMm;
+    const highY = catiTabanY + mahyaYuksekligiMm;
     const highA: Nokta3D = [0, highY, genislikMm];
     const highB: Nokta3D = [uzunlukMm, highY, genislikMm];
     kirisler.push({ a: highA, b: highB, enMm: 60, renk: PALET.ikincil, etiket: `Yüksek kenar ${mmEtiket(Math.round(mahyaYuksekligiMm))}` });
-    kirisler.push({ a: ustKoseler[3], b: highA, enMm: 40, renk: PALET.ikincil });
-    kirisler.push({ a: ustKoseler[2], b: highB, enMm: 40, renk: PALET.ikincil });
-    yuzeyler.push({ noktalar: [ustKoseler[0], ustKoseler[1], highB, highA], fill: PALET.ikincil, fillOpacity: 0.45 });
+    kirisler.push({ a: [0, catiTabanY, genislikMm], b: highA, enMm: 40, renk: PALET.ikincil });
+    kirisler.push({ a: [uzunlukMm, catiTabanY, genislikMm], b: highB, enMm: 40, renk: PALET.ikincil });
+    yuzeyler.push({
+      noktalar: [
+        [0, catiTabanY, 0],
+        [uzunlukMm, catiTabanY, 0],
+        highB,
+        highA,
+      ],
+      fill: PALET.ikincil,
+      fillOpacity: 0.45,
+    });
+  } else if (cati && mahyaYuksekligiMm > 0 && kirmaMi) {
+    // Kırma: mahya uçlarda köşelere inen pah hatlarıyla kısalır - açık beşikten farklı olarak
+    // kaplama yüzeyleri uçlarda üçgen pah yüzeyleriyle kapanır.
+    const hipInsetMm = Math.min(yariAciklikMm, uzunlukMm / 2);
+    const ridgeY = catiTabanY + mahyaYuksekligiMm;
+    const ridgeZ = genislikMm / 2;
+    const R0: Nokta3D = [hipInsetMm, ridgeY, ridgeZ];
+    const R1: Nokta3D = [uzunlukMm - hipInsetMm, ridgeY, ridgeZ];
+    const A0: Nokta3D = [0, catiTabanY, 0];
+    const Aend: Nokta3D = [uzunlukMm, catiTabanY, 0];
+    const B0: Nokta3D = [0, catiTabanY, genislikMm];
+    const Bend: Nokta3D = [uzunlukMm, catiTabanY, genislikMm];
+    kirisler.push({ a: R0, b: R1, enMm: 60, renk: PALET.ikincil, etiket: `Mahya ${mmEtiket(Math.round(mahyaYuksekligiMm))}` });
+    kirisler.push({ a: A0, b: R0, enMm: 40, renk: PALET.destek });
+    kirisler.push({ a: B0, b: R0, enMm: 40, renk: PALET.destek });
+    kirisler.push({ a: Aend, b: R1, enMm: 40, renk: PALET.destek });
+    kirisler.push({ a: Bend, b: R1, enMm: 40, renk: PALET.destek });
+    yuzeyler.push({ noktalar: [A0, Aend, R1, R0], fill: PALET.ikincil, fillOpacity: 0.45 });
+    yuzeyler.push({ noktalar: [R0, R1, Bend, B0], fill: PALET.ikincil, fillOpacity: 0.45 });
+    yuzeyler.push({ noktalar: [A0, R0, B0], fill: PALET.ikincil, fillOpacity: 0.45 });
+    yuzeyler.push({ noktalar: [Aend, R1, Bend], fill: PALET.ikincil, fillOpacity: 0.45 });
   } else if (cati && mahyaYuksekligiMm > 0) {
-    const ridgeY = toplamYukseklikMm + mahyaYuksekligiMm;
+    const ridgeY = catiTabanY + mahyaYuksekligiMm;
     const ridgeZ = genislikMm / 2;
     const ridgeA: Nokta3D = [0, ridgeY, ridgeZ];
     const ridgeB: Nokta3D = [uzunlukMm, ridgeY, ridgeZ];
     kirisler.push({ a: ridgeA, b: ridgeB, enMm: 60, renk: PALET.ikincil, etiket: `Mahya ${mmEtiket(Math.round(mahyaYuksekligiMm))}` });
-    kirisler.push({ a: ustKoseler[0], b: ridgeA, enMm: 40, renk: PALET.ikincil });
-    kirisler.push({ a: ustKoseler[3], b: ridgeA, enMm: 40, renk: PALET.ikincil });
-    kirisler.push({ a: ustKoseler[1], b: ridgeB, enMm: 40, renk: PALET.ikincil });
-    kirisler.push({ a: ustKoseler[2], b: ridgeB, enMm: 40, renk: PALET.ikincil });
+    kirisler.push({ a: [0, catiTabanY, 0], b: ridgeA, enMm: 40, renk: PALET.ikincil });
+    kirisler.push({ a: [0, catiTabanY, genislikMm], b: ridgeA, enMm: 40, renk: PALET.ikincil });
+    kirisler.push({ a: [uzunlukMm, catiTabanY, 0], b: ridgeB, enMm: 40, renk: PALET.ikincil });
+    kirisler.push({ a: [uzunlukMm, catiTabanY, genislikMm], b: ridgeB, enMm: 40, renk: PALET.ikincil });
     // İki eğimli çatı yüzeyi (mahyanın iki yanı).
-    yuzeyler.push({ noktalar: [ustKoseler[0], ustKoseler[1], ridgeB, ridgeA], fill: PALET.ikincil, fillOpacity: 0.45 });
-    yuzeyler.push({ noktalar: [ridgeA, ridgeB, ustKoseler[2], ustKoseler[3]], fill: PALET.ikincil, fillOpacity: 0.45 });
+    yuzeyler.push({
+      noktalar: [
+        [0, catiTabanY, 0],
+        [uzunlukMm, catiTabanY, 0],
+        ridgeB,
+        ridgeA,
+      ],
+      fill: PALET.ikincil,
+      fillOpacity: 0.45,
+    });
+    yuzeyler.push({
+      noktalar: [
+        ridgeA,
+        ridgeB,
+        [uzunlukMm, catiTabanY, genislikMm],
+        [0, catiTabanY, genislikMm],
+      ],
+      fill: PALET.ikincil,
+      fillOpacity: 0.45,
+    });
   } else {
     // Çatı eklenmemişse (veya düz çatı tipi) düz bir üst yüzey (tavan) göster ki kutu tamamen kapalı görünsün.
     yuzeyler.push({ noktalar: ustKoseler, fill: PALET.ana, fillOpacity: 0.3 });
@@ -118,7 +180,9 @@ function ContainerGorunum3D({
   const lejant = [
     { renk: PALET.ana, etiket: "Duvarlar (kutu, basitleştirilmiş)" },
     ...(katSayisi === 2 ? [{ renk: PALET.yatay, etiket: "Kat ayrımı" }] : []),
+    ...(dikmeYuksekligiMm > 0 ? [{ renk: PALET.yatay, etiket: "Çatı katı diz duvarı" }] : []),
     ...(cati && mahyaYuksekligiMm > 0 ? [{ renk: PALET.ikincil, etiket: "Çatı (basitleştirilmiş)" }] : []),
+    ...(cati && mahyaYuksekligiMm > 0 && kirmaMi ? [{ renk: PALET.destek, etiket: "Kırma (pah) hattı" }] : []),
     ...((onDuvarBosluklari?.length ?? 0) > 0 ? [{ renk: PALET.vurgu, etiket: "Ön duvar boşlukları" }] : []),
   ];
 

@@ -19,6 +19,9 @@ export interface CatiKafesiSemaVeri {
    * çizim) varsayılır. Sadece "duz"/"sundurma" (tek eğimli) çizim geometrisini değiştirir;
    * "catikati"/"kirma" görsel olarak açık beşik ile aynı basitleştirilmiş şemayı kullanır. */
   catiTipi?: string;
+  /** catiTipi "catikati" ise: diz duvarı (kneewall) yüksekliği (mm) - görsellerde eğimli çatının
+   * altına eklenen dikey duvar bölümü olarak gösterilir. */
+  dikmeYuksekligiMm?: number;
   acikligMm: number;
   egimYuzde: number;
   catiUzunluguMm: number;
@@ -55,6 +58,7 @@ const PANEL_B_TOTAL_H = PANEL_B_LEGEND_Y + 32;
 function KesitGorunumu({ veri }: { veri: CatiKafesiSemaVeri }) {
   const {
     catiTipi = "acik_besik",
+    dikmeYuksekligiMm: dikmeYuksekligiMmGirdi,
     acikligMm,
     egimYuzde,
     asikVar = false,
@@ -77,19 +81,24 @@ function KesitGorunumu({ veri }: { veri: CatiKafesiSemaVeri }) {
   const ustBaslikUzunlukMm = Math.sqrt(yariAciklikMm ** 2 + mahyaYuksekligiMm ** 2);
   const asikSatirSayisiPerSide = asikVar ? Math.max(2, Math.ceil(ustBaslikUzunlukMm / asikAraligiHedefMm) + 1) : 0;
   const M = diyagonalVar ? diyagonalPanelSayisi : 0;
+  // Çatı katı: eğimli çatı gövdesi diz duvarının (kneewall) üzerine oturur - görsel olarak triangle
+  // (rafter üçgeni) yukarı kaydırılır, altına dikey diz duvarı çizilir.
+  const dikmeYuksekligiMm = catiTipi === "catikati" ? Math.max(0, dikmeYuksekligiMmGirdi ?? 0) : 0;
 
   const drawW = VIEW_W - MARGIN_LEFT - MARGIN_RIGHT;
-  const scale = Math.min(drawW / acikligMm, PANEL_A_H / Math.max(mahyaYuksekligiMm, acikligMm / 6));
+  const scale = Math.min(drawW / acikligMm, PANEL_A_H / Math.max(mahyaYuksekligiMm + dikmeYuksekligiMm, acikligMm / 6));
 
   const scaledAciklik = acikligMm * scale;
   const scaledMahya = mahyaYuksekligiMm * scale;
+  const scaledDikme = dikmeYuksekligiMm * scale;
 
   const x0 = MARGIN_LEFT;
-  const groundY = PANEL_A_TOP + PANEL_A_H;
+  const zeminY = PANEL_A_TOP + PANEL_A_H;
+  const tabanY = zeminY - scaledDikme;
   const xOrta = tekEgimliMi ? x0 + scaledAciklik : x0 + scaledAciklik / 2;
-  const tepeY = groundY - scaledMahya;
+  const tepeY = tabanY - scaledMahya;
 
-  const gövde = `${x0},${groundY} ${xOrta},${tepeY} ${x0 + scaledAciklik},${groundY}`;
+  const gövde = `${x0},${tabanY} ${xOrta},${tepeY} ${x0 + scaledAciklik},${tabanY}`;
   const baslikKalinlik = olcekliKalinlikPx(ustBaslikKesit?.kalinlikMm ?? 40, scale, 2.5);
   const kralKirisiKalinlik = olcekliKalinlikPx(kralKirisiKesit?.kalinlikMm ?? 30, scale, 2);
 
@@ -110,8 +119,8 @@ function KesitGorunumu({ veri }: { veri: CatiKafesiSemaVeri }) {
   const caprazCizgileri =
     M > 0
       ? [
-          ...zigzagSegmentleri(x0, xOrta, groundY, tepeY, M),
-          ...(tekEgimliMi ? [] : zigzagSegmentleri(x0 + scaledAciklik, xOrta, groundY, tepeY, M)),
+          ...zigzagSegmentleri(x0, xOrta, tabanY, tepeY, M),
+          ...(tekEgimliMi ? [] : zigzagSegmentleri(x0 + scaledAciklik, xOrta, tabanY, tepeY, M)),
         ]
       : [];
 
@@ -129,17 +138,18 @@ function KesitGorunumu({ veri }: { veri: CatiKafesiSemaVeri }) {
   const direkCizgileriListesi =
     direkSayisi > 0
       ? [
-          ...direkCizgileri(x0, xOrta, groundY, tepeY, direkSayisi, direkPanelSayisi),
-          ...(tekEgimliMi ? [] : direkCizgileri(x0 + scaledAciklik, xOrta, groundY, tepeY, direkSayisi, direkPanelSayisi)),
+          ...direkCizgileri(x0, xOrta, tabanY, tepeY, direkSayisi, direkPanelSayisi),
+          ...(tekEgimliMi ? [] : direkCizgileri(x0 + scaledAciklik, xOrta, tabanY, tepeY, direkSayisi, direkPanelSayisi)),
         ]
       : [];
 
-  const dimAciklikY = groundY + 30;
+  const dimAciklikY = zeminY + 30;
   const dimYukseklikX = x0 - 30;
 
   const lejant = [
     { renk: PALET.ana, etiket: "Üst/Alt Başlık" },
-    { renk: PALET.ikincil, etiket: "Kral Kirişi" },
+    { renk: PALET.ikincil, etiket: tekEgimliMi ? "Yüksek Uç Dikmesi" : "Kral Kirişi" },
+    ...(dikmeYuksekligiMm > 0 ? [{ renk: PALET.yatay, etiket: "Diz Duvarı (Kneewall)" }] : []),
     ...(direkSayisi > 0 ? [{ renk: PALET.yatay, etiket: "Direk" }] : []),
     ...(M > 0 ? [{ renk: PALET.destek, etiket: "Çapraz Destek" }] : []),
     ...(asikVar ? [{ renk: PALET.vurgu, etiket: "Aşık" }] : []),
@@ -152,15 +162,22 @@ function KesitGorunumu({ veri }: { veri: CatiKafesiSemaVeri }) {
       <text x={x0} y={PANEL_A_TOP - 6} fontSize={11} fill="#a3a3a3">
         Kesit görünüşü (bir kafes)
       </text>
-      <line x1={x0 - 15} y1={groundY} x2={x0 + scaledAciklik + 15} y2={groundY} stroke="#a3a3a3" strokeWidth={2} />
+      <line x1={x0 - 15} y1={zeminY} x2={x0 + scaledAciklik + 15} y2={zeminY} stroke="#a3a3a3" strokeWidth={2} />
+
+      {dikmeYuksekligiMm > 0 && (
+        <>
+          <line x1={x0} y1={zeminY} x2={x0} y2={tabanY} stroke={PALET.yatay} strokeWidth={baslikKalinlik} />
+          <line x1={x0 + scaledAciklik} y1={zeminY} x2={x0 + scaledAciklik} y2={tabanY} stroke={PALET.yatay} strokeWidth={baslikKalinlik} />
+        </>
+      )}
 
       <polygon points={gövde} fill="#e5e5e5" stroke="none" />
-      <line x1={x0} y1={groundY} x2={x0 + scaledAciklik} y2={groundY} stroke={PALET.ana} strokeWidth={baslikKalinlik} />
-      <line x1={x0} y1={groundY} x2={xOrta} y2={tepeY} stroke={PALET.ana} strokeWidth={baslikKalinlik} />
+      <line x1={x0} y1={tabanY} x2={x0 + scaledAciklik} y2={tabanY} stroke={PALET.ana} strokeWidth={baslikKalinlik} />
+      <line x1={x0} y1={tabanY} x2={xOrta} y2={tepeY} stroke={PALET.ana} strokeWidth={baslikKalinlik} />
       {!tekEgimliMi && (
-        <line x1={x0 + scaledAciklik} y1={groundY} x2={xOrta} y2={tepeY} stroke={PALET.ana} strokeWidth={baslikKalinlik} />
+        <line x1={x0 + scaledAciklik} y1={tabanY} x2={xOrta} y2={tepeY} stroke={PALET.ana} strokeWidth={baslikKalinlik} />
       )}
-      <line x1={xOrta} y1={groundY} x2={xOrta} y2={tepeY} stroke={PALET.ikincil} strokeWidth={kralKirisiKalinlik} strokeDasharray="5 3" />
+      <line x1={xOrta} y1={tabanY} x2={xOrta} y2={tepeY} stroke={PALET.ikincil} strokeWidth={kralKirisiKalinlik} strokeDasharray="5 3" />
       {direkCizgileriListesi.map((c, i) => (
         <line key={i} x1={c.x1} y1={c.y1} x2={c.x2} y2={c.y2} stroke={PALET.yatay} strokeWidth={2.5} />
       ))}
@@ -170,11 +187,11 @@ function KesitGorunumu({ veri }: { veri: CatiKafesiSemaVeri }) {
       {asikVar &&
         Array.from({ length: asikSatirSayisiPerSide }, (_, i) => i / (asikSatirSayisiPerSide - 1)).map((oran, i) => (
           <g key={i}>
-            <circle cx={x0 + oran * (xOrta - x0)} cy={groundY + oran * (tepeY - groundY)} r={Math.max(2, olcekliKalinlikPx(asikKesit?.enMm ?? 30, scale) / 2)} fill={PALET.vurgu} />
+            <circle cx={x0 + oran * (xOrta - x0)} cy={tabanY + oran * (tepeY - tabanY)} r={Math.max(2, olcekliKalinlikPx(asikKesit?.enMm ?? 30, scale) / 2)} fill={PALET.vurgu} />
             {!tekEgimliMi && (
               <circle
                 cx={x0 + scaledAciklik - oran * (x0 + scaledAciklik - xOrta)}
-                cy={groundY + oran * (tepeY - groundY)}
+                cy={tabanY + oran * (tepeY - tabanY)}
                 r={Math.max(2, olcekliKalinlikPx(asikKesit?.enMm ?? 30, scale) / 2)}
                 fill={PALET.vurgu}
               />
@@ -183,7 +200,8 @@ function KesitGorunumu({ veri }: { veri: CatiKafesiSemaVeri }) {
         ))}
 
       <YatayOlcu x1={x0} x2={x0 + scaledAciklik} y={dimAciklikY} etiket={mmEtiket(acikligMm)} />
-      <DikeyOlcu y1={tepeY} y2={groundY} x={dimYukseklikX} etiket={mmEtiket(mahyaYuksekligiMm)} />
+      <DikeyOlcu y1={tepeY} y2={tabanY} x={dimYukseklikX} etiket={mmEtiket(mahyaYuksekligiMm)} />
+      {dikmeYuksekligiMm > 0 && <DikeyOlcu y1={tabanY} y2={zeminY} x={dimYukseklikX} etiket={mmEtiket(dikmeYuksekligiMm)} />}
       <text x={xOrta} y={tepeY - 10} textAnchor="middle" fontSize={12} fill="#525252">
         eğim %{etkinEgimYuzde} · başlık {mmEtiket(ustBaslikUzunlukMm)}
       </text>
@@ -344,6 +362,7 @@ export default function TrussSchematic({
         <TrussIsometricView
           veri={{
             catiTipi: veri.catiTipi,
+            dikmeYuksekligiMm: veri.dikmeYuksekligiMm,
             acikligMm,
             egimYuzde: veri.egimYuzde,
             catiUzunluguMm,
