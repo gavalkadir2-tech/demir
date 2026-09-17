@@ -39,6 +39,8 @@ interface KonteynerPdfBilgi {
   katSayisi: number;
   catiVar?: boolean;
   catiEgimYuzde?: number;
+  /** bkz. client CatiKafesiSemaVeri.catiTipi / server calc/roofTruss.ts CatiTipi. */
+  catiTipi?: string;
 }
 
 /** Konteyner ürününün paramsJson'ından PDF'te çizim için gereken temel ölçüleri çıkarır. */
@@ -49,13 +51,17 @@ function konteynerPdfBilgisiCikar(paramsJson: unknown): KonteynerPdfBilgi | null
   const uzunlukMm = Number(p.uzunlukMm);
   if (!genislikMm || !uzunlukMm) return null;
   const cati = p.cati as Record<string, unknown> | undefined;
+  const catiTipi = cati && typeof cati.catiTipi === "string" ? cati.catiTipi : undefined;
   return {
     genislikMm,
     uzunlukMm,
     katYuksekligiMm: Number(p.katYuksekligiMm) || 0,
     katSayisi: Number(p.katSayisi) === 2 ? 2 : 1,
     catiVar: Boolean(p.catiVar),
-    catiEgimYuzde: cati ? Number(cati.egimYuzde) || undefined : undefined,
+    // "duz" çatı tipinde eğim hesaplama motorunda yok sayılır (bkz. calc/roofTruss.ts) - burada da
+    // ham girdi değeri değil, gerçekte uygulanan %0 gösterilmeli.
+    catiEgimYuzde: cati && catiTipi !== "duz" ? Number(cati.egimYuzde) || undefined : undefined,
+    catiTipi,
   };
 }
 
@@ -65,7 +71,7 @@ function konteynerPdfBilgisiCikar(paramsJson: unknown): KonteynerPdfBilgi | null
 function konteynerSemaCiz(doc: PDFKit.PDFDocument, bilgi: KonteynerPdfBilgi, x: number, y: number): number {
   const maxW = 180;
   const maxH = 80;
-  const { genislikMm, uzunlukMm, katYuksekligiMm, katSayisi, catiVar, catiEgimYuzde } = bilgi;
+  const { genislikMm, uzunlukMm, katYuksekligiMm, katSayisi, catiVar, catiEgimYuzde, catiTipi = "acik_besik" } = bilgi;
   const scale = Math.min(maxW / uzunlukMm, maxH / genislikMm);
   const w = Math.max(30, uzunlukMm * scale);
   const h = Math.max(20, genislikMm * scale);
@@ -76,26 +82,49 @@ function konteynerSemaCiz(doc: PDFKit.PDFDocument, bilgi: KonteynerPdfBilgi, x: 
 
   doc.fontSize(7).font("Govde").fillColor("#666");
   const olcuMetni = `${Math.round(uzunlukMm)} x ${Math.round(genislikMm)} mm, kat yüksekliği ${Math.round(katYuksekligiMm)} mm, ${katSayisi} kat${
-    catiVar ? `, çatı eğimi %${catiEgimYuzde ?? "-"}` : ""
+    catiVar ? (catiTipi === "duz" ? ", çatı eğimsiz (düz)" : `, çatı eğimi %${catiEgimYuzde ?? "-"}`) : ""
   }`;
   doc.text(olcuMetni, x, boxY + h + 6, { width: Math.max(w, 260) });
 
   let sonrakiY = boxY + h + 22;
 
   if (catiVar) {
+    // "duz" eğimsizdir (mahya yok, tek düz çizgi); "sundurma" tek eğimlidir (mahya yok, tek eğik
+    // çizgi); diğerleri (açık beşik/çatı katı/kırma) görsel olarak simetrik iki eğimli üçgeni
+    // kullanır - bkz. client TrussSchematic/TrussIsometricView'daki aynı basitleştirme.
     const roofBaseY = sonrakiY + 32;
     const ridgeX = x + w / 2;
     const ridgeY = roofBaseY - 26;
-    doc
-      .moveTo(x, roofBaseY)
-      .lineTo(ridgeX, ridgeY)
-      .lineTo(x + w, roofBaseY)
-      .strokeColor("#7c3aed")
-      .lineWidth(1)
-      .stroke();
-    doc.moveTo(x, roofBaseY).lineTo(x + w, roofBaseY).strokeColor("#404040").stroke();
-    doc.fontSize(7).fillColor("#666").text("Çatı kesiti (temsili, ölçekli değil)", x, roofBaseY + 4);
-    sonrakiY = roofBaseY + 18;
+    const CATI_TIPI_ETIKET: Record<string, string> = {
+      duz: "Düz (yassı) çatı - eğimsiz (temsili, ölçekli değil)",
+      sundurma: "Sundurma çatı - tek eğimli (temsili, ölçekli değil)",
+      catikati: "Çatı katı kesiti - diz duvarı üzerinde (temsili, ölçekli değil)",
+      kirma: "Kırma çatı kesiti - uçlarda pah eklenir (temsili, ölçekli değil)",
+      acik_besik: "Açık beşik çatı kesiti (temsili, ölçekli değil)",
+    };
+    if (catiTipi === "duz") {
+      doc.moveTo(x, roofBaseY).lineTo(x + w, roofBaseY).strokeColor("#7c3aed").lineWidth(1.5).stroke();
+    } else if (catiTipi === "sundurma") {
+      doc.moveTo(x, roofBaseY).lineTo(x + w, ridgeY).strokeColor("#7c3aed").lineWidth(1.5).stroke();
+    } else {
+      doc
+        .moveTo(x, roofBaseY)
+        .lineTo(ridgeX, ridgeY)
+        .lineTo(x + w, roofBaseY)
+        .strokeColor("#7c3aed")
+        .lineWidth(1)
+        .stroke();
+    }
+    if (catiTipi === "catikati") {
+      const dizY = roofBaseY + 10;
+      doc.moveTo(x, roofBaseY).lineTo(x, dizY).strokeColor("#2563eb").lineWidth(1.5).stroke();
+      doc.moveTo(x + w, roofBaseY).lineTo(x + w, dizY).strokeColor("#2563eb").lineWidth(1.5).stroke();
+      doc.moveTo(x, dizY).lineTo(x + w, dizY).strokeColor("#404040").stroke();
+    } else {
+      doc.moveTo(x, roofBaseY).lineTo(x + w, roofBaseY).strokeColor("#404040").stroke();
+    }
+    doc.fontSize(7).fillColor("#666").text(CATI_TIPI_ETIKET[catiTipi] ?? CATI_TIPI_ETIKET.acik_besik, x, roofBaseY + (catiTipi === "catikati" ? 14 : 4));
+    sonrakiY = roofBaseY + (catiTipi === "catikati" ? 28 : 18);
   }
 
   doc.fillColor("#000").font("Govde").fontSize(10);
