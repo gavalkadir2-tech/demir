@@ -385,3 +385,146 @@ test("çatı kafesi: elle ayarlanmış kafesSayisiOverride otomatik hedef aralı
   const altBaslik = sonuc.parcalar.find((p) => p.label === "Alt başlık")!;
   assert.equal(altBaslik.adet, 7);
 });
+
+test("çatı tipi: catiTipi verilmezse varsayılan 'acik_besik' ile aynı sonucu üretir", () => {
+  const girdiOrtak = {
+    acikligMm: 6000,
+    egimYuzde: 30,
+    catiUzunluguMm: 9000,
+    kafesAraligiHedefMm: 900,
+    ustBaslikProfilKey: "ust",
+    altBaslikProfilKey: "alt",
+  };
+  const varsayilan = calculateRoofTruss(girdiOrtak);
+  const acikca = calculateRoofTruss({ ...girdiOrtak, catiTipi: "acik_besik" as const });
+  assert.deepEqual(varsayilan.ozetDegerler, acikca.ozetDegerler);
+  assert.deepEqual(varsayilan.parcalar, acikca.parcalar);
+});
+
+test("çatı tipi 'duz': eğim yok sayılır, tek yüzey (mahya yok)", () => {
+  const sonuc = calculateRoofTruss({
+    catiTipi: "duz",
+    acikligMm: 6000,
+    egimYuzde: 30, // yok sayılmalı
+    catiUzunluguMm: 9000,
+    kafesAraligiHedefMm: 900,
+    ustBaslikProfilKey: "ust",
+    altBaslikProfilKey: "alt",
+  });
+
+  assert.equal(sonuc.ozetDegerler.mahyaYuksekligiMm, 0);
+  assert.equal(sonuc.ozetDegerler.egimDerece, 0);
+  // Tek yüzey: üst başlık uzunluğu doğrudan açıklığa eşit.
+  assert.equal(sonuc.ozetDegerler.ustBaslikUzunlukMm, 6000);
+  // Tek yamaç -> çatı alanı = açıklık x uzunluk (iki eğimli gibi 2 katı değil).
+  assert.equal(sonuc.ozetDegerler.catiAlaniM2, 54);
+
+  const ustBaslik = sonuc.parcalar.find((p) => p.label === "Üst başlık")!;
+  assert.equal(ustBaslik.adet, 11); // 1 yamaç x 11 kafes (2 değil)
+
+  assert.ok(sonuc.uyarilar.some((u) => u.includes("eğim dikkate alınmaz")));
+});
+
+test("çatı tipi 'sundurma': tek eğimli, açıklığın tamamı tek yamaç", () => {
+  const sonuc = calculateRoofTruss({
+    catiTipi: "sundurma",
+    acikligMm: 6000,
+    egimYuzde: 30,
+    catiUzunluguMm: 9000,
+    kafesAraligiHedefMm: 900,
+    ustBaslikProfilKey: "ust",
+    altBaslikProfilKey: "alt",
+    kralKirisiProfilKey: "kral",
+  });
+
+  // Tam açıklık (6000) x eğim (%30) üzerinden hesaplanan yükseklik.
+  assert.equal(sonuc.ozetDegerler.mahyaYuksekligiMm, 1800);
+  const beklenenUstBaslik = Math.round(Math.sqrt(6000 ** 2 + 1800 ** 2));
+  assert.equal(sonuc.ozetDegerler.ustBaslikUzunlukMm, beklenenUstBaslik);
+
+  const ustBaslik = sonuc.parcalar.find((p) => p.label === "Üst başlık")!;
+  assert.equal(ustBaslik.adet, 11); // 1 yamaç x 11 kafes
+
+  // Mahya yerine "yüksek uç dikmesi" olarak etiketlenmeli.
+  assert.ok(sonuc.parcalar.some((p) => p.label === "Yüksek uç dikmesi"));
+  assert.ok(!sonuc.parcalar.some((p) => p.label === "Kral kirişi"));
+});
+
+test("çatı tipi 'catikati': diz duvarı (kneewall) dikmesi ek parça olarak eklenir", () => {
+  const sonuc = calculateRoofTruss({
+    catiTipi: "catikati",
+    acikligMm: 6000,
+    egimYuzde: 30,
+    catiUzunluguMm: 9000,
+    kafesAraligiHedefMm: 900,
+    ustBaslikProfilKey: "ust",
+    altBaslikProfilKey: "alt",
+    dikmeYuksekligiMm: 900,
+    dikmeDuvarProfilKey: "dizduvari",
+  });
+
+  const dizDuvari = sonuc.parcalar.find((p) => p.label === "Çatı katı diz duvarı dikmesi")!;
+  assert.ok(dizDuvari);
+  assert.equal(dizDuvari.uzunlukMm, 900);
+  assert.equal(dizDuvari.adet, 22); // 2 yamaç x 11 kafes (açık beşik gibi iki eğimli)
+  assert.equal(dizDuvari.profilKey, "dizduvari");
+
+  // Geometri açık beşik ile aynı kalmalı (sadece ek diz duvarı eklendi).
+  assert.equal(sonuc.ozetDegerler.mahyaYuksekligiMm, 900);
+});
+
+test("çatı tipi 'catikati': diz duvarı yüksekliği girilip profili verilmezse hata fırlatır", () => {
+  assert.throws(
+    () =>
+      calculateRoofTruss({
+        catiTipi: "catikati",
+        acikligMm: 6000,
+        egimYuzde: 30,
+        catiUzunluguMm: 9000,
+        kafesAraligiHedefMm: 900,
+        ustBaslikProfilKey: "ust",
+        altBaslikProfilKey: "alt",
+        dikmeYuksekligiMm: 900,
+      }),
+    HesaplamaHatasi
+  );
+});
+
+test("çatı tipi 'kirma': köşe kırma kirişleri ve ara dikmeler (jack rafter) eklenir", () => {
+  const sonuc = calculateRoofTruss({
+    catiTipi: "kirma",
+    acikligMm: 6000,
+    egimYuzde: 30,
+    catiUzunluguMm: 9000,
+    kafesAraligiHedefMm: 900,
+    ustBaslikProfilKey: "ust",
+    altBaslikProfilKey: "alt",
+  });
+
+  const kirmaKirisi = sonuc.parcalar.find((p) => p.label === "Kırma (pah) kirişi")!;
+  assert.ok(kirmaKirisi);
+  assert.equal(kirmaKirisi.adet, 4);
+  const beklenenKirmaUzunluk = Math.ceil(Math.sqrt(2 * 3000 ** 2 + 900 ** 2));
+  assert.equal(kirmaKirisi.uzunlukMm, beklenenKirmaUzunluk);
+  assert.equal(kirmaKirisi.profilKey, "ust"); // verilmezse üst başlık profili kullanılır
+
+  const jackRafter = sonuc.parcalar.find((p) => p.label.includes("jack rafter"))!;
+  assert.ok(jackRafter);
+  assert.equal(jackRafter.adet, 6);
+});
+
+test("çatı tipi 'kirma': çatı uzunluğu açıklıktan küçük/eşitse hata fırlatır", () => {
+  assert.throws(
+    () =>
+      calculateRoofTruss({
+        catiTipi: "kirma",
+        acikligMm: 6000,
+        egimYuzde: 30,
+        catiUzunluguMm: 6000, // açıklığa eşit, kırma başları için yer yok
+        kafesAraligiHedefMm: 900,
+        ustBaslikProfilKey: "ust",
+        altBaslikProfilKey: "alt",
+      }),
+    HesaplamaHatasi
+  );
+});

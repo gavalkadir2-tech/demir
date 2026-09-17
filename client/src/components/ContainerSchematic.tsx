@@ -68,8 +68,22 @@ function ContainerGorunum3D({
     for (let i = 0; i < 4; i++) kirisler.push({ a: araKoseler[i], b: araKoseler[(i + 1) % 4], enMm: 40, renk: PALET.yatay });
   }
 
-  const mahyaYuksekligiMm = cati ? (cati.acikligMm / 2) * (cati.egimYuzde / 100) : 0;
-  if (cati && mahyaYuksekligiMm > 0) {
+  // "duz"/"sundurma" tek eğimlidir (mahya yok); diğer tipler (açık beşik/çatı katı/kırma) görsel
+  // olarak simetrik iki eğimli şemayı kullanır (bkz. server calc/roofTruss.ts CatiTipi).
+  const tekEgimliMi = cati?.catiTipi === "duz" || cati?.catiTipi === "sundurma";
+  const etkinEgimYuzde = cati?.catiTipi === "duz" ? 0 : cati?.egimYuzde ?? 0;
+  const yariAciklikMm = cati ? (tekEgimliMi ? cati.acikligMm : cati.acikligMm / 2) : 0;
+  const mahyaYuksekligiMm = cati ? yariAciklikMm * (etkinEgimYuzde / 100) : 0;
+  if (cati && mahyaYuksekligiMm > 0 && tekEgimliMi) {
+    // Sundurma: tek eğimli, mahya yok - genişlik ekseninin bir tarafı (z = genislikMm) yüksek kenar.
+    const highY = toplamYukseklikMm + mahyaYuksekligiMm;
+    const highA: Nokta3D = [0, highY, genislikMm];
+    const highB: Nokta3D = [uzunlukMm, highY, genislikMm];
+    kirisler.push({ a: highA, b: highB, enMm: 60, renk: PALET.ikincil, etiket: `Yüksek kenar ${mmEtiket(Math.round(mahyaYuksekligiMm))}` });
+    kirisler.push({ a: ustKoseler[3], b: highA, enMm: 40, renk: PALET.ikincil });
+    kirisler.push({ a: ustKoseler[2], b: highB, enMm: 40, renk: PALET.ikincil });
+    yuzeyler.push({ noktalar: [ustKoseler[0], ustKoseler[1], highB, highA], fill: PALET.ikincil, fillOpacity: 0.45 });
+  } else if (cati && mahyaYuksekligiMm > 0) {
     const ridgeY = toplamYukseklikMm + mahyaYuksekligiMm;
     const ridgeZ = genislikMm / 2;
     const ridgeA: Nokta3D = [0, ridgeY, ridgeZ];
@@ -83,7 +97,7 @@ function ContainerGorunum3D({
     yuzeyler.push({ noktalar: [ustKoseler[0], ustKoseler[1], ridgeB, ridgeA], fill: PALET.ikincil, fillOpacity: 0.45 });
     yuzeyler.push({ noktalar: [ridgeA, ridgeB, ustKoseler[2], ustKoseler[3]], fill: PALET.ikincil, fillOpacity: 0.45 });
   } else {
-    // Çatı eklenmemişse düz bir üst yüzey (tavan) göster ki kutu tamamen kapalı görünsün.
+    // Çatı eklenmemişse (veya düz çatı tipi) düz bir üst yüzey (tavan) göster ki kutu tamamen kapalı görünsün.
     yuzeyler.push({ noktalar: ustKoseler, fill: PALET.ana, fillOpacity: 0.3 });
   }
 

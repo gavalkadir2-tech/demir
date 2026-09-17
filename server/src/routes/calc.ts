@@ -15,6 +15,8 @@ const kaplamaTuruEnum = z.enum(["trapez_sac", "sandvic_panel", "etermit", "plast
 const disKaplamaTuruEnum = z.enum(["trapez_sac", "sandvic_panel", "petopan", "alcipan", "yok"]);
 const icKaplamaTuruEnum = z.enum(["alcipan", "yok"]);
 const tabanKaplamaTuruEnum = z.enum(["trapez_sac", "sandvic_panel", "betopan", "yok"]);
+// Çatı tipi - bkz. calc/roofTruss.ts CatiTipi. Kullanıcı önce bunu seçer.
+const catiTipiEnum = z.enum(["duz", "acik_besik", "catikati", "kirma", "sundurma"]);
 
 const railingSchema = z.object({
   toplamUzunlukMm: z.number(),
@@ -150,6 +152,7 @@ const wallSchema = z.object({
 });
 
 const trussSchema = z.object({
+  catiTipi: catiTipiEnum.optional(),
   acikligMm: z.number(),
   egimYuzde: z.number(),
   catiUzunluguMm: z.number(),
@@ -177,6 +180,9 @@ const trussSchema = z.object({
   cikmaPayiMm: z.number().optional(),
   direkSayisi: z.number().int().optional(),
   direkProfilId: z.number().int().optional(),
+  dikmeYuksekligiMm: z.number().optional(),
+  dikmeDuvarProfilId: z.number().int().optional(),
+  kirmaMahyaKirisiProfilId: z.number().int().optional(),
   kafesSayisiOverride: z.number().int().optional(),
 });
 

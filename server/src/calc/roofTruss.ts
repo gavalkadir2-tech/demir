@@ -6,7 +6,17 @@ import { HesaplamaHatasi } from "./units";
 import { HesaplananParca, UrunHesapSonucu, bosSonuc, profilOzetOlustur } from "./types";
 import { KAPLAMA_BILGI, KaplamaTuru, kaplamaHesapla } from "./kaplama";
 
+/** Çatı tipi - kullanıcı önce bunu seçer, diğer alanlar buna göre anlam kazanır.
+ * - duz: yassı/düz çatı, eğimsiz (tek yüzey, mahya yok).
+ * - acik_besik: simetrik iki eğimli çatı, ortada mahya (varsayılan, mevcut motorun orijinal davranışı).
+ * - catikati: açık beşik ile aynı eğimli üst geometri + eğim başlamadan önce dikey bir diz duvarı (kneewall).
+ * - kirma: dört yönde eğimli çatı - açık beşik gövdesi + uçlarda kırma (pah) kirişleri ve ara dikmeler (jack rafter).
+ * - sundurma: tek eğimli (lean-to/shed) çatı, mahya yok, açıklığın tamamı tek bir eğimli yüzeydir. */
+export type CatiTipi = "duz" | "acik_besik" | "catikati" | "kirma" | "sundurma";
+
 export interface CatiKafesiGirdi {
+  /** Çatı tipi - varsayılan "acik_besik" (mevcut simetrik iki eğimli davranış, geriye dönük uyumluluk için). */
+  catiTipi?: CatiTipi;
   /** Açıklık (mm) - kafesin kapattığı toplam genişlik */
   acikligMm: number;
   /** Çatı eğimi (%) */
@@ -39,6 +49,13 @@ export interface CatiKafesiGirdi {
   direkSayisi?: number;
   /** Ara direk profil kesiti - direkSayisi > 0 ise zorunlu. */
   direkProfilKey?: string;
+  /** catiTipi "catikati" ise: eğimli çatı başlamadan önceki dikey diz duvarı (kneewall) yüksekliği (mm). */
+  dikmeYuksekligiMm?: number;
+  /** Diz duvarı dikmesi profil kesiti - dikmeYuksekligiMm > 0 ise zorunlu. */
+  dikmeDuvarProfilKey?: string;
+  /** catiTipi "kirma" ise: köşelerden mahyaya uzanan kırma (pah) kirişi profil kesiti - verilmezse
+   * üst başlık profili kullanılır. */
+  kirmaMahyaKirisiProfilKey?: string;
   /** Çatı kaplama türü */
   kaplamaTuru?: KaplamaTuru;
   kaplamaKalinlikMm?: number;
@@ -65,6 +82,7 @@ export interface CatiKafesiGirdi {
 }
 
 const VARSAYILAN = {
+  catiTipi: "acik_besik" as const,
   diyagonalSayisi: 0,
   asikAraligiHedefMm: 1000,
   kaplamaTuru: "trapez_sac" as const,
@@ -83,6 +101,20 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
   if (kafesAraligiHedefMm <= 0) throw new HesaplamaHatasi("Kafesler arası aralık 0'dan büyük olmalı.");
   if (!ustBaslikProfilKey || !altBaslikProfilKey) throw new HesaplamaHatasi("Üst başlık ve alt başlık profilleri seçilmelidir.");
 
+  const catiTipi = girdi.catiTipi ?? VARSAYILAN.catiTipi;
+  const tekEgimliMi = catiTipi === "duz" || catiTipi === "sundurma";
+  const yamacSayisi = tekEgimliMi ? 1 : 2;
+
+  if (catiTipi === "kirma" && catiUzunluguMm <= acikligMm) {
+    throw new HesaplamaHatasi(
+      "Kırma çatı için çatı uzunluğu açıklıktan büyük olmalı (köşelerdeki kırma başları için yer bırakılmalı)."
+    );
+  }
+  const dikmeYuksekligiMm = girdi.dikmeYuksekligiMm ?? 0;
+  if (catiTipi === "catikati" && dikmeYuksekligiMm > 0 && !girdi.dikmeDuvarProfilKey) {
+    throw new HesaplamaHatasi("Çatı katı diz duvarı yüksekliği girildi ama diz duvarı dikmesi profili seçilmedi.");
+  }
+
   const diyagonalSayisi = girdi.diyagonalSayisi ?? VARSAYILAN.diyagonalSayisi;
   if (diyagonalSayisi > 0 && !girdi.diyagonalProfilKey)
     throw new HesaplamaHatasi("Çapraz destek sayısı girildi ama çapraz destek profili seçilmedi.");
@@ -98,15 +130,22 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
 
   const sonuc = bosSonuc();
 
-  if (egimYuzde < 15) {
+  // "duz" (yassı) çatıda eğim yok sayılır - kullanıcı yanlışlıkla eğim girmiş olsa bile düz olarak hesaplanır.
+  const etkinEgimYuzde = catiTipi === "duz" ? 0 : egimYuzde;
+  if (catiTipi === "duz" && egimYuzde > 2) {
+    sonuc.uyarilar.push("Düz (yassı) çatı tipinde eğim dikkate alınmaz; %0 eğim ile hesaplandı.");
+  }
+  if (catiTipi !== "duz" && etkinEgimYuzde < 15) {
     sonuc.uyarilar.push("Eğim %15'in altında; çatı kafesi için genellikle daha dik bir eğim tercih edilir.");
   }
   if (acikligMm > 8000 && !girdi.diyagonalProfilKey) {
     sonuc.uyarilar.push("Açıklık 8 metreden geniş; ek çapraz destek (diyagonal) eklemeyi düşünün.");
   }
 
-  const yariAciklikMm = acikligMm / 2;
-  const mahyaYuksekligiMm = yariAciklikMm * (egimYuzde / 100);
+  // İki eğimli tiplerde (açık beşik/çatı katı/kırma) her yamaç açıklığın yarısını kapatır; tek eğimli
+  // tiplerde (düz/sundurma) mahya olmadığından tek bir yamaç açıklığın tamamını kapatır.
+  const yariAciklikMm = tekEgimliMi ? acikligMm : acikligMm / 2;
+  const mahyaYuksekligiMm = yariAciklikMm * (etkinEgimYuzde / 100);
   const temelUstBaslikUzunlukMm = Math.sqrt(yariAciklikMm ** 2 + mahyaYuksekligiMm ** 2);
 
   // İki makasın birleştiği yerde oluk (vadi) varsa üst başlık oluk mesafesi kadar kısalır (oluk için boşluk
@@ -134,7 +173,7 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
     label: "Üst başlık",
     profilKey: ustBaslikProfilKey,
     uzunlukMm: Math.ceil(ustBaslikUzunlukMm),
-    adet: 2 * kafesSayisi,
+    adet: yamacSayisi * kafesSayisi,
     not: olukluMu
       ? `Çatı eğimine göre hesaplanan diyagonal uzunluk, oluk mesafesi (${Math.round(olukMesafesiMm)} mm) düşülmüştür.`
       : cikmaPayiMm > 0
@@ -151,11 +190,23 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
 
   if (girdi.kralKirisiProfilKey) {
     parcalar.push({
-      label: "Kral kirişi",
+      label: tekEgimliMi ? "Yüksek uç dikmesi" : "Kral kirişi",
       profilKey: girdi.kralKirisiProfilKey,
       uzunlukMm: Math.ceil(mahyaYuksekligiMm),
       adet: kafesSayisi,
-      not: "Makasın tepe (mahya) noktasında, iki makasın birleştiği yerdeki dikey eleman.",
+      not: tekEgimliMi
+        ? "Tek eğimli çatının yüksek ucundaki dikey destek elemanı."
+        : "Makasın tepe (mahya) noktasında, iki makasın birleştiği yerdeki dikey eleman.",
+    });
+  }
+
+  if (catiTipi === "catikati" && dikmeYuksekligiMm > 0 && girdi.dikmeDuvarProfilKey) {
+    parcalar.push({
+      label: "Çatı katı diz duvarı dikmesi",
+      profilKey: girdi.dikmeDuvarProfilKey,
+      uzunlukMm: Math.ceil(dikmeYuksekligiMm),
+      adet: yamacSayisi * kafesSayisi,
+      not: "Eğimli çatı başlamadan önceki dikey diz duvarı (kneewall) - kullanılabilir çatı katı yüksekliğini belirler.",
     });
   }
 
@@ -198,8 +249,8 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
       toplamCaprazMmBirYamacBirKafes += Math.sqrt(panelGenislikMm ** 2 + ustYukseklik ** 2); // alt(k) -> üst(k+1)
       toplamCaprazMmBirYamacBirKafes += Math.sqrt(panelGenislikMm ** 2 + altYukseklik ** 2); // üst(k) -> alt(k+1)
     }
-    const toplamDiyagonalAdet = 4 * diyagonalPanelSayisi * kafesSayisi; // 2 yamaç x (2 x panel) segment x kafes sayısı
-    const toplamCaprazMmTumKafesler = toplamCaprazMmBirYamacBirKafes * 2 * kafesSayisi; // 2 yamaç
+    const toplamDiyagonalAdet = 2 * yamacSayisi * diyagonalPanelSayisi * kafesSayisi; // yamaç sayısı x (2 x panel) segment x kafes sayısı
+    const toplamCaprazMmTumKafesler = toplamCaprazMmBirYamacBirKafes * yamacSayisi * kafesSayisi;
     const ortalamaUzunlukMm = toplamCaprazMmTumKafesler / toplamDiyagonalAdet;
     parcalar.push({
       label: "Çapraz destek (diyagonal ağ)",
@@ -214,13 +265,15 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
   if (girdi.asikProfilKey) {
     const asikAraligiHedefMm = girdi.asikAraligiHedefMm ?? VARSAYILAN.asikAraligiHedefMm;
     const asikSatirSayisiPerSide = Math.max(2, Math.ceil(ustBaslikUzunlukMm / asikAraligiHedefMm) + 1);
-    asikSatirSayisi = 2 * asikSatirSayisiPerSide;
+    asikSatirSayisi = yamacSayisi * asikSatirSayisiPerSide;
     parcalar.push({
       label: "Aşık",
       profilKey: girdi.asikProfilKey,
       uzunlukMm: Math.round(catiUzunluguMm),
       adet: asikSatirSayisi,
-      not: "Çatının iki eğimine (sol+sağ) eşit dağıtılmış aşık sıraları; kesim listesinde standart boya göre bölünecektir.",
+      not: tekEgimliMi
+        ? "Tek eğimli çatı yüzeyine eşit dağıtılmış aşık sıraları; kesim listesinde standart boya göre bölünecektir."
+        : "Çatının iki eğimine (sol+sağ) eşit dağıtılmış aşık sıraları; kesim listesinde standart boya göre bölünecektir.",
     });
   }
 
@@ -245,6 +298,30 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
         not: "Kral kirişleri arasında, ilk açıklıkta düşey çapraz (X).",
       });
     }
+  }
+
+  if (catiTipi === "kirma") {
+    const kirmaMahyaKirisiProfilKey = girdi.kirmaMahyaKirisiProfilKey ?? ustBaslikProfilKey;
+    // Köşeden mahyaya uzanan pah kirişi - basitleştirilmiş köşegen: taban izdüşümü yariAciklikMm x
+    // yariAciklikMm'lik bir dik üçgenin hipotenüsü, düşey bileşen mahyaYuksekligiMm.
+    const kirmaKirisiUzunlukMm = Math.sqrt(2 * yariAciklikMm ** 2 + mahyaYuksekligiMm ** 2);
+    parcalar.push({
+      label: "Kırma (pah) kirişi",
+      profilKey: kirmaMahyaKirisiProfilKey,
+      uzunlukMm: Math.ceil(kirmaKirisiUzunlukMm),
+      adet: 4,
+      not: "Binanın dört köşesinden mahyaya uzanan kırma (pah) kirişleri - basitleştirilmiş köşegen uzunluk hesabı; sahada ölçüp kesilmesi önerilir.",
+    });
+    const kisaDikmeProfilKey = girdi.direkProfilKey ?? kirmaMahyaKirisiProfilKey;
+    const kisaDikmeSayisi = 6;
+    const ortalamaKisaDikmeUzunlukMm = ustBaslikUzunlukMm / 2;
+    parcalar.push({
+      label: "Kırma başı ara dikmesi (jack rafter)",
+      profilKey: kisaDikmeProfilKey,
+      uzunlukMm: Math.ceil(ortalamaKisaDikmeUzunlukMm),
+      adet: kisaDikmeSayisi,
+      not: "Kırma çatı başlarında ana kirişten pah kirişine uzanan, gittikçe kısalan ara dikmeler (jack rafter) - gösterilen ortalama uzunluktur, her biri farklı uzunlukta kesilir; sahada ölçüp kesilmesi önerilir.",
+    });
   }
 
   sonuc.parcalar = parcalar;
@@ -276,15 +353,17 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
       enMm: kaplamaBilgisi.faydaliGenislikMm,
       boyMm: Math.ceil(ustBaslikUzunlukMm),
       kalinlikMm: girdi.kaplamaKalinlikMm ?? kaplamaBilgisi.varsayilanKalinlikMm,
-      adet: kaplamaOzet.panelSayisi * 2, // iki yamaç
+      adet: kaplamaOzet.panelSayisi * yamacSayisi,
       yogunlukKgM3: kaplamaBilgisi.efektifYogunlukKgM3,
       materialKey: girdi.kaplamaMalzemeKey,
-      not: `Her yamaçta ${kaplamaOzet.panelSayisi} panel (${kaplamaBilgisi.faydaliGenislikMm} mm faydalı genişlik) yan yana; toplam net alan ${(kaplamaOzet.netAlaniM2 * 2).toFixed(2)} m², sipariş edilecek alan (fire dahil, ~%${kaplamaBilgisi.tipikFireYuzde} bindirme/kesim payı) ${(kaplamaOzet.siparisAlaniM2 * 2).toFixed(2)} m².`,
+      not: tekEgimliMi
+        ? `${kaplamaOzet.panelSayisi} panel (${kaplamaBilgisi.faydaliGenislikMm} mm faydalı genişlik) yan yana; toplam net alan ${kaplamaOzet.netAlaniM2.toFixed(2)} m², sipariş edilecek alan (fire dahil, ~%${kaplamaBilgisi.tipikFireYuzde} bindirme/kesim payı) ${kaplamaOzet.siparisAlaniM2.toFixed(2)} m².`
+        : `Her yamaçta ${kaplamaOzet.panelSayisi} panel (${kaplamaBilgisi.faydaliGenislikMm} mm faydalı genişlik) yan yana; toplam net alan ${(kaplamaOzet.netAlaniM2 * yamacSayisi).toFixed(2)} m², sipariş edilecek alan (fire dahil, ~%${kaplamaBilgisi.tipikFireYuzde} bindirme/kesim payı) ${(kaplamaOzet.siparisAlaniM2 * yamacSayisi).toFixed(2)} m².`,
     });
   }
 
-  const egimDerece = (Math.atan(egimYuzde / 100) * 180) / Math.PI;
-  const catiAlaniM2 = ((2 * ustBaslikUzunlukMm) / 1000) * (catiUzunluguMm / 1000);
+  const egimDerece = (Math.atan(etkinEgimYuzde / 100) * 180) / Math.PI;
+  const catiAlaniM2 = ((yamacSayisi * ustBaslikUzunlukMm) / 1000) * (catiUzunluguMm / 1000);
 
   sonuc.ozetDegerler = {
     kafesSayisi,
@@ -300,8 +379,8 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
     direkAralikMm: direkSayisi > 0 ? Math.round((yariAciklikMm / (direkSayisi + 1)) * 100) / 100 : 0,
     ...(kaplamaOzet
       ? {
-          kaplamaSiparisAlaniM2: Math.round(kaplamaOzet.siparisAlaniM2 * 2 * 100) / 100,
-          kaplamaFireM2: Math.round(kaplamaOzet.fireM2 * 2 * 100) / 100,
+          kaplamaSiparisAlaniM2: Math.round(kaplamaOzet.siparisAlaniM2 * yamacSayisi * 100) / 100,
+          kaplamaFireM2: Math.round(kaplamaOzet.fireM2 * yamacSayisi * 100) / 100,
           kaplamaFireYuzde: kaplamaOzet.fireYuzde,
         }
       : {}),

@@ -95,6 +95,16 @@ export const URUN_EMOJI: Record<string, string> = {
 };
 const EMOJI = URUN_EMOJI;
 
+// Çatı tipi - kullanıcı önce bunu seçer, diğer alanlar buna göre anlam kazanır (bkz. server
+// calc/roofTruss.ts CatiTipi). "Çatı Kafesi" ürün şablonu ve Konteyner'in çatı özelliği ortak kullanır.
+const CATI_TIPI_SECENEKLERI = [
+  { key: "acik_besik", label: "Açık Beşik (simetrik iki eğimli)" },
+  { key: "duz", label: "Yassı / Düz" },
+  { key: "catikati", label: "Çatı Katı" },
+  { key: "kirma", label: "Kırma (dört yönlü eğimli)" },
+  { key: "sundurma", label: "Sundurma (tek eğimli)" },
+];
+
 const CATI_KAPLAMA_SECENEKLERI = [
   { key: "trapez_sac", label: "Trapez Sac" },
   { key: "sandvic_panel", label: "Sandviç Panel" },
@@ -1949,9 +1959,17 @@ function CatiKafesiAlanlari({
   onChange: (p: Record<string, unknown>) => void;
   baslangic?: Record<string, unknown>;
 }) {
+  const [catiTipi, setCatiTipi] = useState<string>(() => (baslangic?.catiTipi as string) ?? "acik_besik");
   const [acikligMm, setAcikligMm] = useState<number>(() => (baslangic?.acikligMm as number) ?? 6000);
   const [egimYuzde, setEgimYuzde] = useState<number>(() => (baslangic?.egimYuzde as number) ?? 30);
   const [catiUzunluguMm, setCatiUzunluguMm] = useState<number>(() => (baslangic?.catiUzunluguMm as number) ?? 9000);
+  const [dikmeYuksekligiMm, setDikmeYuksekligiMm] = useState<number>(() => (baslangic?.dikmeYuksekligiMm as number) ?? 900);
+  const [dikmeDuvarProfilId, setDikmeDuvarProfilId] = useState<number | undefined>(
+    () => baslangic?.dikmeDuvarProfilId as number | undefined
+  );
+  const [kirmaMahyaKirisiProfilId, setKirmaMahyaKirisiProfilId] = useState<number | undefined>(
+    () => baslangic?.kirmaMahyaKirisiProfilId as number | undefined
+  );
   const [kafesAraligiHedefMm, setKafesAraligiHedefMm] = useState<number>(
     () => (baslangic?.kafesAraligiHedefMm as number) ?? 900
   );
@@ -1990,6 +2008,7 @@ function CatiKafesiAlanlari({
 
   useEffect(() => {
     onChange({
+      catiTipi,
       acikligMm,
       egimYuzde,
       catiUzunluguMm,
@@ -2010,11 +2029,15 @@ function CatiKafesiAlanlari({
       cikmaPayiMm: olukluMu ? undefined : cikmaPayiMm,
       direkSayisi,
       direkProfilId: direkSayisi > 0 ? direkProfilId : undefined,
+      dikmeYuksekligiMm: catiTipi === "catikati" ? dikmeYuksekligiMm : undefined,
+      dikmeDuvarProfilId: catiTipi === "catikati" ? dikmeDuvarProfilId : undefined,
+      kirmaMahyaKirisiProfilId: catiTipi === "kirma" ? kirmaMahyaKirisiProfilId : undefined,
       plakaMalzemeId,
       ankrajMalzemeId,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    catiTipi,
     acikligMm,
     egimYuzde,
     catiUzunluguMm,
@@ -2035,22 +2058,60 @@ function CatiKafesiAlanlari({
     cikmaPayiMm,
     direkSayisi,
     direkProfilId,
+    dikmeYuksekligiMm,
+    dikmeDuvarProfilId,
+    kirmaMahyaKirisiProfilId,
     plakaMalzemeId,
     ankrajMalzemeId,
   ]);
 
   return (
     <div className="space-y-3">
+      <div>
+        <label className="field-label">Çatı Tipi</label>
+        <select className="field-select" value={catiTipi} onChange={(e) => setCatiTipi(e.target.value)}>
+          {CATI_TIPI_SECENEKLERI.map((s) => (
+            <option key={s.key} value={s.key}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      {catiTipi === "kirma" && (
+        <p className="text-xs text-neutral-500">
+          Kırma çatıda köşelerde kırma kirişleri için yer bırakılması gerekir; çatı uzunluğu açıklıktan büyük olmalıdır.
+        </p>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <Sayi label="Açıklık (mm)" value={acikligMm} onChange={setAcikligMm} />
-        <Sayi label="Eğim (%)" value={egimYuzde} onChange={setEgimYuzde} />
+        {catiTipi !== "duz" && <Sayi label="Eğim (%)" value={egimYuzde} onChange={setEgimYuzde} />}
         <Sayi label="Çatı Uzunluğu (mm)" value={catiUzunluguMm} onChange={setCatiUzunluguMm} />
         <Sayi label="Kafesler Arası Aralık (mm)" value={kafesAraligiHedefMm} onChange={setKafesAraligiHedefMm} />
       </div>
+      {catiTipi === "catikati" && (
+        <div className="grid grid-cols-2 gap-3 rounded-xl border border-neutral-200 p-3">
+          <Sayi label="Diz Duvarı (Kneewall) Yüksekliği (mm)" value={dikmeYuksekligiMm} onChange={setDikmeYuksekligiMm} />
+          <MaterialSelect
+            label="Diz Duvarı Dikmesi Profili"
+            materials={materials}
+            value={dikmeDuvarProfilId}
+            onChange={setDikmeDuvarProfilId}
+          />
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <MaterialSelect label="Üst Başlık Profili" materials={materials} value={ustBaslikProfilId} onChange={setUstBaslikProfilId} />
         <MaterialSelect label="Alt Başlık Profili" materials={materials} value={altBaslikProfilId} onChange={setAltBaslikProfilId} />
       </div>
+      {catiTipi === "kirma" && (
+        <MaterialSelect
+          label="Kırma (Pah) Kirişi Profili (opsiyonel, boşsa üst başlık profili kullanılır)"
+          materials={materials}
+          value={kirmaMahyaKirisiProfilId}
+          onChange={setKirmaMahyaKirisiProfilId}
+          allowEmpty
+        />
+      )}
       <div className="grid grid-cols-2 gap-3">
         <MaterialSelect label="Aşık Profili (opsiyonel)" materials={materials} value={asikProfilId} onChange={setAsikProfilId} allowEmpty />
         <Sayi label="Aşık Aralığı (mm)" value={asikAraligiHedefMm} onChange={setAsikAraligiHedefMm} />
@@ -2678,6 +2739,7 @@ function konteynerDuvarSetiVarsayilan(): Record<KonteynerYon, KonteynerDuvarDege
 }
 
 interface KonteynerCatiDegerleri {
+  catiTipi?: string;
   egimYuzde: number;
   kafesAraligiHedefMm: number;
   ustBaslikProfilId?: number;
@@ -2696,13 +2758,16 @@ interface KonteynerCatiDegerleri {
   cikmaPayiMm?: number;
   direkSayisi?: number;
   direkProfilId?: number;
+  dikmeYuksekligiMm?: number;
+  dikmeDuvarProfilId?: number;
+  kirmaMahyaKirisiProfilId?: number;
   plakaMalzemeId?: number;
   ankrajMalzemeId?: number;
   kafesSayisiOverride?: number;
 }
 
 function konteynerCatiVarsayilan(): KonteynerCatiDegerleri {
-  return { egimYuzde: 20, kafesAraligiHedefMm: 900, kaplamaTuru: "trapez_sac" };
+  return { catiTipi: "acik_besik", egimYuzde: 20, kafesAraligiHedefMm: 900, kaplamaTuru: "trapez_sac" };
 }
 
 /** Konteynerin bir duvarının ayarları - Çelik Duvar Paneli'ndeki (DuvarAlanlari) genişlik/yükseklik
@@ -2950,16 +3015,56 @@ function KonteynerCatiFormu({
    * alır, eşzamanlı otomatik profil ataması gibi durumlarda birbirini ezmeyi önler. */
   onDegis: (patch: Partial<KonteynerCatiDegerleri>) => void;
 }) {
+  const catiTipi = deger.catiTipi ?? "acik_besik";
   return (
     <div className="space-y-3">
+      <div>
+        <label className="field-label">Çatı Tipi</label>
+        <select className="field-select" value={catiTipi} onChange={(e) => onDegis({ catiTipi: e.target.value })}>
+          {CATI_TIPI_SECENEKLERI.map((s) => (
+            <option key={s.key} value={s.key}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      {catiTipi === "kirma" && (
+        <p className="text-xs text-neutral-500">
+          Kırma çatıda köşelerde kırma kirişleri için yer bırakılması gerekir; konteyner uzunluğu genişlikten büyük olmalıdır.
+        </p>
+      )}
       <div className="grid grid-cols-2 gap-3">
-        <Sayi label="Eğim (%)" value={deger.egimYuzde} onChange={(v) => onDegis({ egimYuzde: v })} />
+        {catiTipi !== "duz" && <Sayi label="Eğim (%)" value={deger.egimYuzde} onChange={(v) => onDegis({ egimYuzde: v })} />}
         <Sayi label="Kafesler Arası Aralık (mm)" value={deger.kafesAraligiHedefMm} onChange={(v) => onDegis({ kafesAraligiHedefMm: v })} />
       </div>
+      {catiTipi === "catikati" && (
+        <div className="grid grid-cols-2 gap-3 rounded-xl border border-neutral-200 p-3">
+          <Sayi
+            label="Diz Duvarı (Kneewall) Yüksekliği (mm)"
+            value={deger.dikmeYuksekligiMm ?? 900}
+            onChange={(v) => onDegis({ dikmeYuksekligiMm: v })}
+          />
+          <MaterialSelect
+            label="Diz Duvarı Dikmesi Profili"
+            materials={materials}
+            value={deger.dikmeDuvarProfilId}
+            onChange={(v) => onDegis({ dikmeDuvarProfilId: v })}
+          />
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <MaterialSelect label="Üst Başlık Profili" materials={materials} value={deger.ustBaslikProfilId} onChange={(v) => onDegis({ ustBaslikProfilId: v })} />
         <MaterialSelect label="Alt Başlık Profili" materials={materials} value={deger.altBaslikProfilId} onChange={(v) => onDegis({ altBaslikProfilId: v })} />
       </div>
+      {catiTipi === "kirma" && (
+        <MaterialSelect
+          label="Kırma (Pah) Kirişi Profili (opsiyonel, boşsa üst başlık profili kullanılır)"
+          materials={materials}
+          value={deger.kirmaMahyaKirisiProfilId}
+          onChange={(v) => onDegis({ kirmaMahyaKirisiProfilId: v })}
+          allowEmpty
+        />
+      )}
       <div className="grid grid-cols-2 gap-3">
         <MaterialSelect
           label="Aşık Profili (opsiyonel)"

@@ -1,6 +1,8 @@
 import { PALET } from "./schematicShared";
 
 export interface TrussIsoVeri {
+  /** bkz. TrussSchematic.tsx CatiKafesiSemaVeri.catiTipi. */
+  catiTipi?: string;
   acikligMm: number;
   egimYuzde: number;
   catiUzunluguMm: number;
@@ -30,6 +32,7 @@ interface Cizgi {
  * stabilite çaprazlarıyla birlikte üç boyutlu izlenim veren bir çizim olarak gösterir. */
 export default function TrussIsometricView({ veri }: { veri: TrussIsoVeri }) {
   const {
+    catiTipi = "acik_besik",
     acikligMm,
     egimYuzde,
     catiUzunluguMm,
@@ -42,8 +45,10 @@ export default function TrussIsometricView({ veri }: { veri: TrussIsoVeri }) {
   } = veri;
   if (!acikligMm || !catiUzunluguMm || kafesSayisi < 1) return null;
 
-  const yariAciklik = acikligMm / 2;
-  const mahya = yariAciklik * (egimYuzde / 100);
+  const tekEgimliMi = catiTipi === "duz" || catiTipi === "sundurma";
+  const etkinEgimYuzde = catiTipi === "duz" ? 0 : egimYuzde;
+  const yariAciklik = tekEgimliMi ? acikligMm : acikligMm / 2;
+  const mahya = yariAciklik * (etkinEgimYuzde / 100);
   const ustBaslikUzunluk = Math.sqrt(yariAciklik ** 2 + mahya ** 2);
 
   const COS30 = Math.cos(Math.PI / 6);
@@ -89,21 +94,23 @@ export default function TrussIsometricView({ veri }: { veri: TrussIsoVeri }) {
     const apex = S(X, mahya, yariAciklik);
     const tabanOrta = S(X, 0, yariAciklik);
     cizgi(eaveL, apex, PALET.ana, 2);
-    cizgi(apex, eaveR, PALET.ana, 2);
+    if (!tekEgimliMi) cizgi(apex, eaveR, PALET.ana, 2);
     cizgi(eaveL, eaveR, PALET.ana, 1.5);
     cizgi(tabanOrta, apex, PALET.ikincil, 1.5, true);
   }
 
-  // Aşıklar (çatı uzunluğu boyunca, her iki yamaçta)
+  // Aşıklar (çatı uzunluğu boyunca; tek eğimlide tek yamaç, diğerlerinde iki yamaç)
   if (asikVar) {
     for (const oran of asikOranlari) {
       const solBas = S(0, oran * mahya, oran * yariAciklik);
       const solSon = S(catiUzunluguMm, oran * mahya, oran * yariAciklik);
       cizgi(solBas, solSon, PALET.vurgu, 1.5);
-      const sagZ = acikligMm - oran * yariAciklik;
-      const sagBas = S(0, oran * mahya, sagZ);
-      const sagSon = S(catiUzunluguMm, oran * mahya, sagZ);
-      cizgi(sagBas, sagSon, PALET.vurgu, 1.5);
+      if (!tekEgimliMi) {
+        const sagZ = acikligMm - oran * yariAciklik;
+        const sagBas = S(0, oran * mahya, sagZ);
+        const sagSon = S(catiUzunluguMm, oran * mahya, sagZ);
+        cizgi(sagBas, sagSon, PALET.vurgu, 1.5);
+      }
     }
   }
 
@@ -111,21 +118,25 @@ export default function TrussIsometricView({ veri }: { veri: TrussIsoVeri }) {
   if (stabiliteVar && kafesSayisi >= 2) {
     const X0 = kafesXler[0];
     const X1 = kafesXler[1];
-    // Yatay (üst başlık düzleminde, her iki yamaçta)
+    // Yatay (üst başlık düzleminde; tek eğimlide tek yamaç, diğerlerinde iki yamaç)
     cizgi(S(X0, 0, 0), S(X1, mahya, yariAciklik), PALET.stabilite, 2);
     cizgi(S(X0, mahya, yariAciklik), S(X1, 0, 0), PALET.stabilite, 2);
-    cizgi(S(X0, 0, acikligMm), S(X1, mahya, yariAciklik), PALET.stabilite, 2);
-    cizgi(S(X0, mahya, yariAciklik), S(X1, 0, acikligMm), PALET.stabilite, 2);
-    // Düşey (kral kirişleri arasında)
+    if (!tekEgimliMi) {
+      cizgi(S(X0, 0, acikligMm), S(X1, mahya, yariAciklik), PALET.stabilite, 2);
+      cizgi(S(X0, mahya, yariAciklik), S(X1, 0, acikligMm), PALET.stabilite, 2);
+    }
+    // Düşey (kral kirişleri/yüksek uç dikmeleri arasında)
     cizgi(S(X0, 0, yariAciklik), S(X1, mahya, yariAciklik), PALET.yatay, 2);
     cizgi(S(X0, mahya, yariAciklik), S(X1, 0, yariAciklik), PALET.yatay, 2);
   }
 
-  // Çatı kaplaması (yarı saydam, sadece görsel bağlam için)
+  // Çatı kaplaması (yarı saydam, sadece görsel bağlam için) - tek eğimlide tek yamaç yüzeyi yeterli.
   const kaplamaPoligonlari = kaplamaGoster
     ? [
         [S(0, 0, 0), S(0, mahya, yariAciklik), S(catiUzunluguMm, mahya, yariAciklik), S(catiUzunluguMm, 0, 0)],
-        [S(0, mahya, yariAciklik), S(0, 0, acikligMm), S(catiUzunluguMm, 0, acikligMm), S(catiUzunluguMm, mahya, yariAciklik)],
+        ...(tekEgimliMi
+          ? []
+          : [[S(0, mahya, yariAciklik), S(0, 0, acikligMm), S(catiUzunluguMm, 0, acikligMm), S(catiUzunluguMm, mahya, yariAciklik)]]),
       ]
     : [];
 
