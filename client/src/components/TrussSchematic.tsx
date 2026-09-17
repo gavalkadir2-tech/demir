@@ -160,7 +160,7 @@ function KesitGorunumu({ veri }: { veri: CatiKafesiSemaVeri }) {
     <svg viewBox={`0 0 ${VIEW_W} ${PANEL_A_TOTAL_H}`} className="w-full h-auto" role="img" aria-label="Çatı kafesi kesit görünüşü şematik çizimi">
       <OkTanimlari />
       <text x={x0} y={PANEL_A_TOP - 6} fontSize={11} fill="#a3a3a3">
-        Kesit görünüşü (bir kafes)
+        Kesit görünüşü (bir kafes){catiTipi === "kirma" ? " - orta kesit, uçlarda pah var (bkz. 3D görünüm)" : ""}
       </text>
       <line x1={x0 - 15} y1={zeminY} x2={x0 + scaledAciklik + 15} y2={zeminY} stroke="#a3a3a3" strokeWidth={2} />
 

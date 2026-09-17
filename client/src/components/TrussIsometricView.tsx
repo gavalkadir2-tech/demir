@@ -93,16 +93,27 @@ export default function TrussIsometricView({ veri }: { veri: TrussIsoVeri }) {
   const cizgi = (a: { x: number; y: number }, b: { x: number; y: number }, renk: string, kalinlik: number, kesikli?: boolean) =>
     cizgiler.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, renk, kalinlik, kesikli });
 
-  // Kafesler (üst başlık, alt başlık, kral kirişi) - çatı katıda T kadar yukarıda oturur.
+  // Kırma: mahya, uçlarda köşelere inen pah (hip) hatlarıyla kısalır - açık beşikten farklı olarak
+  // kaplama yüzeyleri uçlarda üçgen pah yüzeyleriyle kapanır (dikdörtgen değil, altıgen taban).
+  const kirmaMi = catiTipi === "kirma";
+  const hipInsetMm = kirmaMi ? Math.min(yariAciklik, catiUzunluguMm / 2) : 0;
+
+  // Kafesler (üst başlık, alt başlık, kral kirişi) - çatı katıda T kadar yukarıda oturur. Kırmada,
+  // pah (hip) bölgesindeki kafesler (uçlara hipInsetMm'den yakın) tam yükseklikte mahyaya çıkan
+  // açık-beşik tipi eğimli kirişler ÇİZMEZ - bu, gerçekte olmayan bir "iki eğimli" görünümü verirdi;
+  // o bölgede görseli pah yüzeyleri/hatları taşır, kafes sadece alt başlık hizasında görünür.
   for (const X of kafesXler) {
+    const pahBolgesindeMi = kirmaMi && (X < hipInsetMm || X > catiUzunluguMm - hipInsetMm);
     const eaveL = S(X, T, 0);
     const eaveR = S(X, T, acikligMm);
-    const apex = S(X, T + mahya, yariAciklik);
-    const tabanOrta = S(X, T, yariAciklik);
-    cizgi(eaveL, apex, PALET.ana, 2);
-    if (!tekEgimliMi) cizgi(apex, eaveR, PALET.ana, 2);
     cizgi(eaveL, eaveR, PALET.ana, 1.5);
-    cizgi(tabanOrta, apex, PALET.ikincil, 1.5, true);
+    if (!pahBolgesindeMi) {
+      const apex = S(X, T + mahya, yariAciklik);
+      const tabanOrta = S(X, T, yariAciklik);
+      cizgi(eaveL, apex, PALET.ana, 2);
+      if (!tekEgimliMi) cizgi(apex, eaveR, PALET.ana, 2);
+      cizgi(tabanOrta, apex, PALET.ikincil, 1.5, true);
+    }
     if (T > 0) {
       cizgi(S(X, 0, 0), eaveL, PALET.yatay, 2);
       cizgi(S(X, 0, acikligMm), eaveR, PALET.yatay, 2);
@@ -144,10 +155,6 @@ export default function TrussIsometricView({ veri }: { veri: TrussIsoVeri }) {
     cizgi(S(X0, T + mahya, yariAciklik), S(X1, T, yariAciklik), PALET.yatay, 2);
   }
 
-  // Kırma: mahya, uçlarda köşelere inen pah (hip) hatlarıyla kısalır - açık beşikten farklı olarak
-  // kaplama yüzeyleri uçlarda üçgen pah yüzeyleriyle kapanır (dikdörtgen değil, altıgen taban).
-  const kirmaMi = catiTipi === "kirma";
-  const hipInsetMm = kirmaMi ? Math.min(yariAciklik, catiUzunluguMm / 2) : 0;
   if (kirmaMi) {
     const A0 = S(0, T, 0);
     const Aend = S(catiUzunluguMm, T, 0);
