@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import {
   OkTanimlari,
   YatayOlcu,
@@ -47,7 +47,7 @@ const PANEL_A_BOTTOM = PANEL_A_TOP + PANEL_A_H + PANEL_A_DIM_H;
 const PANEL_A_LEGEND_Y = PANEL_A_BOTTOM + 8;
 const PANEL_A_TOTAL_H = PANEL_A_LEGEND_Y + 32;
 
-const PANEL_B_TOP = 40;
+const PANEL_B_TOP = 46;
 const PANEL_B_H = 180;
 const PANEL_B_DIM_H = 40;
 const PANEL_B_BOTTOM = PANEL_B_TOP + PANEL_B_H + PANEL_B_DIM_H;
@@ -56,6 +56,7 @@ const PANEL_B_TOTAL_H = PANEL_B_LEGEND_Y + 32;
 
 /** Kesit (bir kafes) görünüşü - üçgen profil, diyagonal/direk detayları. */
 function KesitGorunumu({ veri }: { veri: CatiKafesiSemaVeri }) {
+  const gradientId = useId();
   const {
     catiTipi = "acik_besik",
     dikmeYuksekligiMm: dikmeYuksekligiMmGirdi,
@@ -146,6 +147,16 @@ function KesitGorunumu({ veri }: { veri: CatiKafesiSemaVeri }) {
   const dimAciklikY = zeminY + 30;
   const dimYukseklikX = x0 - 30;
 
+  // Zemin tarama çizgileri (standart mimari çizim kuralı) - çatının boşlukta değil, bir yapının
+  // üzerinde oturduğu hissini vermek için zemin çizgisinin altına kısa diyagonal tikler eklenir.
+  const zeminTicksBaslangic = x0 - 15;
+  const zeminTicksBitis = x0 + scaledAciklik + 15;
+  const zeminTickAraligi = 10;
+  const zeminTickler = Array.from(
+    { length: Math.max(0, Math.floor((zeminTicksBitis - zeminTicksBaslangic) / zeminTickAraligi)) },
+    (_, i) => zeminTicksBaslangic + i * zeminTickAraligi
+  );
+
   const lejant = [
     { renk: PALET.ana, etiket: "Üst/Alt Başlık" },
     { renk: PALET.ikincil, etiket: tekEgimliMi ? "Yüksek Uç Dikmesi" : "Kral Kirişi" },
@@ -159,19 +170,38 @@ function KesitGorunumu({ veri }: { veri: CatiKafesiSemaVeri }) {
   return (
     <svg viewBox={`0 0 ${VIEW_W} ${PANEL_A_TOTAL_H}`} className="w-full h-auto" role="img" aria-label="Çatı kafesi kesit görünüşü şematik çizimi">
       <OkTanimlari />
+      <defs>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#eef2f7" />
+          <stop offset="100%" stopColor="#dde3ea" />
+        </linearGradient>
+      </defs>
       <text x={x0} y={PANEL_A_TOP - 6} fontSize={11} fill="#a3a3a3">
         Kesit görünüşü (bir kafes){catiTipi === "kirma" ? " - orta kesit, uçlarda pah var (bkz. 3D görünüm)" : ""}
       </text>
       <line x1={x0 - 15} y1={zeminY} x2={x0 + scaledAciklik + 15} y2={zeminY} stroke="#a3a3a3" strokeWidth={2} />
+      {zeminTickler.map((tx, i) => (
+        <line key={i} x1={tx} y1={zeminY} x2={tx - 6} y2={zeminY + 6} stroke="#c7ccd2" strokeWidth={1} />
+      ))}
 
       {dikmeYuksekligiMm > 0 && (
         <>
+          <rect
+            x={x0}
+            y={tabanY}
+            width={scaledAciklik}
+            height={zeminY - tabanY}
+            fill={PALET.yatay}
+            fillOpacity={0.12}
+            stroke={PALET.yatay}
+            strokeWidth={1}
+          />
           <line x1={x0} y1={zeminY} x2={x0} y2={tabanY} stroke={PALET.yatay} strokeWidth={baslikKalinlik} />
           <line x1={x0 + scaledAciklik} y1={zeminY} x2={x0 + scaledAciklik} y2={tabanY} stroke={PALET.yatay} strokeWidth={baslikKalinlik} />
         </>
       )}
 
-      <polygon points={gövde} fill="#e5e5e5" stroke="none" />
+      <polygon points={gövde} fill={`url(#${gradientId})`} stroke="none" />
       <line x1={x0} y1={tabanY} x2={x0 + scaledAciklik} y2={tabanY} stroke={PALET.ana} strokeWidth={baslikKalinlik} />
       <line x1={x0} y1={tabanY} x2={xOrta} y2={tepeY} stroke={PALET.ana} strokeWidth={baslikKalinlik} />
       {!tekEgimliMi && (
@@ -211,7 +241,10 @@ function KesitGorunumu({ veri }: { veri: CatiKafesiSemaVeri }) {
   );
 }
 
-/** Aşık yerleşim planı (bir yamaç, açılmış görünüş - üstten bakış). */
+/** Üstten görünüş - binanın gerçek planı (çatı uzunluğu x açıklık), üzerinde kafes pozisyonları,
+ * mahya/pah (hip) hatları ve aşık sıraları. Önceden yalnızca "bir yamaç açılmış" soyut bir şerit
+ * gösteriliyordu (gerçek plan oranlarını yansıtmıyordu, çatı tipleri arasında görsel fark yoktu) -
+ * artık gerçek bina dikdörtgeni üzerinde her çatı tipi kendi mahya/pah şeklini gösteriyor. */
 function AsikPlaniGorunumu({
   veri,
   duzenlenebilir,
@@ -235,47 +268,78 @@ function AsikPlaniGorunumu({
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
   const tekEgimliMi = catiTipi === "duz" || catiTipi === "sundurma";
+  const kirmaMi = catiTipi === "kirma";
   const etkinEgimYuzde = catiTipi === "duz" ? 0 : egimYuzde;
   const yariAciklikMm = tekEgimliMi ? acikligMm : acikligMm / 2;
   const mahyaYuksekligiMm = yariAciklikMm * (etkinEgimYuzde / 100);
   const ustBaslikUzunlukMm = Math.sqrt(yariAciklikMm ** 2 + mahyaYuksekligiMm ** 2);
   const asikSatirSayisiPerSide = asikVar ? Math.max(2, Math.ceil(ustBaslikUzunlukMm / asikAraligiHedefMm) + 1) : 0;
+  const hipInsetMm = kirmaMi ? Math.min(yariAciklikMm, catiUzunluguMm / 2) : 0;
 
   const drawW = VIEW_W - MARGIN_LEFT - MARGIN_RIGHT;
   const scaleBx = drawW / catiUzunluguMm;
-  const scaleBy = PANEL_B_H / ustBaslikUzunlukMm;
+  const scaleBy = PANEL_B_H / acikligMm;
   const bx0 = MARGIN_LEFT;
   const by0 = PANEL_B_TOP;
   const scaledUzunluk = catiUzunluguMm * scaleBx;
-  const scaledRafter = ustBaslikUzunlukMm * scaleBy;
+  const scaledGenislik = acikligMm * scaleBy;
+  // Z ekseni (açıklık yönü) -> ekran Y: Z=0 üstte (by0), Z=acikligMm altta (by0+scaledGenislik).
+  const zY = (zMm: number) => by0 + zMm * scaleBy;
+  const xX = (xMm: number) => bx0 + xMm * scaleBx;
 
-  const kafesXPozisyonlari = Array.from({ length: kafesSayisi }, (_, i) => bx0 + Math.min(i * gercekAralikMm, catiUzunluguMm) * scaleBx);
-  const asikYPozisyonlari = asikVar
-    ? Array.from({ length: asikSatirSayisiPerSide }, (_, i) => by0 + (i / (asikSatirSayisiPerSide - 1)) * scaledRafter)
+  const kafesXPozisyonlari = Array.from({ length: kafesSayisi }, (_, i) => xX(Math.min(i * gercekAralikMm, catiUzunluguMm)));
+  const asikYCiftleri = asikVar
+    ? Array.from({ length: asikSatirSayisiPerSide }, (_, i) => {
+        const oran = i / (asikSatirSayisiPerSide - 1);
+        return tekEgimliMi ? [zY(oran * yariAciklikMm)] : [zY(oran * yariAciklikMm), zY(acikligMm - oran * yariAciklikMm)];
+      }).flat()
     : [];
   const stabiliteCizilecek = stabiliteVar && kafesSayisi >= 2;
   const tiklanabilir = Boolean(duzenlenebilir && onKafesSayisiDegisti);
 
+  // Mahya/pah (hip) hattı - çatı tipine göre farklı şekil: düzde yok, sundurmada yüksek kenarda,
+  // kırmada uçlarda köşelere pah ile kısalır, diğerlerinde (açık beşik/çatı katı) tam ortada.
+  const mahyaY = tekEgimliMi ? zY(acikligMm) : zY(yariAciklikMm);
+  const mahyaCizgileri: { x1: number; y1: number; x2: number; y2: number }[] = [];
+  const pahCizgileri: { x1: number; y1: number; x2: number; y2: number }[] = [];
+  if (catiTipi === "sundurma") {
+    mahyaCizgileri.push({ x1: bx0, y1: mahyaY, x2: bx0 + scaledUzunluk, y2: mahyaY });
+  } else if (kirmaMi) {
+    const rX0 = xX(hipInsetMm);
+    const rX1 = xX(catiUzunluguMm - hipInsetMm);
+    mahyaCizgileri.push({ x1: rX0, y1: mahyaY, x2: rX1, y2: mahyaY });
+    pahCizgileri.push(
+      { x1: bx0, y1: zY(0), x2: rX0, y2: mahyaY },
+      { x1: bx0, y1: zY(acikligMm), x2: rX0, y2: mahyaY },
+      { x1: bx0 + scaledUzunluk, y1: zY(0), x2: rX1, y2: mahyaY },
+      { x1: bx0 + scaledUzunluk, y1: zY(acikligMm), x2: rX1, y2: mahyaY }
+    );
+  } else if (catiTipi !== "duz") {
+    mahyaCizgileri.push({ x1: bx0, y1: mahyaY, x2: bx0 + scaledUzunluk, y2: mahyaY });
+  }
+
   const lejant = [
     { renk: PALET.ana, etiket: "Kafes" },
+    ...(mahyaCizgileri.length > 0 ? [{ renk: PALET.ikincil, etiket: tekEgimliMi ? "Yüksek Kenar" : "Mahya" }] : []),
+    ...(pahCizgileri.length > 0 ? [{ renk: PALET.destek, etiket: "Kırma (Pah) Hattı" }] : []),
     ...(asikVar ? [{ renk: PALET.vurgu, etiket: "Aşık" }] : []),
     ...(stabiliteCizilecek ? [{ renk: PALET.stabilite, etiket: "Stabilite Bağlantısı" }] : []),
   ];
 
   return (
-    <svg viewBox={`0 0 ${VIEW_W} ${PANEL_B_TOTAL_H}`} className="w-full h-auto" role="img" aria-label="Çatı kafesi aşık yerleşim planı şematik çizimi">
+    <svg viewBox={`0 0 ${VIEW_W} ${PANEL_B_TOTAL_H}`} className="w-full h-auto" role="img" aria-label="Çatı kafesi üstten görünüş (çatı planı) şematik çizimi">
       <OkTanimlari />
-      <text x={bx0} y={by0 - 12} fontSize={11} fill="#a3a3a3">
-        Üstten görünüş (bir yamaç, açılmış plan)
+      <text x={bx0} y={16} fontSize={11} fill="#a3a3a3">
+        Üstten görünüş (çatı planı)
       </text>
-      <rect x={bx0} y={by0} width={scaledUzunluk} height={scaledRafter} fill="#f5f5f5" stroke="#d4d4d4" />
+      <rect x={bx0} y={by0} width={scaledUzunluk} height={scaledGenislik} fill="#f5f5f5" stroke="#d4d4d4" />
 
       {tiklanabilir && (
         <rect
           x={bx0}
           y={by0}
           width={scaledUzunluk}
-          height={scaledRafter}
+          height={scaledGenislik}
           fill="transparent"
           style={{ cursor: "copy" }}
           onClick={() => onKafesSayisiDegisti!(kafesSayisi + 1)}
@@ -284,15 +348,33 @@ function AsikPlaniGorunumu({
         </rect>
       )}
 
+      {asikYCiftleri.map((py, i) => (
+        <line key={i} x1={bx0} y1={py} x2={bx0 + scaledUzunluk} y2={py} stroke={PALET.vurgu} strokeWidth={1.5} style={{ pointerEvents: "none" }} />
+      ))}
+      {pahCizgileri.map((c, i) => (
+        <line key={i} x1={c.x1} y1={c.y1} x2={c.x2} y2={c.y2} stroke={PALET.destek} strokeWidth={2} style={{ pointerEvents: "none" }} />
+      ))}
+      {mahyaCizgileri.map((c, i) => (
+        <line key={i} x1={c.x1} y1={c.y1} x2={c.x2} y2={c.y2} stroke={PALET.ikincil} strokeWidth={2.5} style={{ pointerEvents: "none" }} />
+      ))}
+
       {kafesXPozisyonlari.map((px, i) => (
         <g key={i}>
-          <line x1={px} y1={by0} x2={px} y2={by0 + scaledRafter} stroke={hoverIndex === i && tiklanabilir ? "#dc2626" : PALET.ana} strokeWidth={2.5} style={{ pointerEvents: "none" }} />
+          <line
+            x1={px}
+            y1={by0}
+            x2={px}
+            y2={by0 + scaledGenislik}
+            stroke={hoverIndex === i && tiklanabilir ? "#dc2626" : PALET.ana}
+            strokeWidth={2.5}
+            style={{ pointerEvents: "none" }}
+          />
           {tiklanabilir && kafesSayisi > 2 && (
             <rect
               x={px - 7}
               y={by0}
               width={14}
-              height={scaledRafter}
+              height={scaledGenislik}
               fill="transparent"
               style={{ cursor: "pointer" }}
               onMouseEnter={() => setHoverIndex(i)}
@@ -308,18 +390,15 @@ function AsikPlaniGorunumu({
           )}
         </g>
       ))}
-      {asikYPozisyonlari.map((py, i) => (
-        <line key={i} x1={bx0} y1={py} x2={bx0 + scaledUzunluk} y2={py} stroke={PALET.vurgu} strokeWidth={2} style={{ pointerEvents: "none" }} />
-      ))}
       {stabiliteCizilecek && (
         <g>
-          <line x1={kafesXPozisyonlari[0]} y1={by0} x2={kafesXPozisyonlari[1]} y2={by0 + scaledRafter} stroke={PALET.stabilite} strokeWidth={2.5} />
-          <line x1={kafesXPozisyonlari[0]} y1={by0 + scaledRafter} x2={kafesXPozisyonlari[1]} y2={by0} stroke={PALET.stabilite} strokeWidth={2.5} />
+          <line x1={kafesXPozisyonlari[0]} y1={by0} x2={kafesXPozisyonlari[1]} y2={by0 + scaledGenislik} stroke={PALET.stabilite} strokeWidth={2.5} />
+          <line x1={kafesXPozisyonlari[0]} y1={by0 + scaledGenislik} x2={kafesXPozisyonlari[1]} y2={by0} stroke={PALET.stabilite} strokeWidth={2.5} />
         </g>
       )}
 
-      <YatayOlcu x1={bx0} x2={bx0 + scaledUzunluk} y={by0 + scaledRafter + 30} etiket={mmEtiket(catiUzunluguMm)} />
-      <DikeyOlcu y1={by0} y2={by0 + scaledRafter} x={bx0 - 30} etiket={mmEtiket(ustBaslikUzunlukMm)} />
+      <YatayOlcu x1={bx0} x2={bx0 + scaledUzunluk} y={by0 + scaledGenislik + 30} etiket={mmEtiket(catiUzunluguMm)} />
+      <DikeyOlcu y1={by0} y2={by0 + scaledGenislik} x={bx0 - 30} etiket={mmEtiket(acikligMm)} />
       {kafesXPozisyonlari.length > 1 && (
         <YatayOlcu x1={kafesXPozisyonlari[0]} x2={kafesXPozisyonlari[1]} y={by0 - 12} etiket={mmEtiket(gercekAralikMm)} etiketAltta={false} fontSize={10} kalin={false} />
       )}

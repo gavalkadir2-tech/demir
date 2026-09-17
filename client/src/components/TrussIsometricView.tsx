@@ -124,16 +124,21 @@ export default function TrussIsometricView({ veri }: { veri: TrussIsoVeri }) {
     cizgi(S(0, 0, acikligMm), S(catiUzunluguMm, 0, acikligMm), PALET.yatay, 1.5);
   }
 
-  // Aşıklar (çatı uzunluğu boyunca; tek eğimlide tek yamaç, diğerlerinde iki yamaç)
+  // Aşıklar (çatı uzunluğu boyunca; tek eğimlide tek yamaç, diğerlerinde iki yamaç). Kırmada aşık
+  // hattının uzunluğu, o yükseklikteki pah yamuğunun genişliğine göre daralır (mahyaya yaklaştıkça
+  // X aralığı [oran*hipInsetMm, catiUzunluguMm - oran*hipInsetMm]'e kısalır) - aksi halde aşıklar
+  // pah yüzeyinin dışına taşardı.
   if (asikVar) {
     for (const oran of asikOranlari) {
-      const solBas = S(0, T + oran * mahya, oran * yariAciklik);
-      const solSon = S(catiUzunluguMm, T + oran * mahya, oran * yariAciklik);
+      const xBas = kirmaMi ? oran * hipInsetMm : 0;
+      const xSon = kirmaMi ? catiUzunluguMm - oran * hipInsetMm : catiUzunluguMm;
+      const solBas = S(xBas, T + oran * mahya, oran * yariAciklik);
+      const solSon = S(xSon, T + oran * mahya, oran * yariAciklik);
       cizgi(solBas, solSon, PALET.vurgu, 1.5);
       if (!tekEgimliMi) {
         const sagZ = acikligMm - oran * yariAciklik;
-        const sagBas = S(0, T + oran * mahya, sagZ);
-        const sagSon = S(catiUzunluguMm, T + oran * mahya, sagZ);
+        const sagBas = S(xBas, T + oran * mahya, sagZ);
+        const sagSon = S(xSon, T + oran * mahya, sagZ);
         cizgi(sagBas, sagSon, PALET.vurgu, 1.5);
       }
     }
@@ -168,35 +173,81 @@ export default function TrussIsometricView({ veri }: { veri: TrussIsoVeri }) {
     cizgi(Bend, R1, PALET.destek, 2);
   }
 
-  // Çatı kaplaması (yarı saydam, sadece görsel bağlam için) - tek eğimlide tek yamaç yüzeyi yeterli;
-  // kırmada mahya kısalır ve uçlarda üçgen pah yüzeyleri eklenir.
-  const kaplamaPoligonlari = kaplamaGoster
+  // Çatı kaplaması (sadece görsel bağlam için) - tek eğimlide tek yamaç yüzeyi yeterli; kırmada
+  // mahya kısalır ve uçlarda üçgen pah yüzeyleri eklenir. Her yüzey, 3B normaline göre (basit bir
+  // "yukarı-öne-sola" ışık kaynağına göre) farklı tonlanır - düz bir mavi yerine yamaçlar birbirinden
+  // ayırt edilebilir, daha üç boyutlu bir izlenim verir.
+  type Nokta3 = [number, number, number];
+  const kaplamaYuzeyleri3D: Nokta3[][] = kaplamaGoster
     ? kirmaMi
       ? [
-          [S(0, T, 0), S(hipInsetMm, T + mahya, yariAciklik), S(catiUzunluguMm - hipInsetMm, T + mahya, yariAciklik), S(catiUzunluguMm, T, 0)],
           [
-            S(hipInsetMm, T + mahya, yariAciklik),
-            S(0, T, acikligMm),
-            S(catiUzunluguMm, T, acikligMm),
-            S(catiUzunluguMm - hipInsetMm, T + mahya, yariAciklik),
+            [0, T, 0],
+            [hipInsetMm, T + mahya, yariAciklik],
+            [catiUzunluguMm - hipInsetMm, T + mahya, yariAciklik],
+            [catiUzunluguMm, T, 0],
           ],
-          [S(0, T, 0), S(hipInsetMm, T + mahya, yariAciklik), S(0, T, acikligMm)],
-          [S(catiUzunluguMm, T, 0), S(catiUzunluguMm - hipInsetMm, T + mahya, yariAciklik), S(catiUzunluguMm, T, acikligMm)],
+          [
+            [hipInsetMm, T + mahya, yariAciklik],
+            [0, T, acikligMm],
+            [catiUzunluguMm, T, acikligMm],
+            [catiUzunluguMm - hipInsetMm, T + mahya, yariAciklik],
+          ],
+          [
+            [0, T, 0],
+            [hipInsetMm, T + mahya, yariAciklik],
+            [0, T, acikligMm],
+          ],
+          [
+            [catiUzunluguMm, T, 0],
+            [catiUzunluguMm - hipInsetMm, T + mahya, yariAciklik],
+            [catiUzunluguMm, T, acikligMm],
+          ],
         ]
       : [
-          [S(0, T, 0), S(0, T + mahya, yariAciklik), S(catiUzunluguMm, T + mahya, yariAciklik), S(catiUzunluguMm, T, 0)],
+          [
+            [0, T, 0],
+            [0, T + mahya, yariAciklik],
+            [catiUzunluguMm, T + mahya, yariAciklik],
+            [catiUzunluguMm, T, 0],
+          ],
           ...(tekEgimliMi
             ? []
-            : [
+            : ([
                 [
-                  S(0, T + mahya, yariAciklik),
-                  S(0, T, acikligMm),
-                  S(catiUzunluguMm, T, acikligMm),
-                  S(catiUzunluguMm, T + mahya, yariAciklik),
+                  [0, T + mahya, yariAciklik],
+                  [0, T, acikligMm],
+                  [catiUzunluguMm, T, acikligMm],
+                  [catiUzunluguMm, T + mahya, yariAciklik],
                 ],
-              ]),
+              ] as Nokta3[][])),
         ]
     : [];
+
+  const isikYonu = ((): Nokta3 => {
+    const [lx, ly, lz] = [-0.5, 0.85, -0.6];
+    const len = Math.sqrt(lx * lx + ly * ly + lz * lz);
+    return [lx / len, ly / len, lz / len];
+  })();
+  const yuzeyTonlu = kaplamaYuzeyleri3D.map((noktalar) => {
+    const [p0, p1, p2] = noktalar;
+    const u: Nokta3 = [p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]];
+    const v: Nokta3 = [p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2]];
+    const n: Nokta3 = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+    const nLen = Math.sqrt(n[0] ** 2 + n[1] ** 2 + n[2] ** 2) || 1;
+    const parlaklik = Math.max(
+      0,
+      (n[0] / nLen) * isikYonu[0] + (n[1] / nLen) * isikYonu[1] + (n[2] / nLen) * isikYonu[2]
+    );
+    const derinlik = noktalar.reduce((s, p) => s + p[0] + p[2], 0) / noktalar.length;
+    return { noktalar, fillOpacity: 0.16 + 0.32 * parlaklik, derinlik };
+  });
+  // Derinlik sıralaması (uzak->yakın) - çakışan yüzeyler doğru üst üste binsin diye.
+  yuzeyTonlu.sort((a, b) => a.derinlik - b.derinlik);
+  const kaplamaPoligonlari = yuzeyTonlu.map((y) => ({
+    puanlar: y.noktalar.map(([x, yy, z]) => S(x, yy, z)),
+    fillOpacity: y.fillOpacity,
+  }));
 
   const lejant = [
     { renk: PALET.ana, etiket: "Başlık" },
@@ -210,8 +261,16 @@ export default function TrussIsometricView({ veri }: { veri: TrussIsoVeri }) {
 
   return (
     <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H + 36}`} className="w-full h-auto" role="img" aria-label="Çatı kafesi 3D izometrik görünüm">
-      {kaplamaPoligonlari.map((pts, i) => (
-        <polygon key={i} points={pts.map((p) => `${p.x},${p.y}`).join(" ")} fill="#93c5fd" fillOpacity={0.25} stroke="none" />
+      {kaplamaPoligonlari.map((y, i) => (
+        <polygon
+          key={i}
+          points={y.puanlar.map((p) => `${p.x},${p.y}`).join(" ")}
+          fill="#3b82f6"
+          fillOpacity={y.fillOpacity}
+          stroke="#3b82f6"
+          strokeOpacity={0.3}
+          strokeWidth={0.75}
+        />
       ))}
       {cizgiler.map((c, i) => (
         <line
