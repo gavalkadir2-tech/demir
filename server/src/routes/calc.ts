@@ -14,7 +14,7 @@ const kaplamaTuruEnum = z.enum(["trapez_sac", "sandvic_panel", "etermit", "plast
 // alanları) alçıpan olarak seçilebilsin - bkz. client DUVAR_DIS_KAPLAMA_SECENEKLERI.
 const disKaplamaTuruEnum = z.enum(["trapez_sac", "sandvic_panel", "petopan", "alcipan", "yok"]);
 const icKaplamaTuruEnum = z.enum(["alcipan", "yok"]);
-const tabanKaplamaTuruEnum = z.enum(["trapez_sac", "sandvic_panel", "yok"]);
+const tabanKaplamaTuruEnum = z.enum(["trapez_sac", "sandvic_panel", "betopan", "yok"]);
 
 const railingSchema = z.object({
   toplamUzunlukMm: z.number(),

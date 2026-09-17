@@ -122,11 +122,12 @@ const DUVAR_IC_KAPLAMA_SECENEKLERI = [
   { key: "yok", label: "Kaplama Yok" },
 ];
 
-// Taban/zemin döşemesi için: yapısal taşıyıcılık gereken bir yüzey olduğundan sadece sac/panel
-// tipi kaplamalar listelenir (etermit/polikarbon/petopan/alçıpan taban için uygun değildir).
+// Taban/zemin döşemesi için: yapısal taşıyıcılık gereken bir yüzey olduğundan sadece sac/panel/rijit
+// levha tipi kaplamalar listelenir (etermit/polikarbon/petopan/alçıpan taban için uygun değildir).
 const KONTEYNER_TABAN_KAPLAMA_SECENEKLERI = [
   { key: "trapez_sac", label: "Trapez Sac" },
   { key: "sandvic_panel", label: "Sandviç Panel" },
+  { key: "betopan", label: "Betopan" },
   { key: "yok", label: "Kaplama Yok" },
 ];
 

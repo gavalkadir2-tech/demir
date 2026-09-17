@@ -9,6 +9,7 @@ export type KaplamaTuru =
   | "polikarbon"
   | "alcipan"
   | "petopan"
+  | "betopan"
   | "yok";
 
 /** Kaplamanın hangi yüzeyde kullanılabileceği - seçim listelerini bağlama göre filtrelemek için. */
@@ -87,6 +88,14 @@ export const KAPLAMA_BILGI: Record<Exclude<KaplamaTuru, "yok">, KaplamaBilgisi> 
     faydaliGenislikMm: 500,
     tipikFireYuzde: 12,
     kullanimAlanlari: ["duvar_dis"],
+  },
+  betopan: {
+    label: "betopan (çimento esaslı yer levhası)",
+    varsayilanKalinlikMm: 18,
+    efektifYogunlukKgM3: 1200,
+    faydaliGenislikMm: 1250,
+    tipikFireYuzde: 8,
+    kullanimAlanlari: ["taban"],
   },
 };
 
