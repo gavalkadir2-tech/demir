@@ -8,8 +8,9 @@ export interface TrussIsoVeri {
   acikligMm: number;
   egimYuzde: number;
   catiUzunluguMm: number;
-  kafesSayisi: number;
-  gercekAralikMm: number;
+  /** Her kafesin çatı uzunluğu ekseninde gerçek pozisyonu (mm) - eşit aralıklı olmak zorunda değil
+   * (bkz. TrussSchematic.tsx kafesPozisyonHesapla). */
+  kafesPozisyonlariMm: number[];
   asikVar?: boolean;
   asikAraligiHedefMm?: number;
   stabiliteVar?: boolean;
@@ -39,14 +40,13 @@ export default function TrussIsometricView({ veri }: { veri: TrussIsoVeri }) {
     acikligMm,
     egimYuzde,
     catiUzunluguMm,
-    kafesSayisi,
-    gercekAralikMm,
+    kafesPozisyonlariMm,
     asikVar = false,
     asikAraligiHedefMm = 1000,
     stabiliteVar = false,
     kaplamaGoster = true,
   } = veri;
-  if (!acikligMm || !catiUzunluguMm || kafesSayisi < 1) return null;
+  if (!acikligMm || !catiUzunluguMm || kafesPozisyonlariMm.length < 1) return null;
 
   const tekEgimliMi = catiTipi === "duz" || catiTipi === "sundurma";
   const etkinEgimYuzde = catiTipi === "duz" ? 0 : egimYuzde;
@@ -85,7 +85,7 @@ export default function TrussIsometricView({ veri }: { veri: TrussIsoVeri }) {
     return { x: sx * scale + offX, y: sy * scale + offY };
   };
 
-  const kafesXler = Array.from({ length: kafesSayisi }, (_, i) => Math.min(i * gercekAralikMm, catiUzunluguMm));
+  const kafesXler = kafesPozisyonlariMm;
   const asikSatirSayisiPerSide = asikVar ? Math.max(2, Math.ceil(ustBaslikUzunluk / asikAraligiHedefMm) + 1) : 0;
   const asikOranlari = Array.from({ length: asikSatirSayisiPerSide }, (_, i) => i / (asikSatirSayisiPerSide - 1));
 
@@ -145,7 +145,7 @@ export default function TrussIsometricView({ veri }: { veri: TrussIsoVeri }) {
   }
 
   // Stabilite bağlantıları (ilk açıklıkta, X şeklinde)
-  if (stabiliteVar && kafesSayisi >= 2) {
+  if (stabiliteVar && kafesXler.length >= 2) {
     const X0 = kafesXler[0];
     const X1 = kafesXler[1];
     // Yatay (üst başlık düzleminde; tek eğimlide tek yamaç, diğerlerinde iki yamaç)

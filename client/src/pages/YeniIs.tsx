@@ -721,13 +721,14 @@ export function UrunFormu({
     setSemaSayiSurumu((v) => v + 1);
   };
 
-  /** Çatı kafesi şematiğinde bir kafese tıklanarak artırma/azaltma yapıldığında çağrılır;
-   * kafesSayisiOverride backend'de kafesAraligiHedefMm'den otomatik hesabın yerine geçer. */
-  const kafesSayisiGuncelle = async (yeniSayi: number) => {
-    if (yeniSayi < 2) return;
-    const yeniParams = { ...params, kafesSayisiOverride: yeniSayi };
-    await hesapla(yeniParams);
-    setSemaSayiSurumu((v) => v + 1);
+  /** Çatı kafesi şematiğinde (tıpkı duvar panelinin dikme düzenlemesi gibi) boş alana tıklayarak
+   * kafes ekleme / bir kafese tıklayarak kaldırma yapıldığında çağrılır (null = otomatik yerleşime
+   * dön). dikmePozisyonlariGuncelle ile aynı desen - undo/redo geçmişine eklenir. */
+  const kafesPozisyonlariGuncelle = (yeniListe: number[] | null) => {
+    const yeniParams = { ...params };
+    if (yeniListe) yeniParams.kafesPozisyonlariOverrideMm = yeniListe;
+    else delete yeniParams.kafesPozisyonlariOverrideMm;
+    semaDegisikligiUygula(yeniParams);
   };
 
   /** Ferforje panel şematiğinde bir dikey çubuğa tıklanarak artırma/azaltma yapıldığında çağrılır;
@@ -787,26 +788,27 @@ export function UrunFormu({
     await semaDegisikligiUygula({ ...params, icDuvarlar: yeniListeler });
   };
 
-  /** Konteyner şematiğinin "Çatı" sekmesinde bir kafese tıklanarak artırma/azaltma yapıldığında
-   * çağrılır; kafesSayisiOverride params.cati içine yazılır. */
-  const konteynerCatiKafesSayisiGuncelle = async (yeniSayi: number) => {
-    if (yeniSayi < 2) return;
+  /** Konteyner şematiğinin "Çatı" sekmesinde boş alana tıklayarak kafes ekleme / bir kafese
+   * tıklayarak kaldırma yapıldığında çağrılır; kafesPozisyonlariOverrideMm params.cati içine
+   * yazılır (null = otomatik yerleşime dön). */
+  const konteynerCatiKafesPozisyonlariGuncelle = async (yeniListe: number[] | null) => {
     const mevcutCati = (params.cati as Record<string, unknown> | undefined) ?? {};
-    const yeniCati = { ...mevcutCati, kafesSayisiOverride: yeniSayi };
-    await hesapla({ ...params, cati: yeniCati });
-    setSemaSayiSurumu((v) => v + 1);
+    const yeniCati = { ...mevcutCati };
+    if (yeniListe) yeniCati.kafesPozisyonlariOverrideMm = yeniListe;
+    else delete yeniCati.kafesPozisyonlariOverrideMm;
+    await semaDegisikligiUygula({ ...params, cati: yeniCati });
   };
 
   /** CatiKafesiAlanlari'nın onChange'i kendi izlediği alanlarla params'ı baştan kurar ve
-   * kafesSayisiOverride'ı hiç içermez; çatı uzunluğu değişmediyse (override'ın hâlâ geçerli
+   * kafesPozisyonlariOverrideMm'i hiç içermez; çatı uzunluğu değişmediyse (override'ın hâlâ geçerli
    * olduğu anlamına gelir) mevcut override korunur - bu hem sonraki alan değişikliklerinde hem de
    * şematik tıklamasının kendi tetiklediği yeniden-mount'ta (semaSayiSurumu) override'ın silinmesini
    * önler. */
   const catiKafesiParamsGuncelle = (yeni: Record<string, unknown>) => {
     setParams((onceki) => {
       const uzunlukSabit = yeni.catiUzunluguMm === onceki.catiUzunluguMm;
-      const korunabilir = onceki.kafesSayisiOverride && uzunlukSabit;
-      return { ...yeni, ...(korunabilir ? { kafesSayisiOverride: onceki.kafesSayisiOverride } : {}) };
+      const korunabilir = onceki.kafesPozisyonlariOverrideMm && uzunlukSabit;
+      return { ...yeni, ...(korunabilir ? { kafesPozisyonlariOverrideMm: onceki.kafesPozisyonlariOverrideMm } : {}) };
     });
   };
 
@@ -1030,13 +1032,13 @@ export function UrunFormu({
             onKolonSiraAdediDegisti={templateKey === "pergola" ? kolonSiraAdediGuncelle : undefined}
             onAcikSayisiDegisti={templateKey === "steel_frame" ? acikSayisiGuncelle : undefined}
             onRafSayisiDegisti={templateKey === "shelf" ? rafSayisiGuncelle : undefined}
-            onKafesSayisiDegisti={templateKey === "truss" ? kafesSayisiGuncelle : undefined}
+            onKafesPozisyonlariDegisti={templateKey === "truss" ? kafesPozisyonlariGuncelle : undefined}
             onDikeyCubukSayisiDegisti={templateKey === "ferforje_panel" ? dikeyCubukSayisiGuncelle : undefined}
             onKonteynerDuvarDikmeDegisti={templateKey === "container" ? konteynerDuvarDikmeGuncelle : undefined}
             onKonteynerDuvarYatayDegisti={templateKey === "container" ? konteynerDuvarYatayGuncelle : undefined}
             onKonteynerIcDuvarDikmeDegisti={templateKey === "container" ? konteynerIcDuvarDikmeGuncelle : undefined}
             onKonteynerIcDuvarYatayDegisti={templateKey === "container" ? konteynerIcDuvarYatayGuncelle : undefined}
-            onKonteynerCatiKafesSayisiDegisti={templateKey === "container" ? konteynerCatiKafesSayisiGuncelle : undefined}
+            onKonteynerCatiKafesPozisyonlariDegisti={templateKey === "container" ? konteynerCatiKafesPozisyonlariGuncelle : undefined}
           />
 
           <HesapSonucuGorunum sonuc={onizleme.sonuc} malzemeler={onizleme.malzemeler} />
@@ -2101,7 +2103,13 @@ function CatiKafesiAlanlari({
       )}
       <div className="grid grid-cols-2 gap-3">
         <MaterialSelect label="Üst Başlık Profili" materials={materials} value={ustBaslikProfilId} onChange={setUstBaslikProfilId} />
-        <MaterialSelect label="Alt Başlık Profili" materials={materials} value={altBaslikProfilId} onChange={setAltBaslikProfilId} />
+        <MaterialSelect
+          label="Alt Başlık Profili (opsiyonel)"
+          materials={materials}
+          value={altBaslikProfilId}
+          onChange={setAltBaslikProfilId}
+          allowEmpty
+        />
       </div>
       {catiTipi === "kirma" && (
         <MaterialSelect
@@ -2763,7 +2771,7 @@ interface KonteynerCatiDegerleri {
   kirmaMahyaKirisiProfilId?: number;
   plakaMalzemeId?: number;
   ankrajMalzemeId?: number;
-  kafesSayisiOverride?: number;
+  kafesPozisyonlariOverrideMm?: number[];
 }
 
 function konteynerCatiVarsayilan(): KonteynerCatiDegerleri {
@@ -3054,7 +3062,13 @@ function KonteynerCatiFormu({
       )}
       <div className="grid grid-cols-2 gap-3">
         <MaterialSelect label="Üst Başlık Profili" materials={materials} value={deger.ustBaslikProfilId} onChange={(v) => onDegis({ ustBaslikProfilId: v })} />
-        <MaterialSelect label="Alt Başlık Profili" materials={materials} value={deger.altBaslikProfilId} onChange={(v) => onDegis({ altBaslikProfilId: v })} />
+        <MaterialSelect
+          label="Alt Başlık Profili (opsiyonel)"
+          materials={materials}
+          value={deger.altBaslikProfilId}
+          onChange={(v) => onDegis({ altBaslikProfilId: v })}
+          allowEmpty
+        />
       </div>
       {catiTipi === "kirma" && (
         <MaterialSelect

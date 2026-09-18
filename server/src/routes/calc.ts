@@ -158,7 +158,7 @@ const trussSchema = z.object({
   catiUzunluguMm: z.number(),
   kafesAraligiHedefMm: z.number(),
   ustBaslikProfilId: z.number().int(),
-  altBaslikProfilId: z.number().int(),
+  altBaslikProfilId: z.number().int().optional(),
   kralKirisiProfilId: z.number().int().optional(),
   diyagonalProfilId: z.number().int().optional(),
   diyagonalSayisi: z.number().int().optional(),
@@ -184,6 +184,7 @@ const trussSchema = z.object({
   dikmeDuvarProfilId: z.number().int().optional(),
   kirmaMahyaKirisiProfilId: z.number().int().optional(),
   kafesSayisiOverride: z.number().int().optional(),
+  kafesPozisyonlariOverrideMm: z.array(z.number()).optional(),
 });
 
 const shelfSchema = z.object({

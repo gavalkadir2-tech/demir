@@ -528,3 +528,75 @@ test("çatı tipi 'kirma': çatı uzunluğu açıklıktan küçük/eşitse hata 
     HesaplamaHatasi
   );
 });
+
+test("çatı kafesi: alt başlık profili verilmezse alt başlık parçası eklenmez, hata fırlatmaz", () => {
+  const sonuc = calculateRoofTruss({
+    acikligMm: 6000,
+    egimYuzde: 30,
+    catiUzunluguMm: 9000,
+    kafesAraligiHedefMm: 900,
+    ustBaslikProfilKey: "ust",
+  });
+
+  assert.ok(!sonuc.parcalar.some((p) => p.label === "Alt başlık"));
+  assert.ok(sonuc.parcalar.some((p) => p.label === "Üst başlık"));
+});
+
+test("çatı kafesi: üst başlık profili verilmezse hata fırlatır", () => {
+  assert.throws(
+    () =>
+      calculateRoofTruss({
+        acikligMm: 6000,
+        egimYuzde: 30,
+        catiUzunluguMm: 9000,
+        kafesAraligiHedefMm: 900,
+        ustBaslikProfilKey: "",
+      }),
+    HesaplamaHatasi
+  );
+});
+
+test("çatı kafesi: kafesPozisyonlariOverrideMm verilirse elle yerleştirilen pozisyonlar aynen kullanılır", () => {
+  const sonuc = calculateRoofTruss({
+    acikligMm: 6000,
+    egimYuzde: 30,
+    catiUzunluguMm: 3000,
+    kafesAraligiHedefMm: 900,
+    ustBaslikProfilKey: "ust",
+    altBaslikProfilKey: "alt",
+    kafesPozisyonlariOverrideMm: [0, 1000, 2000, 3000], // eşit aralıklı değil (900 hedefine göre), elle yerleştirilmiş
+  });
+
+  assert.equal(sonuc.ozetDegerler.kafesSayisi, 4);
+  const altBaslik = sonuc.parcalar.find((p) => p.label === "Alt başlık")!;
+  assert.equal(altBaslik.adet, 4);
+  // Uçlarda kafes var, en büyük boşluk (1000mm) hedefin (900mm) %150'sini (1350mm) aşmıyor -> uyarı yok.
+  assert.equal(sonuc.uyarilar.length, 0);
+});
+
+test("çatı kafesi: kafesPozisyonlariOverrideMm ile uç boşluğu/aşırı aralık uyarısı verir", () => {
+  const sonuc = calculateRoofTruss({
+    acikligMm: 6000,
+    egimYuzde: 30,
+    catiUzunluguMm: 9000,
+    kafesAraligiHedefMm: 900,
+    ustBaslikProfilKey: "ust",
+    kafesPozisyonlariOverrideMm: [500, 3000, 9000], // sol uçta kafes yok + 2500mm boşluk (900*1.5=1350 sınırını aşıyor)
+  });
+
+  assert.ok(sonuc.uyarilar.some((u) => u.includes("bir ucunda kafes yok")));
+  assert.ok(sonuc.uyarilar.some((u) => u.includes("boşluk var")));
+});
+
+test("çatı kafesi: kafesPozisyonlariOverrideMm tekrarlı/sırasız pozisyonları temizler", () => {
+  const sonuc = calculateRoofTruss({
+    acikligMm: 6000,
+    egimYuzde: 30,
+    catiUzunluguMm: 9000,
+    kafesAraligiHedefMm: 900,
+    ustBaslikProfilKey: "ust",
+    kafesPozisyonlariOverrideMm: [9000, 0, 4500, 0, 4500.4], // sırasız + yakın tekrar (yuvarlanınca eşit)
+  });
+
+  assert.equal(sonuc.ozetDegerler.kafesSayisi, 3); // 0, 4500 (veya 4500.4->4500), 9000
+});

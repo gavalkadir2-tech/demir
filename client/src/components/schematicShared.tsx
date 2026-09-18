@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { sayi } from "../lib/format";
 import { Material } from "../api/types";
 
@@ -172,6 +172,20 @@ export function kesitOlcusu(material?: Material | null, varsayilan: KesitOlcusu 
  * ölçeklenmiş kalınlık gösterimi. */
 export function olcekliKalinlikPx(gercekMm: number, scale: number, minPx = 1.5, maxPx = 24): number {
   return Math.min(maxPx, Math.max(minPx, gercekMm * scale));
+}
+
+/** Tıklanan noktanın, SVG'nin responsive ölçeklemesinden bağımsız gerçek viewBox koordinatını
+ * verir - böylece ekran pikseli değil, çizimin kendi koordinat sistemi kullanılır. Tıklayarak
+ * eleman ekleme/kaldırma yapılan tüm şematik çizimlerde (duvar, çatı kafesi, ...) ortak kullanılır. */
+export function svgKoordDonustur(e: ReactMouseEvent<SVGElement>): { x: number; y: number } {
+  const svg = e.currentTarget.ownerSVGElement ?? (e.currentTarget as unknown as SVGSVGElement);
+  const pt = svg.createSVGPoint();
+  pt.x = e.clientX;
+  pt.y = e.clientY;
+  const ctm = svg.getScreenCTM();
+  if (!ctm) return { x: 0, y: 0 };
+  const loc = pt.matrixTransform(ctm.inverse());
+  return { x: loc.x, y: loc.y };
 }
 
 // --- Çoklu açı görünüm sekmesi ----------------------------------------------------------------

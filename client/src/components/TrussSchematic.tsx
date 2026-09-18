@@ -9,6 +9,7 @@ import {
   VIEW_W,
   KesitOlcusu,
   olcekliKalinlikPx,
+  svgKoordDonustur,
   GorunumSekmeleri,
   SemaGorunumTipi,
 } from "./schematicShared";
@@ -31,11 +32,26 @@ export interface CatiKafesiSemaVeri {
   diyagonalPanelSayisi?: number;
   kafesSayisi?: number;
   gercekAralikMm?: number;
+  /** Kullanıcının önceden elle (tıklayarak) düzenlediği kafes pozisyonları (mm) - verilirse
+   * otomatik eşit aralık yerleşimi yerine doğrudan bu liste kullanılır (bkz. WallSchematic'teki
+   * dikmePozisyonlariOverrideMm ile aynı desen). */
+  kafesPozisyonlariOverrideMm?: number[];
   stabiliteVar?: boolean;
   direkSayisi?: number;
   ustBaslikKesit?: KesitOlcusu;
   kralKirisiKesit?: KesitOlcusu;
   asikKesit?: KesitOlcusu;
+}
+
+/** Gerçek kafes pozisyonlarını (mm, çatı uzunluğu ekseninde) döner - kullanıcı şematik üzerinden
+ * elle düzenlemişse (kafesPozisyonlariOverrideMm) aynen bu liste kullanılır, aksi halde
+ * kafesSayisi/gercekAralikMm'den eşit aralıklı pozisyonlar türetilir. */
+function kafesPozisyonHesapla(veri: CatiKafesiSemaVeri): number[] {
+  const { catiUzunluguMm, kafesSayisi = 2, gercekAralikMm = catiUzunluguMm, kafesPozisyonlariOverrideMm } = veri;
+  if (kafesPozisyonlariOverrideMm && kafesPozisyonlariOverrideMm.length > 0) {
+    return Array.from(new Set(kafesPozisyonlariOverrideMm.map((x) => Math.round(x)))).sort((a, b) => a - b);
+  }
+  return Array.from({ length: kafesSayisi }, (_, i) => Math.min(Math.round(i * gercekAralikMm), catiUzunluguMm));
 }
 
 const MARGIN_LEFT = 70;
@@ -248,11 +264,11 @@ function KesitGorunumu({ veri }: { veri: CatiKafesiSemaVeri }) {
 function AsikPlaniGorunumu({
   veri,
   duzenlenebilir,
-  onKafesSayisiDegisti,
+  onKafesPozisyonlariDegisti,
 }: {
   veri: CatiKafesiSemaVeri;
   duzenlenebilir?: boolean;
-  onKafesSayisiDegisti?: (yeniSayi: number) => void;
+  onKafesPozisyonlariDegisti?: (yeniListe: number[] | null) => void;
 }) {
   const {
     catiTipi = "acik_besik",
@@ -261,11 +277,10 @@ function AsikPlaniGorunumu({
     catiUzunluguMm,
     asikVar = false,
     asikAraligiHedefMm = 1000,
-    kafesSayisi = 2,
-    gercekAralikMm = catiUzunluguMm,
     stabiliteVar = false,
   } = veri;
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const kafesPozisyonlari = kafesPozisyonHesapla(veri);
 
   const tekEgimliMi = catiTipi === "duz" || catiTipi === "sundurma";
   const kirmaMi = catiTipi === "kirma";
@@ -287,15 +302,16 @@ function AsikPlaniGorunumu({
   const zY = (zMm: number) => by0 + zMm * scaleBy;
   const xX = (xMm: number) => bx0 + xMm * scaleBx;
 
-  const kafesXPozisyonlari = Array.from({ length: kafesSayisi }, (_, i) => xX(Math.min(i * gercekAralikMm, catiUzunluguMm)));
+  const kafesXPozisyonlari = kafesPozisyonlari.map(xX);
+  const gercekAralikMm = kafesPozisyonlari.length > 1 ? kafesPozisyonlari[1] - kafesPozisyonlari[0] : catiUzunluguMm;
   const asikYCiftleri = asikVar
     ? Array.from({ length: asikSatirSayisiPerSide }, (_, i) => {
         const oran = i / (asikSatirSayisiPerSide - 1);
         return tekEgimliMi ? [zY(oran * yariAciklikMm)] : [zY(oran * yariAciklikMm), zY(acikligMm - oran * yariAciklikMm)];
       }).flat()
     : [];
-  const stabiliteCizilecek = stabiliteVar && kafesSayisi >= 2;
-  const tiklanabilir = Boolean(duzenlenebilir && onKafesSayisiDegisti);
+  const stabiliteCizilecek = stabiliteVar && kafesPozisyonlari.length >= 2;
+  const tiklanabilir = Boolean(duzenlenebilir && onKafesPozisyonlariDegisti);
 
   // Mahya/pah (hip) hattı - çatı tipine göre farklı şekil: düzde yok, sundurmada yüksek kenarda,
   // kırmada uçlarda köşelere pah ile kısalır, diğerlerinde (açık beşik/çatı katı) tam ortada.
@@ -342,7 +358,13 @@ function AsikPlaniGorunumu({
           height={scaledGenislik}
           fill="transparent"
           style={{ cursor: "copy" }}
-          onClick={() => onKafesSayisiDegisti!(kafesSayisi + 1)}
+          onClick={(e) => {
+            const { x } = svgKoordDonustur(e);
+            const xMm = Math.round((x - bx0) / scaleBx);
+            if (xMm <= 0 || xMm >= catiUzunluguMm) return;
+            if (kafesPozisyonlari.some((p) => Math.abs(p - xMm) < 10)) return;
+            onKafesPozisyonlariDegisti!([...kafesPozisyonlari, xMm].sort((a, b) => a - b));
+          }}
         >
           <title>Yeni kafes eklemek için tıkla</title>
         </rect>
@@ -369,7 +391,7 @@ function AsikPlaniGorunumu({
             strokeWidth={2.5}
             style={{ pointerEvents: "none" }}
           />
-          {tiklanabilir && kafesSayisi > 2 && (
+          {tiklanabilir && kafesPozisyonlari.length > 2 && (
             <rect
               x={px - 7}
               y={by0}
@@ -381,7 +403,7 @@ function AsikPlaniGorunumu({
               onMouseLeave={() => setHoverIndex(null)}
               onClick={(e) => {
                 e.stopPropagation();
-                onKafesSayisiDegisti!(kafesSayisi - 1);
+                onKafesPozisyonlariDegisti!(kafesPozisyonlari.filter((_, idx) => idx !== i));
                 setHoverIndex(null);
               }}
             >
@@ -408,35 +430,68 @@ function AsikPlaniGorunumu({
   );
 }
 
-/** Çatı kafesinin kesit/aşık planı/3D görünüşlerini, seçilen başlık/aşık profilinin gerçek
+/** Çatı kafesinin kesit/üstten planı/3D görünüşlerini, seçilen başlık/aşık profilinin gerçek
  * ölçüsüyle tutarlı, ölçekli bir çizim olarak gösterir. `duzenlenebilir` verilirse üstten
- * görünüşte boş alana tıklayarak kafes eklenebilir / bir kafese tıklayarak kaldırılabilir
- * (pozisyonlar eşit aralıklı kalır, sadece kafes sayısı değişir). */
+ * görünüşte, tıpkı Çelik Duvar Paneli'nin dikme düzenlemesi gibi, boş alana tıklayarak kafes
+ * eklenebilir, bir kafese tıklayarak kaldırılabilir, ayrıca sayısal bir liste üzerinden
+ * pozisyonlar elle de düzenlenebilir. */
 export default function TrussSchematic({
   veri,
   duzenlenebilir,
-  onKafesSayisiDegisti,
+  onKafesPozisyonlariDegisti,
 }: {
   veri: CatiKafesiSemaVeri;
   duzenlenebilir?: boolean;
-  onKafesSayisiDegisti?: (yeniSayi: number) => void;
+  onKafesPozisyonlariDegisti?: (yeniListe: number[] | null) => void;
 }) {
   const [gorunum, setGorunum] = useState<SemaGorunumTipi>("on");
-  const { acikligMm, catiUzunluguMm, kafesSayisi = 2, gercekAralikMm } = veri;
+  const [listeAcik, setListeAcik] = useState(false);
+  const { acikligMm, catiUzunluguMm, kafesPozisyonlariOverrideMm } = veri;
   if (!acikligMm) return null;
 
-  const editable = Boolean(duzenlenebilir && onKafesSayisiDegisti);
+  const editable = Boolean(duzenlenebilir && onKafesPozisyonlariDegisti);
+  const kafesPozisyonlari = kafesPozisyonHesapla(veri);
+
+  const kafesSil = (index: number) => {
+    if (kafesPozisyonlari.length <= 2) return;
+    onKafesPozisyonlariDegisti!(kafesPozisyonlari.filter((_, i) => i !== index));
+  };
+  const kafesDegistir = (index: number, deger: number) => {
+    const yeni = [...kafesPozisyonlari];
+    yeni[index] = deger;
+    onKafesPozisyonlariDegisti!(yeni);
+  };
 
   return (
     <div>
       <GorunumSekmeleri aktif={gorunum} onSec={setGorunum} secenekler={["on", "ust", "3d"]} />
       {editable && gorunum === "ust" && (
-        <div className="mb-2 text-xs text-neutral-500">
-          💡 Boş alana tıklayarak kafes ekleyebilir, bir kafese tıklayarak kaldırabilirsiniz.
+        <div className="mb-2 space-y-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {kafesPozisyonlariOverrideMm && kafesPozisyonlariOverrideMm.length > 0 && (
+              <button
+                type="button"
+                className="text-brand-700 font-semibold text-xs whitespace-nowrap"
+                onClick={() => onKafesPozisyonlariDegisti!(null)}
+              >
+                ↺ Otomatik yerleşime dön
+              </button>
+            )}
+            <button
+              type="button"
+              className="text-neutral-500 text-xs font-semibold whitespace-nowrap ml-auto"
+              onClick={() => setListeAcik((v) => !v)}
+            >
+              {listeAcik ? "▲" : "▼"} Pozisyonları Listele
+            </button>
+          </div>
+          <div className="text-xs text-neutral-500">
+            💡 Boş alana tıklayarak kafes ekleyebilir, bir kafese tıklayarak kaldırabilirsiniz.
+          </div>
         </div>
       )}
       {gorunum === "on" && <KesitGorunumu veri={veri} />}
-      {gorunum === "ust" && <AsikPlaniGorunumu veri={veri} duzenlenebilir={editable} onKafesSayisiDegisti={onKafesSayisiDegisti} />}
+      {gorunum === "ust" && <AsikPlaniGorunumu veri={veri} duzenlenebilir={editable} onKafesPozisyonlariDegisti={onKafesPozisyonlariDegisti} />}
       {gorunum === "3d" && catiUzunluguMm > 0 && (
         <TrussIsometricView
           veri={{
@@ -445,14 +500,34 @@ export default function TrussSchematic({
             acikligMm,
             egimYuzde: veri.egimYuzde,
             catiUzunluguMm,
-            kafesSayisi,
-            gercekAralikMm: gercekAralikMm ?? catiUzunluguMm,
+            kafesPozisyonlariMm: kafesPozisyonlari,
             asikVar: veri.asikVar,
             asikAraligiHedefMm: veri.asikAraligiHedefMm,
             stabiliteVar: veri.stabiliteVar,
             kaplamaGoster: true,
           }}
         />
+      )}
+
+      {editable && gorunum === "ust" && listeAcik && (
+        <div className="mt-3 rounded-xl border border-neutral-200 p-3">
+          <div className="text-xs font-semibold text-neutral-600 mb-1.5">Kafes Pozisyonları (mm, çatı başından)</div>
+          <div className="space-y-1.5">
+            {kafesPozisyonlari.map((px, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <input type="number" className="field-input text-sm py-1.5" value={px} onChange={(e) => kafesDegistir(i, Number(e.target.value))} />
+                <button
+                  type="button"
+                  className="text-red-600 text-xs font-semibold shrink-0"
+                  disabled={kafesPozisyonlari.length <= 2}
+                  onClick={() => kafesSil(i)}
+                >
+                  Sil
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

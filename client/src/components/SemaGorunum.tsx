@@ -28,13 +28,13 @@ export default function SemaGorunum({
   onKolonSiraAdediDegisti,
   onAcikSayisiDegisti,
   onRafSayisiDegisti,
-  onKafesSayisiDegisti,
+  onKafesPozisyonlariDegisti,
   onDikeyCubukSayisiDegisti,
   onKonteynerDuvarDikmeDegisti,
   onKonteynerDuvarYatayDegisti,
   onKonteynerIcDuvarDikmeDegisti,
   onKonteynerIcDuvarYatayDegisti,
-  onKonteynerCatiKafesSayisiDegisti,
+  onKonteynerCatiKafesPozisyonlariDegisti,
 }: {
   templateKey: string;
   params: Record<string, unknown>;
@@ -53,8 +53,8 @@ export default function SemaGorunum({
   onAcikSayisiDegisti?: (yeniAcikSayisi: number) => void;
   /** "shelf" şablonunda kullanılır: raf sayısını tıklayarak artırma/azaltma. */
   onRafSayisiDegisti?: (yeniSayi: number) => void;
-  /** "truss" şablonunda kullanılır: kafes sayısını tıklayarak artırma/azaltma. */
-  onKafesSayisiDegisti?: (yeniSayi: number) => void;
+  /** "truss" şablonunda kullanılır: kafes pozisyonlarını tıklayarak ekleme/kaldırma. */
+  onKafesPozisyonlariDegisti?: (yeniListe: number[] | null) => void;
   /** "ferforje_panel" şablonunda kullanılır: dikey çubuk sayısını tıklayarak artırma/azaltma. */
   onDikeyCubukSayisiDegisti?: (yeniSayi: number) => void;
   /** "container" şablonunda kullanılır: aktif kat+yön duvarının dikme pozisyonlarını düzenleme. */
@@ -65,8 +65,8 @@ export default function SemaGorunum({
   onKonteynerIcDuvarDikmeDegisti?: (index: number, yeniListe: number[] | null) => void;
   /** "container" şablonunda kullanılır: aktif iç bölme duvarının yatay ara profillerini düzenleme. */
   onKonteynerIcDuvarYatayDegisti?: (index: number, yeniListe: DuvarYatayAraProfilVeri[]) => void;
-  /** "container" şablonunda kullanılır: çatının kafes sayısını tıklayarak artırma/azaltma. */
-  onKonteynerCatiKafesSayisiDegisti?: (yeniSayi: number) => void;
+  /** "container" şablonunda kullanılır: çatının kafes pozisyonlarını tıklayarak ekleme/kaldırma. */
+  onKonteynerCatiKafesPozisyonlariDegisti?: (yeniListe: number[] | null) => void;
 }) {
   const n = (k: string): number => Number(params[k] ?? 0);
   const b = (k: string): boolean => Boolean(params[k]);
@@ -182,6 +182,7 @@ export default function SemaGorunum({
             diyagonalPanelSayisi: ozetDegerler.diyagonalPanelSayisi,
             kafesSayisi: ozetDegerler.kafesSayisi,
             gercekAralikMm: ozetDegerler.gercekAralikMm,
+            kafesPozisyonlariOverrideMm: params.kafesPozisyonlariOverrideMm as number[] | undefined,
             stabiliteVar: Boolean(params.stabiliteBaglantisiVar && params.stabiliteProfilId),
             direkSayisi: Number(params.direkSayisi ?? 0),
             ustBaslikKesit: kesit("ustBaslikProfilId"),
@@ -189,7 +190,7 @@ export default function SemaGorunum({
             asikKesit: kesit("asikProfilId"),
           }}
           duzenlenebilir={duzenlenebilir}
-          onKafesSayisiDegisti={onKafesSayisiDegisti}
+          onKafesPozisyonlariDegisti={onKafesPozisyonlariDegisti}
         />
       );
     case "spiral_stairs":
@@ -343,6 +344,7 @@ export default function SemaGorunum({
             diyagonalPanelSayisi: ozetDegerler.catiDiyagonalPanelSayisi,
             kafesSayisi: ozetDegerler.catiKafesSayisi,
             gercekAralikMm: ozetDegerler.catiGercekAralikMm,
+            kafesPozisyonlariOverrideMm: catiParam("kafesPozisyonlariOverrideMm") as number[] | undefined,
             stabiliteVar: Boolean(catiParam("stabiliteBaglantisiVar") && catiParam("stabiliteProfilId")),
             direkSayisi: Number(catiParam("direkSayisi") ?? 0),
             ustBaslikKesit: kesitOlcusu(catiMatAt("ustBaslikProfilId")),
@@ -362,7 +364,7 @@ export default function SemaGorunum({
           onYatayAraProfilleriDegisti={onKonteynerDuvarYatayDegisti}
           onIcDuvarDikmePozisyonlariDegisti={onKonteynerIcDuvarDikmeDegisti}
           onIcDuvarYatayAraProfilleriDegisti={onKonteynerIcDuvarYatayDegisti}
-          onCatiKafesSayisiDegisti={onKonteynerCatiKafesSayisiDegisti}
+          onCatiKafesPozisyonlariDegisti={onKonteynerCatiKafesPozisyonlariDegisti}
         />
       );
     }

@@ -27,8 +27,9 @@ export interface CatiKafesiGirdi {
   kafesAraligiHedefMm: number;
   /** Üst başlık (eğimli) profil kesiti */
   ustBaslikProfilKey: string;
-  /** Alt başlık (yatay) profil kesiti */
-  altBaslikProfilKey: string;
+  /** Alt başlık (yatay) profil kesiti - opsiyonel; verilmezse alt başlık hiç eklenmez (örn. çatı
+   * doğrudan bir duvar/kolon üstüne oturuyorsa alt başlığa gerek olmayabilir). */
+  altBaslikProfilKey?: string;
   /** Kral kirişi (dikey orta eleman) profil kesiti - opsiyonel */
   kralKirisiProfilKey?: string;
   /** Çapraz destek profil kesiti - opsiyonel */
@@ -77,8 +78,13 @@ export interface CatiKafesiGirdi {
   stabiliteProfilKey?: string;
   /** Kullanıcının şematik üzerinden elle ayarladığı kafes sayısı. Verilirse kafesAraligiHedefMm'den
    * otomatik hesap yerine doğrudan bu sayı kullanılır (kafesler yine eşit aralıklı dağıtılır,
-   * sadece sayı değişir). */
+   * sadece sayı değişir). kafesPozisyonlariOverrideMm verilirse bu alan yok sayılır. */
   kafesSayisiOverride?: number;
+  /** Kullanıcının şematik üzerinden elle (tıklayarak) yerleştirdiği kesin kafes pozisyonları (mm,
+   * çatı uzunluğu ekseninde) - verilirse otomatik eşit aralıklı yerleşim yerine aynen kullanılır
+   * (bkz. wall.ts'deki dikmePozisyonlariMm ile aynı desen). Yapısal sağlamlık kullanıcının
+   * sorumluluğunda; sadece göze çarpan riskleri (uçlarda kafes yokluğu, aşırı boşluk) uyarılır. */
+  kafesPozisyonlariOverrideMm?: number[];
 }
 
 const VARSAYILAN = {
@@ -99,7 +105,7 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
   if (egimYuzde < 0) throw new HesaplamaHatasi("Eğim negatif olamaz.");
   if (catiUzunluguMm <= 0) throw new HesaplamaHatasi("Çatı uzunluğu 0'dan büyük olmalı.");
   if (kafesAraligiHedefMm <= 0) throw new HesaplamaHatasi("Kafesler arası aralık 0'dan büyük olmalı.");
-  if (!ustBaslikProfilKey || !altBaslikProfilKey) throw new HesaplamaHatasi("Üst başlık ve alt başlık profilleri seçilmelidir.");
+  if (!ustBaslikProfilKey) throw new HesaplamaHatasi("Üst başlık profili seçilmelidir.");
 
   const catiTipi = girdi.catiTipi ?? VARSAYILAN.catiTipi;
   const tekEgimliMi = catiTipi === "duz" || catiTipi === "sundurma";
@@ -156,9 +162,34 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
   const ustBaslikUzunlukMm = olukluMu ? temelUstBaslikUzunlukMm - olukMesafesiMm : temelUstBaslikUzunlukMm + cikmaPayiMm;
   if (ustBaslikUzunlukMm <= 0) throw new HesaplamaHatasi("Oluk mesafesi üst başlık uzunluğuna göre çok büyük.");
 
+  const KAFES_EPSILON = 1;
   let araliklarSayisi: number;
   let kafesSayisi: number;
-  if (girdi.kafesSayisiOverride && girdi.kafesSayisiOverride >= 2) {
+  if (girdi.kafesPozisyonlariOverrideMm && girdi.kafesPozisyonlariOverrideMm.length >= 2) {
+    // Kullanıcı şematik üzerinden kafesleri elle düzenlemiş - otomatik eşit aralıklı yerleşim
+    // yerine bu listeyi aynen kullan (sayı ve "ortalama aralık" buradan türetilir).
+    const kafesPozisyonlari = Array.from(new Set(girdi.kafesPozisyonlariOverrideMm.map((x) => Math.round(x)))).sort(
+      (a, b) => a - b
+    );
+    kafesSayisi = kafesPozisyonlari.length;
+    araliklarSayisi = Math.max(1, kafesSayisi - 1);
+
+    if (kafesPozisyonlari[0] > KAFES_EPSILON) {
+      sonuc.uyarilar.push("Çatının bir ucunda kafes yok - sahada kontrol edin.");
+    }
+    if (catiUzunluguMm - kafesPozisyonlari[kafesPozisyonlari.length - 1] > KAFES_EPSILON) {
+      sonuc.uyarilar.push("Çatının diğer ucunda kafes yok - sahada kontrol edin.");
+    }
+    let maksBoslukMm = 0;
+    for (let i = 1; i < kafesPozisyonlari.length; i++) {
+      maksBoslukMm = Math.max(maksBoslukMm, kafesPozisyonlari[i] - kafesPozisyonlari[i - 1]);
+    }
+    if (maksBoslukMm > kafesAraligiHedefMm * 1.5) {
+      sonuc.uyarilar.push(
+        `İki kafes arasında ${maksBoslukMm.toFixed(0)} mm boşluk var, hedeflenen ${Math.round(kafesAraligiHedefMm)} mm aralığı aşıyor.`
+      );
+    }
+  } else if (girdi.kafesSayisiOverride && girdi.kafesSayisiOverride >= 2) {
     kafesSayisi = Math.round(girdi.kafesSayisiOverride);
     araliklarSayisi = kafesSayisi - 1;
   } else {
@@ -181,12 +212,14 @@ export function calculateRoofTruss(girdi: CatiKafesiGirdi): UrunHesapSonucu {
       : "Çatı eğimine göre hesaplanan diyagonal uzunluk.",
   });
 
-  parcalar.push({
-    label: "Alt başlık",
-    profilKey: altBaslikProfilKey,
-    uzunlukMm: Math.round(acikligMm),
-    adet: kafesSayisi,
-  });
+  if (altBaslikProfilKey) {
+    parcalar.push({
+      label: "Alt başlık",
+      profilKey: altBaslikProfilKey,
+      uzunlukMm: Math.round(acikligMm),
+      adet: kafesSayisi,
+    });
+  }
 
   if (girdi.kralKirisiProfilKey) {
     parcalar.push({

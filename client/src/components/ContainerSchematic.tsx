@@ -213,7 +213,7 @@ export default function ContainerSchematic({
   onYatayAraProfilleriDegisti,
   onIcDuvarDikmePozisyonlariDegisti,
   onIcDuvarYatayAraProfilleriDegisti,
-  onCatiKafesSayisiDegisti,
+  onCatiKafesPozisyonlariDegisti,
 }: {
   katSayisi: 1 | 2;
   kat1Duvarlar: Record<KonteynerYon, DuvarPaneliSemaVeri>;
@@ -225,7 +225,7 @@ export default function ContainerSchematic({
   onYatayAraProfilleriDegisti?: (kat: 1 | 2, yon: KonteynerYon, yeniListe: DuvarYatayAraProfilVeri[]) => void;
   onIcDuvarDikmePozisyonlariDegisti?: (index: number, yeniListe: number[] | null) => void;
   onIcDuvarYatayAraProfilleriDegisti?: (index: number, yeniListe: DuvarYatayAraProfilVeri[]) => void;
-  onCatiKafesSayisiDegisti?: (yeniSayi: number) => void;
+  onCatiKafesPozisyonlariDegisti?: (yeniListe: number[] | null) => void;
 }) {
   const [eleman, setEleman] = useState<"duvarlar" | "ic_duvarlar" | "cati" | "3d">("duvarlar");
   const [aktifKat, setAktifKat] = useState<1 | 2>(1);
@@ -335,7 +335,7 @@ export default function ContainerSchematic({
       )}
 
       {eleman === "cati" && cati && (
-        <TrussSchematic veri={cati} duzenlenebilir={duzenlenebilir} onKafesSayisiDegisti={onCatiKafesSayisiDegisti} />
+        <TrussSchematic veri={cati} duzenlenebilir={duzenlenebilir} onKafesPozisyonlariDegisti={onCatiKafesPozisyonlariDegisti} />
       )}
 
       {eleman === "3d" && (

@@ -1,4 +1,4 @@
-import { useState, MouseEvent as ReactMouseEvent } from "react";
+import { useState } from "react";
 import {
   OkTanimlari,
   YatayOlcu,
@@ -11,6 +11,7 @@ import {
   LEGEND_H,
   KesitOlcusu,
   olcekliKalinlikPx,
+  svgKoordDonustur,
   GorunumSekmeleri,
   SemaGorunumTipi,
   Izometrik3DSahne,
@@ -89,19 +90,6 @@ function dikmePozisyonHesapla(veri: DuvarPaneliSemaVeri) {
   }
   dikmePozisyonlari.sort((a, b) => a - b);
   return { gecerliBosluklar, dikmePozisyonlari };
-}
-
-/** Tıklanan noktanın, SVG'nin responsive ölçeklemesinden bağımsız gerçek viewBox koordinatını
- * verir - böylece ekran pikseli değil, çizimin kendi koordinat sistemi kullanılır. */
-function svgKoordDonustur(e: ReactMouseEvent<SVGElement>): { x: number; y: number } {
-  const svg = e.currentTarget.ownerSVGElement ?? (e.currentTarget as unknown as SVGSVGElement);
-  const pt = svg.createSVGPoint();
-  pt.x = e.clientX;
-  pt.y = e.clientY;
-  const ctm = svg.getScreenCTM();
-  if (!ctm) return { x: 0, y: 0 };
-  const loc = pt.matrixTransform(ctm.inverse());
-  return { x: loc.x, y: loc.y };
 }
 
 function OndenGorunum({
