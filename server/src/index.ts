@@ -1,9 +1,12 @@
 import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import path from "path";
 import fs from "fs";
 import { hataMiddleware } from "./lib/errors";
+import { girisGerekli, SESSION_SECRET } from "./lib/auth";
 
+import authRouter from "./routes/auth";
 import customersRouter from "./routes/customers";
 import materialsRouter from "./routes/materials";
 import productTemplatesRouter from "./routes/productTemplates";
@@ -23,6 +26,7 @@ const app = express();
 app.use(cors());
 // AI plan fotoğrafı yüklemeleri base64 olarak JSON gövdesinde gelir; varsayılan 100kb limiti yetersiz.
 app.use(express.json({ limit: "12mb" }));
+app.use(cookieParser(SESSION_SECRET));
 
 // Render, her deploy'da RENDER_GIT_COMMIT ortam değişkenini otomatik ayarlar - hangi commit'in
 // yayında olduğunu görmek için (örn. bir düzeltmenin gerçekten deploy olup olmadığını doğrulamak
@@ -30,6 +34,14 @@ app.use(express.json({ limit: "12mb" }));
 app.get("/api/health", (_req, res) =>
   res.json({ ok: true, commit: process.env.RENDER_GIT_COMMIT ?? null, checkedAt: new Date().toISOString() })
 );
+
+// Girişsiz erişilebilen rotalar: Google ile giriş akışının kendisi ve müşterinin
+// token'la eriştiği teklif onay / iş takip sayfalarının API'leri.
+app.use("/api/auth", authRouter);
+app.use("/api/public", publicRouter);
+
+// Bu satırdan sonraki tüm /api rotaları geçerli oturum çerezi ister.
+app.use("/api", girisGerekli);
 
 app.use("/api/customers", customersRouter);
 app.use("/api/materials", materialsRouter);
@@ -43,7 +55,6 @@ app.use("/api/settings", settingsRouter);
 app.use("/api/ai", aiRouter);
 app.use("/api/workers", workersRouter);
 app.use("/api/notifications", notificationsRouter);
-app.use("/api/public", publicRouter);
 app.use("/api/backup", backupRouter);
 
 // Üretimde (Render vb.) client build'i backend'in kendisinden sun (tek servis, tek URL).

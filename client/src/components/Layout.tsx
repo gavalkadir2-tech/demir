@@ -2,6 +2,11 @@ import { useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import BildirimZili from "./BildirimZili";
 import GlobalArama from "./GlobalArama";
+import { api } from "../api/client";
+
+function cikisYap() {
+  api.post("/auth/logout").finally(() => window.location.reload());
+}
 
 const NAV_ITEMS = [
   { to: "/", label: "Ana Sayfa", emoji: "🏠" },
@@ -87,6 +92,14 @@ export default function Layout() {
           <GlobalArama />
         </div>
         <NavList koyu />
+        <button
+          type="button"
+          onClick={cikisYap}
+          className="mt-auto mx-3 mb-3 flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-neutral-400 hover:bg-neutral-800 hover:text-white transition"
+        >
+          <span className="text-lg leading-none">🚪</span>
+          Çıkış Yap
+        </button>
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
@@ -116,6 +129,11 @@ export default function Layout() {
               </button>
             </div>
             <NavList onNavigate={() => setMenuOpen(false)} />
+            <div className="px-3 pb-3">
+              <button type="button" onClick={cikisYap} className="btn-secondary w-full">
+                🚪 Çıkış Yap
+              </button>
+            </div>
           </div>
         )}
 

@@ -1,5 +1,5 @@
 import { Route, Routes } from "react-router-dom";
-import Layout from "./components/Layout";
+import AuthGate from "./components/AuthGate";
 import Dashboard from "./pages/Dashboard";
 import YeniIs from "./pages/YeniIs";
 import Isler from "./pages/Isler";
@@ -25,7 +25,7 @@ export default function App() {
     <Routes>
       <Route path="/teklif-onay/:token" element={<TeklifOnay />} />
       <Route path="/takip/:token" element={<IsTakip />} />
-      <Route element={<Layout />}>
+      <Route element={<AuthGate />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/yeni-is" element={<YeniIs />} />
         <Route path="/isler" element={<Isler />} />
