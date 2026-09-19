@@ -172,12 +172,11 @@ interface AiIsYorumu {
 
 export default function YeniIs() {
   const [params] = useSearchParams();
-  const navigate = useNavigate();
 
-  // URL'den önceden bir şablon geldiyse (örn. Ürünler sayfasından "Yeni İş" ile), 2. adım
-  // (Ürün Seç) tamamen atlanır - kullanıcı zaten hangi ürünü yapacağını seçmiş demektir.
+  // URL'den önceden bir şablon geldiyse (örn. Ürünler sayfasından "Yeni İş" ile), ürün seçim
+  // bölümü hiç gösterilmez - kullanıcı zaten hangi ürünü yapacağını seçmiş demektir.
   const oncedenSablon = params.get("template");
-  const [adim, setAdim] = useState<1 | 2 | 3>(1);
+  const [adim, setAdim] = useState<1 | 2>(1);
   const [projectId, setProjectId] = useState<number | null>(null);
   const [templateKey, setTemplateKey] = useState<string | null>(oncedenSablon);
   const [aiAlanlar, setAiAlanlar] = useState<Record<string, unknown> | null>(null);
@@ -196,33 +195,13 @@ export default function YeniIs() {
 
   if (adim === 1) {
     return (
-      <IsBilgisiAdimi
-        onDevam={async (id) => {
+      <IsBilgisiVeUrunSecAdimi
+        oncedenSablon={oncedenSablon}
+        onTamam={(id, key, alanlar) => {
           setProjectId(id);
-          if (templateKey) {
-            if (templateKey === "custom") {
-              navigate(`/isler/${id}`);
-              return;
-            }
-            await api.put(`/projects/${id}`, { category: TEMPLATE_KATEGORI[templateKey] ?? "OTHER" }).catch(() => {});
-            setAdim(3);
-          } else {
-            setAdim(2);
-          }
-        }}
-      />
-    );
-  }
-
-  if (adim === 2) {
-    if (!projectId) return <Spinner />;
-    return (
-      <UrunSecAdimi
-        projectId={projectId}
-        onSecildi={(key, alanlar) => {
           setTemplateKey(key);
           if (alanlar) setAiAlanlar(alanlar);
-          setAdim(3);
+          setAdim(2);
         }}
       />
     );
@@ -232,7 +211,7 @@ export default function YeniIs() {
 
   return (
     <div className="space-y-6">
-      <StepHeader adim={3} baslik="Ölçüler ve Malzeme" />
+      <StepHeader adim={2} toplam={2} baslik="Ölçüler ve Malzeme" />
       <UrunFormu
         templateKey={templateKey}
         projectId={projectId}
@@ -246,16 +225,33 @@ export default function YeniIs() {
   );
 }
 
-function StepHeader({ adim, baslik }: { adim: number; baslik: string }) {
+function StepHeader({ adim, toplam, baslik }: { adim: number; toplam: number; baslik: string }) {
   return (
     <div>
-      <div className="text-sm font-semibold text-brand-600">Adım {adim}/3</div>
+      <div className="text-sm font-semibold text-brand-600">
+        Adım {adim}/{toplam}
+      </div>
       <h1 className="text-2xl font-bold">{baslik}</h1>
     </div>
   );
 }
 
-function IsBilgisiAdimi({ onDevam }: { onDevam: (projectId: number) => void }) {
+/** İş Bilgisi (müşteri/iş adı) ve Ürün Seçimi tek adımda birleştirilmiştir - müşteri/başlık +
+ * seçilen ürün türü (kart tıklaması ya da AI/fotoğraf tanıması) birlikte bilinene kadar proje hiç
+ * oluşturulmaz; tüm bilgiler netleşince tek bir POST /projects çağrısıyla (customerId+title+
+ * category) proje oluşturulup bir sonraki adıma geçilir. URL'den önceden bir şablon geldiyse
+ * (örn. Ürünler sayfasından "Yeni İş" ile) AI/ürün kartı bölümü hiç gösterilmez, sadece
+ * müşteri/başlık girilip doğrudan devam edilir. */
+function IsBilgisiVeUrunSecAdimi({
+  oncedenSablon,
+  onTamam,
+}: {
+  oncedenSablon: string | null;
+  onTamam: (projectId: number, templateKey: string, aiAlanlar?: Record<string, unknown>) => void;
+}) {
+  const navigate = useNavigate();
+
+  // İş bilgisi (müşteri/iş adı).
   const [musteriler, setMusteriler] = useState<Customer[] | null>(null);
   const [mod, setMod] = useState<"mevcut" | "yeni">("mevcut");
   const [customerId, setCustomerId] = useState<number | undefined>(undefined);
@@ -263,43 +259,129 @@ function IsBilgisiAdimi({ onDevam }: { onDevam: (projectId: number) => void }) {
   const [yeniTelefon, setYeniTelefon] = useState("");
   const [title, setTitle] = useState("");
   const [hata, setHata] = useState<string | null>(null);
-  const [kaydediliyor, setKaydediliyor] = useState(false);
+  const [devamEdiliyor, setDevamEdiliyor] = useState(false);
+
+  // Ürün seçimi / AI ile hızlı doldurma - oncedenSablon varsa hiç gösterilmez.
+  const [sablonlar, setSablonlar] = useState<ProductTemplate[] | null>(null);
+  const [aiMetin, setAiMetin] = useState("");
+  const [aiCalisiyor, setAiCalisiyor] = useState(false);
+  const [aiSonuc, setAiSonuc] = useState<AiIsYorumu | null>(null);
+  const [fotoOnizlemeUrl, setFotoOnizlemeUrl] = useState<string | null>(null);
+  const [fotoBase64, setFotoBase64] = useState<string | null>(null);
+  const [fotoMimeType, setFotoMimeType] = useState<string | null>(null);
+  const [fotoCalisiyor, setFotoCalisiyor] = useState(false);
 
   useEffect(() => {
     api.get<Customer[]>("/customers").then(setMusteriler);
   }, []);
+  useEffect(() => {
+    if (!oncedenSablon) api.get<ProductTemplate[]>("/product-templates").then(setSablonlar);
+  }, [oncedenSablon]);
 
-  const devam = async () => {
-    if (!title.trim()) return setHata("İş adı zorunlu.");
-    if (mod === "mevcut" && !customerId) return setHata("Müşteri seçin.");
-    if (mod === "yeni" && !yeniAd.trim()) return setHata("Yeni müşteri adı girin.");
+  /** Müşteri/iş adı alanlarını doğrular, "yeni müşteri" modundaysa müşteriyi oluşturur ve
+   * kullanılacak customerId'yi döner - geçersizse null döner (hata zaten set edilmiş olur). */
+  const isBilgisiHazirla = async (): Promise<number | null> => {
+    if (!title.trim()) {
+      setHata("İş adı zorunlu.");
+      return null;
+    }
+    if (mod === "mevcut" && !customerId) {
+      setHata("Müşteri seçin.");
+      return null;
+    }
+    if (mod === "yeni" && !yeniAd.trim()) {
+      setHata("Yeni müşteri adı girin.");
+      return null;
+    }
+    if (mod === "mevcut") return customerId!;
+    const musteri = await api.post<Customer>("/customers", { name: yeniAd, phone: yeniTelefon });
+    return musteri.id;
+  };
 
-    setKaydediliyor(true);
+  /** Seçilen ürün şablonuyla (kart tıklaması ya da AI/fotoğraf sonucu) projeyi tek seferde
+   * (müşteri+başlık+kategori) oluşturup bir sonraki adıma geçer - "custom" için doğrudan iş
+   * detayına yönlendirir. */
+  const projeyiOlusturVeDevamEt = async (templateKey: string, aiAlanlar?: Record<string, unknown>, baslikOverride?: string) => {
     setHata(null);
+    setDevamEdiliyor(true);
     try {
-      let cid = customerId;
-      if (mod === "yeni") {
-        const musteri = await api.post<Customer>("/customers", { name: yeniAd, phone: yeniTelefon });
-        cid = musteri.id;
+      const cid = await isBilgisiHazirla();
+      if (cid === null) return;
+      const proje = await api.post<{ id: number }>("/projects", {
+        customerId: cid,
+        title: baslikOverride ?? title,
+        category: TEMPLATE_KATEGORI[templateKey] ?? "OTHER",
+      });
+      if (templateKey === "custom") {
+        navigate(`/isler/${proje.id}`);
+        return;
       }
-      // Kategori burada sorulmuyor; bir sonraki adımda seçilen/tanınan ürün türünden otomatik
-      // belirlenip projeye işlenecek. Teslim tarihi/öncelik de artık iş oluşturmada sorulmuyor -
-      // gerekirse iş detayından "✏️ Düzenle" ile sonradan girilebilir.
-      const proje = await api.post<{ id: number }>("/projects", { customerId: cid, title });
-      onDevam(proje.id);
+      onTamam(proje.id, templateKey, aiAlanlar);
     } catch (e: any) {
       setHata(e.message);
     } finally {
-      setKaydediliyor(false);
+      setDevamEdiliyor(false);
     }
   };
 
+  const aiIleDoldur = async () => {
+    if (!aiMetin.trim()) return setHata("Önce yapılacak işi anlatın.");
+    setAiCalisiyor(true);
+    setHata(null);
+    setAiSonuc(null);
+    try {
+      const yorum = await api.post<AiIsYorumu>("/ai/is-yorumla", { metin: aiMetin });
+      setAiSonuc(yorum);
+      setTitle(yorum.baslik);
+    } catch (e: any) {
+      setHata(e.message);
+    } finally {
+      setAiCalisiyor(false);
+    }
+  };
+
+  const fotoSec = (dosya: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result);
+      setFotoOnizlemeUrl(dataUrl);
+      setFotoBase64(dataUrl.slice(dataUrl.indexOf(",") + 1));
+      setFotoMimeType(dosya.type);
+    };
+    reader.readAsDataURL(dosya);
+  };
+
+  const fotoIleDoldur = async () => {
+    if (!fotoBase64 || !fotoMimeType) return setHata("Önce bir fotoğraf seçin.");
+    setFotoCalisiyor(true);
+    setHata(null);
+    setAiSonuc(null);
+    try {
+      const yorum = await api.post<AiIsYorumu>("/ai/plan-yorumla", {
+        imageBase64: fotoBase64,
+        mimeType: fotoMimeType,
+        not: aiMetin.trim() || undefined,
+      });
+      setAiSonuc(yorum);
+      setTitle(yorum.baslik);
+    } catch (e: any) {
+      setHata(e.message);
+    } finally {
+      setFotoCalisiyor(false);
+    }
+  };
+
+  const aiSonucuylaDevamEt = () => {
+    if (!aiSonuc) return;
+    projeyiOlusturVeDevamEt(aiSonuc.templateKey, { ...aiSonuc.alanlar, bosluklar: aiSonuc.bosluklar ?? undefined }, aiSonuc.baslik);
+  };
+
   return (
-    <div className="space-y-6 max-w-lg">
-      <StepHeader adim={1} baslik="İş Bilgisi" />
+    <div className="space-y-6 max-w-2xl">
+      <StepHeader adim={1} toplam={2} baslik="İş Bilgisi ve Ürün Seçimi" />
+      <HataKutusu mesaj={hata} />
 
       <div className="card space-y-4">
-        <HataKutusu mesaj={hata} />
         <div>
           <label className="field-label">Müşteri</label>
           <div className="flex gap-2 mb-2">
@@ -335,190 +417,94 @@ function IsBilgisiAdimi({ onDevam }: { onDevam: (projectId: number) => void }) {
           <label className="field-label">İş Adı *</label>
           <input className="field-input" placeholder="örn. Bahçe korkuluğu" value={title} onChange={(e) => setTitle(e.target.value)} />
         </div>
-
-        <button className="btn-primary w-full" onClick={devam} disabled={kaydediliyor}>
-          {kaydediliyor ? "Kaydediliyor..." : "Devam Et →"}
-        </button>
       </div>
-    </div>
-  );
-}
 
-function UrunSecAdimi({
-  projectId,
-  onSecildi,
-}: {
-  projectId: number;
-  onSecildi: (templateKey: string, aiAlanlar?: Record<string, unknown>) => void;
-}) {
-  const navigate = useNavigate();
-  const [sablonlar, setSablonlar] = useState<ProductTemplate[] | null>(null);
-  const [hata, setHata] = useState<string | null>(null);
-
-  const [aiMetin, setAiMetin] = useState("");
-  const [aiCalisiyor, setAiCalisiyor] = useState(false);
-  const [aiSonuc, setAiSonuc] = useState<AiIsYorumu | null>(null);
-
-  const [fotoOnizlemeUrl, setFotoOnizlemeUrl] = useState<string | null>(null);
-  const [fotoBase64, setFotoBase64] = useState<string | null>(null);
-  const [fotoMimeType, setFotoMimeType] = useState<string | null>(null);
-  const [fotoCalisiyor, setFotoCalisiyor] = useState(false);
-  const [devamEdiliyor, setDevamEdiliyor] = useState(false);
-
-  useEffect(() => {
-    api.get<ProductTemplate[]>("/product-templates").then(setSablonlar);
-  }, []);
-
-  const projeyiGuncelle = async (data: Record<string, unknown>) => {
-    try {
-      await api.put(`/projects/${projectId}`, data);
-    } catch {
-      // Kategori/başlık güncellemesi başarısız olsa bile akışı durdurmaya değmez; proje zaten var.
-    }
-  };
-
-  const aiSonucuUygula = async (yorum: AiIsYorumu) => {
-    setAiSonuc(yorum);
-    setDevamEdiliyor(true);
-    await projeyiGuncelle({ title: yorum.baslik, category: TEMPLATE_KATEGORI[yorum.templateKey] ?? "OTHER" });
-    onSecildi(yorum.templateKey, { ...yorum.alanlar, bosluklar: yorum.bosluklar ?? undefined });
-  };
-
-  const aiIleDoldur = async () => {
-    if (!aiMetin.trim()) return setHata("Önce yapılacak işi anlatın.");
-    setAiCalisiyor(true);
-    setHata(null);
-    setAiSonuc(null);
-    try {
-      const yorum = await api.post<AiIsYorumu>("/ai/is-yorumla", { metin: aiMetin });
-      await aiSonucuUygula(yorum);
-    } catch (e: any) {
-      setHata(e.message);
-    } finally {
-      setAiCalisiyor(false);
-    }
-  };
-
-  const fotoSec = (dosya: File) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = String(reader.result);
-      setFotoOnizlemeUrl(dataUrl);
-      setFotoBase64(dataUrl.slice(dataUrl.indexOf(",") + 1));
-      setFotoMimeType(dosya.type);
-    };
-    reader.readAsDataURL(dosya);
-  };
-
-  const fotoIleDoldur = async () => {
-    if (!fotoBase64 || !fotoMimeType) return setHata("Önce bir fotoğraf seçin.");
-    setFotoCalisiyor(true);
-    setHata(null);
-    setAiSonuc(null);
-    try {
-      const yorum = await api.post<AiIsYorumu>("/ai/plan-yorumla", {
-        imageBase64: fotoBase64,
-        mimeType: fotoMimeType,
-        not: aiMetin.trim() || undefined,
-      });
-      await aiSonucuUygula(yorum);
-    } catch (e: any) {
-      setHata(e.message);
-    } finally {
-      setFotoCalisiyor(false);
-    }
-  };
-
-  const urunTiklandi = async (key: string) => {
-    setDevamEdiliyor(true);
-    await projeyiGuncelle({ category: TEMPLATE_KATEGORI[key] ?? "OTHER" });
-    if (key === "custom") {
-      navigate(`/isler/${projectId}`);
-      return;
-    }
-    onSecildi(key);
-  };
-
-  return (
-    <div className="space-y-6">
-      <StepHeader adim={2} baslik="Ürün Seçin" />
-      <HataKutusu mesaj={hata} />
-
-      <div className="card space-y-3 border-2 border-brand-200 bg-brand-50/40">
-        <label className="field-label">🤖 Yapay Zeka ile Hızlı Doldur (opsiyonel)</label>
-        <p className="text-xs text-neutral-500">
-          Yapılacak işi kendi cümlelerinizle anlatın, ürün tipini ve ölçüleri sizin için tahmin edip formu doldursun. Sonuçları
-          mutlaka kontrol edin.
-        </p>
-        <textarea
-          className="field-input"
-          rows={2}
-          placeholder="örn. 3 metre uzunluğunda, 1 metre yüksekliğinde bahçe korkuluğu, ortasında bir ara kayıt olsun"
-          value={aiMetin}
-          onChange={(e) => setAiMetin(e.target.value)}
-        />
-        <button className="btn-secondary w-full" onClick={aiIleDoldur} disabled={aiCalisiyor || devamEdiliyor}>
-          {aiCalisiyor ? "Analiz ediliyor..." : "🤖 AI ile Doldur"}
+      {oncedenSablon ? (
+        <button className="btn-primary w-full" onClick={() => projeyiOlusturVeDevamEt(oncedenSablon)} disabled={devamEdiliyor}>
+          {devamEdiliyor ? "Kaydediliyor..." : "Devam Et →"}
         </button>
+      ) : (
+        <>
+          <div className="card space-y-3 border-2 border-brand-200 bg-brand-50/40">
+            <label className="field-label">🤖 Yapay Zeka ile Hızlı Doldur (opsiyonel)</label>
+            <p className="text-xs text-neutral-500">
+              Yapılacak işi kendi cümlelerinizle anlatın, ürün tipini ve ölçüleri sizin için tahmin edip formu doldursun. Sonuçları
+              mutlaka kontrol edin.
+            </p>
+            <textarea
+              className="field-input"
+              rows={2}
+              placeholder="örn. 3 metre uzunluğunda, 1 metre yüksekliğinde bahçe korkuluğu, ortasında bir ara kayıt olsun"
+              value={aiMetin}
+              onChange={(e) => setAiMetin(e.target.value)}
+            />
+            <button className="btn-secondary w-full" onClick={aiIleDoldur} disabled={aiCalisiyor || devamEdiliyor}>
+              {aiCalisiyor ? "Analiz ediliyor..." : "🤖 AI ile Doldur"}
+            </button>
 
-        <div className="border-t border-brand-200 pt-3 space-y-2">
-          <label className="field-label">📷 Ya da elle çizilmiş bir plan/kroki fotoğrafı yükleyin</label>
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="field-input"
-            onChange={(e) => {
-              const dosya = e.target.files?.[0];
-              if (dosya) fotoSec(dosya);
-            }}
-          />
-          {fotoOnizlemeUrl && (
-            <div className="flex items-center gap-3">
-              <img src={fotoOnizlemeUrl} alt="Yüklenen plan önizlemesi" className="h-20 w-20 object-cover rounded-lg border border-neutral-200" />
-              <button className="btn-secondary btn-sm flex-1" onClick={fotoIleDoldur} disabled={fotoCalisiyor || devamEdiliyor}>
-                {fotoCalisiyor ? "Fotoğraf okunuyor..." : "🤖 Fotoğraftan Doldur"}
-              </button>
+            <div className="border-t border-brand-200 pt-3 space-y-2">
+              <label className="field-label">📷 Ya da elle çizilmiş bir plan/kroki fotoğrafı yükleyin</label>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="field-input"
+                onChange={(e) => {
+                  const dosya = e.target.files?.[0];
+                  if (dosya) fotoSec(dosya);
+                }}
+              />
+              {fotoOnizlemeUrl && (
+                <div className="flex items-center gap-3">
+                  <img src={fotoOnizlemeUrl} alt="Yüklenen plan önizlemesi" className="h-20 w-20 object-cover rounded-lg border border-neutral-200" />
+                  <button className="btn-secondary btn-sm flex-1" onClick={fotoIleDoldur} disabled={fotoCalisiyor || devamEdiliyor}>
+                    {fotoCalisiyor ? "Fotoğraf okunuyor..." : "🤖 Fotoğraftan Doldur"}
+                  </button>
+                </div>
+              )}
+              <p className="text-xs text-neutral-500">
+                Bu gerçek bir lazer ölçüm değildir — sadece fotoğraftaki yazılı ölçüleri/şekli okumaya çalışır. Net olmayan
+                fotoğraflarda sonuç düşük güvenilirlikte olabilir, mutlaka kontrol edin.
+              </p>
+            </div>
+
+            {aiSonuc && (
+              <div className="text-sm space-y-2">
+                <div className="font-semibold text-brand-700">
+                  ✅ "{EMOJI[aiSonuc.templateKey] ?? "🛠️"} {aiSonuc.baslik}" olarak tanındı (güven: {aiSonuc.guven}). Müşteriyi seçip
+                  aşağıdan devam edin.
+                </div>
+                <UyariKutusu mesajlar={aiSonuc.belirsizlikler} />
+                <button className="btn-primary w-full" onClick={aiSonucuylaDevamEt} disabled={devamEdiliyor}>
+                  {devamEdiliyor ? "Kaydediliyor..." : "Bu ürünle devam et →"}
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="text-center text-sm text-neutral-400">— ya da bir ürün seçin —</div>
+
+          {!sablonlar ? (
+            <Spinner />
+          ) : (
+            <div className="grid sm:grid-cols-2 gap-4">
+              {sablonlar.map((s) => (
+                <button
+                  key={s.key}
+                  onClick={() => projeyiOlusturVeDevamEt(s.key)}
+                  disabled={devamEdiliyor}
+                  className="card flex items-center gap-4 hover:shadow-md hover:border-brand-300 text-left disabled:opacity-50"
+                >
+                  <div className="text-4xl">{EMOJI[s.key] ?? "🛠️"}</div>
+                  <div>
+                    <div className="font-bold text-lg">{s.name}</div>
+                    {s.description && <div className="text-sm text-neutral-500">{s.description}</div>}
+                  </div>
+                </button>
+              ))}
             </div>
           )}
-          <p className="text-xs text-neutral-500">
-            Bu gerçek bir lazer ölçüm değildir — sadece fotoğraftaki yazılı ölçüleri/şekli okumaya çalışır. Net olmayan
-            fotoğraflarda sonuç düşük güvenilirlikte olabilir, mutlaka kontrol edin.
-          </p>
-        </div>
-
-        {aiSonuc && (
-          <div className="text-sm space-y-2">
-            <div className="font-semibold text-brand-700">
-              ✅ "{EMOJI[aiSonuc.templateKey] ?? "🛠️"} {aiSonuc.baslik}" olarak dolduruldu (güven: {aiSonuc.guven}). Aşağıdaki
-              adımdaki ölçüleri kontrol edin.
-            </div>
-            <UyariKutusu mesajlar={aiSonuc.belirsizlikler} />
-          </div>
-        )}
-      </div>
-
-      <div className="text-center text-sm text-neutral-400">— ya da bir ürün seçin —</div>
-
-      {!sablonlar ? (
-        <Spinner />
-      ) : (
-        <div className="grid sm:grid-cols-2 gap-4">
-          {sablonlar.map((s) => (
-            <button
-              key={s.key}
-              onClick={() => urunTiklandi(s.key)}
-              disabled={devamEdiliyor}
-              className="card flex items-center gap-4 hover:shadow-md hover:border-brand-300 text-left disabled:opacity-50"
-            >
-              <div className="text-4xl">{EMOJI[s.key] ?? "🛠️"}</div>
-              <div>
-                <div className="font-bold text-lg">{s.name}</div>
-                {s.description && <div className="text-sm text-neutral-500">{s.description}</div>}
-              </div>
-            </button>
-          ))}
-        </div>
+        </>
       )}
     </div>
   );
