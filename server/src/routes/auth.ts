@@ -1,41 +1,22 @@
 import { Router } from "express";
 import { z } from "zod";
-import { OAuth2Client } from "google-auth-library";
-import { asyncHandler, ApiHatasi } from "../lib/errors";
-import { ALLOWED_EMAIL, oturumAyarla, oturumTemizle, oturumEpostasi } from "../lib/auth";
+import { ApiHatasi } from "../lib/errors";
+import { ALLOWED_EMAIL, APP_PASSWORD, oturumAyarla, oturumTemizle, oturumEpostasi } from "../lib/auth";
 
 const router = Router();
 
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const girisSchema = z.object({ email: z.string(), password: z.string() });
 
-const girisSchema = z.object({ credential: z.string().min(1) });
+router.post("/login", (req, res) => {
+  const { email, password } = girisSchema.parse(req.body);
 
-router.post(
-  "/google",
-  asyncHandler(async (req, res) => {
-    if (!process.env.GOOGLE_CLIENT_ID) {
-      throw new ApiHatasi(500, "Sunucuda GOOGLE_CLIENT_ID ayarlanmamış - Google ile giriş kullanılamıyor.");
-    }
-    const { credential } = girisSchema.parse(req.body);
+  if (email.trim().toLowerCase() !== ALLOWED_EMAIL.toLowerCase() || password !== APP_PASSWORD) {
+    throw new ApiHatasi(401, "E-posta veya şifre hatalı.");
+  }
 
-    let ticket;
-    try {
-      ticket = await client.verifyIdToken({ idToken: credential, audience: process.env.GOOGLE_CLIENT_ID });
-    } catch {
-      throw new ApiHatasi(401, "Google kimlik doğrulaması geçersiz.");
-    }
-    const payload = ticket.getPayload();
-    if (!payload?.email || !payload.email_verified) {
-      throw new ApiHatasi(401, "Google hesabı doğrulanamadı.");
-    }
-    if (payload.email.toLowerCase() !== ALLOWED_EMAIL.toLowerCase()) {
-      throw new ApiHatasi(403, "Bu uygulamaya sadece yetkili hesapla giriş yapılabilir.");
-    }
-
-    oturumAyarla(res, ALLOWED_EMAIL);
-    res.json({ email: ALLOWED_EMAIL });
-  })
-);
+  oturumAyarla(res, ALLOWED_EMAIL);
+  res.json({ email: ALLOWED_EMAIL });
+});
 
 router.get("/me", (req, res) => {
   const email = oturumEpostasi(req);

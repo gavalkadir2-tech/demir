@@ -1,7 +1,19 @@
 import { Request, Response, NextFunction } from "express";
 
-/** Bu uygulamaya girişine izin verilen tek Google hesabı. Ortam değişkeniyle geçersiz kılınabilir. */
+/** Bu uygulamaya girişine izin verilen tek e-posta. Ortam değişkeniyle geçersiz kılınabilir. */
 export const ALLOWED_EMAIL = process.env.ALLOWED_EMAIL ?? "gavalkadir2@gmail.com";
+
+// Ortam değişkeniyle ayarlanmazsa varsayılan şifre kullanılır - "şimdi kullanılabilir olsun"
+// isteğiyle hızlıca devreye alınabilsin diye. Render'da APP_PASSWORD ayarlanarak değiştirilmeli.
+export const APP_PASSWORD = (() => {
+  const deger = process.env.APP_PASSWORD;
+  if (deger) return deger;
+  console.warn(
+    "[auth] APP_PASSWORD ortam değişkeni ayarlanmamış - varsayılan şifre kullanılıyor. " +
+      "Render'da APP_PASSWORD ayarlayarak değiştirin."
+  );
+  return "DemirciAtolye2026!";
+})();
 
 export const SESSION_COOKIE = "demirci_session";
 
