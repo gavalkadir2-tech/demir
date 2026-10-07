@@ -8,11 +8,31 @@ export class ApiError extends Error {
   }
 }
 
+// Render'ın ücretsiz planında sunucu bir süre kullanılmadığında uykuya geçer, ilk istek 30-50
+// saniye sürebilir - bu yüzden zaman aşımı süresi buna göre cömert tutuldu. Sınır olmazsa bağlantı
+// koptuğunda/sunucu hiç yanıt vermediğinde istek sonsuza kadar bekler, ekranda hiç hata
+// görünmeden döngüde kalan bir yükleniyor simgesi bırakır.
+const ISTEK_ZAMAN_ASIMI_MS = 45_000;
+
 async function istek<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`/api${path}`, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
-  });
+  const controller = new AbortController();
+  const zamanAsimi = setTimeout(() => controller.abort(), ISTEK_ZAMAN_ASIMI_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(`/api${path}`, {
+      ...init,
+      headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+      signal: controller.signal,
+    });
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") {
+      throw new ApiError(0, "Sunucuya ulaşılamıyor (zaman aşımı). Sunucu uykudan uyanıyor olabilir, birkaç saniye sonra tekrar deneyin.");
+    }
+    throw new ApiError(0, "Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.");
+  } finally {
+    clearTimeout(zamanAsimi);
+  }
 
   if (res.status === 204) return undefined as T;
 
