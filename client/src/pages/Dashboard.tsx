@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { Dashboard as DashboardData, AylikTrendVeri, KategoriKarliligiVeri, EnCokKullanilanMalzeme } from "../api/types";
 import { DURUM_ETIKET, DURUM_RENK, DURUM_SIMGE, KATEGORI_ETIKET } from "../api/types";
-import { Spinner, StatCard, Badge } from "../components/ui";
+import { Spinner, StatCard, Badge, HataKutusu } from "../components/ui";
 import { tl, tarih } from "../lib/format";
 import {
   AylikTrendGrafik,
@@ -106,13 +106,30 @@ export default function Dashboard() {
   const [aiOzet, setAiOzet] = useState<GunlukOzet | null>(null);
   const [aiYukleniyor, setAiYukleniyor] = useState(false);
   const [aiHata, setAiHata] = useState<string | null>(null);
+  const [yukleHatasi, setYukleHatasi] = useState<string | null>(null);
+  const [yenidenDeneSayaci, setYenidenDeneSayaci] = useState(0);
 
   useEffect(() => {
-    api.get<DashboardData>("/dashboard").then(setVeri);
-    api.get<AylikTrendVeri[]>("/dashboard/aylik-trend").then(setTrend);
-    api.get<KategoriKarliligiVeri[]>("/dashboard/kategori-karliligi").then(setKategoriKarliligi);
-    api.get<EnCokKullanilanMalzeme[]>("/dashboard/en-cok-kullanilan-malzemeler").then(setEnCokKullanilan);
-  }, []);
+    setYukleHatasi(null);
+    api
+      .get<DashboardData>("/dashboard")
+      .then(setVeri)
+      .catch((e: any) => setYukleHatasi(e.message ?? "Veriler yüklenemedi."));
+    api.get<AylikTrendVeri[]>("/dashboard/aylik-trend").then(setTrend).catch(() => {});
+    api.get<KategoriKarliligiVeri[]>("/dashboard/kategori-karliligi").then(setKategoriKarliligi).catch(() => {});
+    api.get<EnCokKullanilanMalzeme[]>("/dashboard/en-cok-kullanilan-malzemeler").then(setEnCokKullanilan).catch(() => {});
+  }, [yenidenDeneSayaci]);
+
+  if (yukleHatasi) {
+    return (
+      <div className="space-y-3">
+        <HataKutusu mesaj={yukleHatasi} />
+        <button className="btn-secondary" onClick={() => setYenidenDeneSayaci((n) => n + 1)}>
+          Tekrar Dene
+        </button>
+      </div>
+    );
+  }
 
   if (!veri) return <Spinner />;
 

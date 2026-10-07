@@ -272,10 +272,24 @@ function IsBilgisiVeUrunSecAdimi({
   const [fotoCalisiyor, setFotoCalisiyor] = useState(false);
 
   useEffect(() => {
-    api.get<Customer[]>("/customers").then(setMusteriler);
+    api
+      .get<Customer[]>("/customers")
+      .then(setMusteriler)
+      .catch((e: any) => {
+        setHata(e.message ?? "Müşteriler yüklenemedi.");
+        setMusteriler([]);
+      });
   }, []);
   useEffect(() => {
-    if (!oncedenSablon) api.get<ProductTemplate[]>("/product-templates").then(setSablonlar);
+    if (!oncedenSablon) {
+      api
+        .get<ProductTemplate[]>("/product-templates")
+        .then(setSablonlar)
+        .catch((e: any) => {
+          setHata(e.message ?? "Ürün şablonları yüklenemedi.");
+          setSablonlar([]);
+        });
+    }
   }, [oncedenSablon]);
 
   /** Müşteri/iş adı alanlarını doğrular, "yeni müşteri" modundaysa müşteriyi oluşturur ve
